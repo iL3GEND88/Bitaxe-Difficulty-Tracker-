@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>AxeOS Tracker</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07111f;--surf:#0b1929;--surf2:#0f2035;--bdr:#152d4a;
+  --grn:#22d37a;--red:#f45060;--txt:#f0f8ff;--muted:#8ab4cc;--muted2:#1a3550;
+  --orange:#f7931a;
+}
+html,body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'SF Pro',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* HEADER */
+#hdr{background:linear-gradient(135deg,#0b1929,#071520);border-bottom:1px solid var(--bdr);
+  padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
+.axe{width:36px;height:36px;border-radius:8px;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 18px rgba(247,147,26,.5)}
+#hdr-title{flex:1}
+#hdr-title h1{font-size:1rem;font-weight:700;letter-spacing:.08em}
+#hdr-title p{font-size:.65rem;color:var(--muted);margin-top:1px}
+#refresh-btn{background:transparent;border:1px solid var(--bdr);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:.72rem;cursor:pointer;white-space:nowrap}
+#refresh-btn.spinning .ricon{display:inline-block;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* NAV */
+#nav{display:flex;background:var(--surf);border-bottom:1px solid var(--bdr);position:sticky;top:61px;z-index:99}
+.nav-tab{flex:1;padding:11px 4px;text-align:center;font-size:.68rem;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;transition:all .2s}
+.nav-tab.on{color:var(--orange);border-bottom-color:var(--orange)}
+
+/* MAIN */
+#main{padding:14px;padding-bottom:30px}
+.section{display:none}
+.section.on{display:block}
+
+/* CARD BASE — matches settings style */
+.card{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.card-hdr{padding:12px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px}
+.card-dot{width:8px;height:8px;border-radius:50%;background:var(--muted2);flex-shrink:0;transition:all .3s}
+.card-dot.live{background:var(--grn);box-shadow:0 0 6px var(--grn)}
+.card-dot.err{background:var(--red)}
+.card-ip{font-size:.92rem;font-weight:700;flex:1}
+.card-hr{font-size:.75rem;color:var(--grn);font-weight:600}
+
+/* STAT ROWS */
+.stat-row{display:flex;align-items:center;padding:9px 16px;border-bottom:1px solid var(--muted2);font-size:.8rem}
+.stat-row:last-child{border-bottom:none}
+.stat-lbl{color:var(--muted);width:115px;flex-shrink:0;font-size:.75rem}
+.stat-val{font-weight:600;flex:1}
+.green{color:var(--grn)}
+.red{color:var(--red)}
+.orange{color:var(--orange)}
+
+/* TEMP BARS */
+.temp-section{padding:10px 16px;border-top:1px solid var(--muted2)}
+.temp-sec-lbl{font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.temp-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.temp-row:last-child{margin-bottom:0}
+.temp-lbl{font-size:.7rem;color:var(--muted);width:52px;flex-shrink:0}
+.temp-bar-wrap{flex:1;background:var(--muted2);border-radius:4px;height:6px;overflow:hidden}
+.temp-bar{height:100%;border-radius:4px}
+.temp-val{font-size:.75rem;font-weight:600;width:46px;text-align:right;flex-shrink:0}
+
+/* CHART CARD */
+.chart-card{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.chart-card-hdr{padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.chart-card-title{font-size:.75rem;font-weight:600;display:flex;align-items:center;gap:8px}
+.chart-card-sub{font-size:.62rem;color:var(--muted)}
+.chart-wrap{padding:12px;background:var(--bg)}
+canvas.diff-chart{width:100%;display:block;border-radius:8px}
+
+/* TOP 10 */
+.top10-hdr{padding:12px 16px;border-bottom:1px solid var(--bdr);font-size:.8rem;font-weight:700}
+.top10-row{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--muted2);font-size:.8rem}
+.top10-row:last-child{border-bottom:none}
+.top10-rank{width:28px;text-align:center;flex-shrink:0}
+.top10-diff{flex:1;font-weight:600}
+.top10-meta{font-size:.62rem;color:var(--muted);text-align:right;line-height:1.6}
+.acc{color:var(--grn)}
+
+/* SETTINGS */
+.set-hdr{padding:12px 16px;border-bottom:1px solid var(--bdr);font-size:.8rem;font-weight:700}
+.set-body{padding:14px 16px}
+.set-sec{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--bdr);padding-bottom:5px;margin:4px 0 12px}
+.field-group{margin-bottom:12px}
+.field-lbl{font-size:.67rem;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.field-input{width:100%;background:var(--bg);border:1px solid var(--bdr);color:var(--txt);border-radius:8px;padding:9px 12px;font-size:.88rem;font-family:inherit}
+.field-input:focus{outline:none;border-color:var(--orange)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.toggle-lbl{font-size:.78rem;color:var(--txt)}
+input[type=checkbox].toggle{width:20px;height:20px;accent-color:var(--grn);cursor:pointer}
+.btn-row{display:flex;gap:10px;margin-top:14px}
+.btn-save{flex:1;background:var(--grn);border:none;color:#000;font-weight:700;padding:11px;border-radius:8px;font-size:.78rem;cursor:pointer;font-family:inherit;text-transform:uppercase}
+.btn-restart{flex:1;background:transparent;border:1px solid var(--red);color:var(--red);padding:11px;border-radius:8px;font-size:.78rem;cursor:pointer;font-family:inherit;text-transform:uppercase}
+.set-msg{font-size:.7rem;text-align:center;min-height:18px;margin-top:10px;color:var(--muted)}
+
+.loading{text-align:center;padding:40px;color:var(--muted);font-size:.82rem}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div class="axe">⛏</div>
+  <div id="hdr-title">
+    <h1>AxeOS Tracker</h1>
+    <p id="hdr-sub">Connecting…</p>
+  </div>
+  <button id="btn-donate-mob" onclick="document.getElementById('mob-donate-overlay').style.display='flex'" style="background:transparent;border:1px solid #f7931a;color:#f7931a;font-family:inherit;font-size:.62rem;padding:4px 10px;border-radius:6px;cursor:pointer;letter-spacing:.06em;white-space:nowrap">💛 Donate</button>
+  <button id="refresh-btn" onclick="manualRefresh()"><span class="ricon">↻</span> Refresh</button>
+</div>
+
+<div id="nav">
+  <div class="nav-tab on" onclick="showTab('miners')">⛏ Miners</div>
+  <div class="nav-tab" onclick="showTab('top10')">📋 Session</div>
+  <div class="nav-tab" onclick="showTab('alltime')">⭐ All-Time</div>
+  <div class="nav-tab" onclick="showTab('pool')">⛁ Pool</div>
+  <div class="nav-tab" onclick="showTab('settings')">⚙ Settings</div>
+</div>
+
+<div id="main">
+  <div id="tab-miners" class="section on"><div class="loading">Loading…</div></div>
+  <div id="tab-top10" class="section"><div class="loading">Loading…</div></div>
+  <div id="tab-alltime" class="section"><div class="loading">Loading…</div></div>
+  <div id="tab-pool" class="section"><div class="loading">Loading...</div></div>
+  <div id="tab-settings" class="section"><div class="loading">Loading…</div></div>
+</div>
+
+<script>
+const SERVER = window.location.protocol + '//' + window.location.host;
+const MEDALS = ['🥇','🥈','🥉'];
+const COLORS = ['#f7931a','#38bdf8','#a78bfa','#34d399','#fb7185','#fbbf24','#60a5fa','#f472b6'];
+let minerData = {}, allTimeData = {}, sessionData = {}, minerIPs = [], activeTab = 'miners', refreshing = false, refreshPaused = false;
+
+function fmtD(n){
+  if(!n||isNaN(n)) return '—';
+  if(n>=1e12) return (n/1e12).toFixed(2)+'T';
+  if(n>=1e9)  return (n/1e9).toFixed(2)+'G';
+  if(n>=1e6)  return (n/1e6).toFixed(2)+'M';
+  if(n>=1e3)  return (n/1e3).toFixed(1)+'K';
+  return n.toFixed(1);
+}
+function fmtUp(s){
+  if(!s) return '—';
+  var d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);
+  return d>0?d+'d '+h+'h':h>0?h+'h '+m+'m':m+'m';
+}
+function fmtHR(hr){
+  if(!hr) return '—';
+  return hr>=1000?(hr/1000).toFixed(2)+' TH/s':hr.toFixed(1)+' GH/s';
+}
+function tempColor(v,isVR){
+  if(isVR) return v>80?'var(--red)':v>70?'var(--orange)':'var(--grn)';
+  return v>=70?'var(--red)':v>=65?'var(--orange)':'var(--grn)';
+}
+function hexRgba(h,a){
+  var r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);
+  return 'rgba('+r+','+g+','+b+','+a+')';
+}
+
+// ── Mobile miner color storage ────────────────────────────────────────────────
+var mobileColors = {};
+function loadMobileColors(){
+  try{ var s=localStorage.getItem('mob_colors'); if(s) mobileColors=JSON.parse(s); }catch(e){}
+}
+function saveMobileColors(){
+  try{ localStorage.setItem('mob_colors',JSON.stringify(mobileColors)); }catch(e){}
+}
+function getMinerColor(ip){
+  if(mobileColors[ip]) return mobileColors[ip];
+  return COLORS[minerIPs.indexOf(ip)%COLORS.length];
+}
+function setMinerColor(ip, color){
+  mobileColors[ip]=color;
+  saveMobileColors();
+}
+loadMobileColors();
+
+
+function parseDiffStr(v){
+  if(!v) return 0; if(typeof v==='number') return v;
+  var m=String(v).match(/^([\d.]+)([KMGT]?)$/i); if(!m) return 0;
+  var n=parseFloat(m[1]),s=m[2].toUpperCase();
+  if(s==='T') return n*1e12; if(s==='G') return n*1e9;
+  if(s==='M') return n*1e6; if(s==='K') return n*1e3; return n;
+}
+
+function showTab(name){
+  activeTab = name;
+  document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('on',['miners','top10','alltime','pool','settings'][i]===name));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('on'));
+  document.getElementById('tab-'+name).classList.add('on');
+  if(name==='top10') renderTop10();
+  if(name==='alltime') renderAllTime();
+  if(name==='pool') renderPool();
+  if(name==='settings') renderSettings();
+}
+
+async function loadMiners(){
+  if(minerIPs.length>0) return; // already have miners, don't overwrite
+  try{
+    const r=await fetch(SERVER+'/miners');
+    if(r.ok){
+      const d=await r.json();
+      if(d.ips&&d.ips.length){ minerIPs=d.ips; return; }
+    }
+  }catch(e){}
+  // Fallback: pull IPs from session data or all-time data keys
+  var fromSession=Object.keys(sessionData).filter(function(k){return k&&k!=='undefined';});
+  var fromAllTime=Object.keys(allTimeData).filter(function(k){return k&&k!=='undefined';});
+  if(fromSession.length) minerIPs=fromSession;
+  else if(fromAllTime.length) minerIPs=fromAllTime;
+}
+async function loadAllMinerData(){
+  const results=await Promise.allSettled(minerIPs.map(async ip=>{
+    const r=await fetch(SERVER+'/api?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000)});
+    if(!r.ok) return {ip,error:true};
+    const d=await r.json(); return {ip,...d};
+  }));
+  results.forEach(r=>{if(r.status==='fulfilled'&&r.value) minerData[r.value.ip]=r.value;});
+}
+async function loadAllTime(){
+  try{const r=await fetch(SERVER+'/alltime');if(r.ok) allTimeData=await r.json();}catch(e){}
+}
+async function loadSession(){
+  try{const r=await fetch(SERVER+'/session');if(r.ok) sessionData=await r.json();}catch(e){}
+}
+
+// ── MINERS TAB ────────────────────────────────────────────────────────────────
+function renderMiners(){
+  var c=document.getElementById('tab-miners');
+  if(!minerIPs.length){c.innerHTML='<div class="loading">No miners configured</div>';return;}
+  c.innerHTML='';
+  var totalShares=0, globalBest=0;
+
+  // Add Miner button card
+  var addCard=document.createElement('div'); addCard.className='card';
+  addCard.style.marginBottom='14px';
+  addCard.innerHTML='<div style="padding:14px 16px">'+
+    '<div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Add Miner</div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<input id="mob-add-ip" type="text" inputmode="decimal" placeholder="192.168.1.100" '+
+        'style="flex:1;background:var(--bg);border:1px solid var(--bdr);color:var(--txt);'+
+        'border-radius:8px;padding:9px 12px;font-size:.88rem;font-family:inherit">'+
+      '<button onclick="mobAddMiner()" '+
+        'style="background:var(--orange);border:none;color:#000;font-weight:700;'+
+        'padding:9px 16px;border-radius:8px;font-size:.82rem;cursor:pointer;white-space:nowrap">+ Add</button>'+
+    '</div>'+
+    '<div id="mob-add-msg" style="font-size:.7rem;color:var(--muted);min-height:16px;margin-top:6px"></div>'+
+  '</div>';
+  c.appendChild(addCard);
+
+  // Total hashrate summary card
+  var totalHR=0;
+  minerIPs.forEach(function(ip){
+    var sd=sessionData[ip]||{};
+    var d=minerData[ip]||{};
+    var hr=sd.hashrate!=null?sd.hashrate:(d.hashRate_1m||d.hashRate||0);
+    totalHR+=hr;
+  });
+  if(minerIPs.length>1){
+    var sumCard=document.createElement('div'); sumCard.className='card';
+    sumCard.style.marginBottom='14px';
+    sumCard.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">'+
+      '<div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Total Hashrate</div>'+
+      '<div style="font-size:1.1rem;font-weight:700;color:var(--grn)" id="mob-totalhr">'+
+        (totalHR>=1000?(totalHR/1000).toFixed(2)+' TH/s':totalHR.toFixed(1)+' GH/s')+
+      '</div></div>';
+    c.appendChild(sumCard);
+  }
+
+  minerIPs.forEach(function(ip){
+    var d=minerData[ip]||{};
+    var key=ip.replace(/[.]/g,'_');
+    var isLive=(d.hashRate_1m>0)||(d.hashRate>0);
+    var hr=d.hashRate_1m||d.hashRate||0;
+    var color=getMinerColor(ip);
+    totalShares+=d.sharesAccepted||0;
+    var best=parseDiffStr(d.bestDiff)||0;
+    if(best>globalBest) globalBest=best;
+    var rej=d.sharesRejected||0, tot=d.sharesAccepted||0;
+    var rejStr=tot>0?rej+' ('+(rej/tot*100).toFixed(2)+'%)':String(rej);
+
+    // ── Stats card ────────────────────────────────────────────────────────────
+    var card=document.createElement('div'); card.className='card';
+    card.style.borderLeft='3px solid '+(isLive?color:'var(--muted2)');
+
+    var hdr=document.createElement('div'); hdr.className='card-hdr';
+    var dotEl=document.createElement('div'); dotEl.id='dot-'+key; dotEl.className='card-dot'+(isLive?' live':d.error?' err':'');
+    var ipEl=document.createElement('div'); ipEl.className='card-ip'; ipEl.style.color=color; ipEl.style.flex='1'; ipEl.textContent=ip;
+    var hrEl=document.createElement('div'); hrEl.className='card-hr'; hrEl.id='hrbadge-'+key; hrEl.textContent=fmtHR(winHR);
+    var rmEl=document.createElement('button'); rmEl.dataset.ip=ip;
+    rmEl.style.cssText='background:transparent;border:none;color:var(--muted);font-size:1rem;cursor:pointer;padding:0 2px 0 8px;flex-shrink:0';
+    rmEl.textContent='✕';
+    rmEl.onclick=function(e){e.stopPropagation();mobRemoveMiner(this.dataset.ip);};
+    var clbl=document.createElement('label'); clbl.style.cssText='display:flex;align-items:center;cursor:pointer;margin-left:8px';
+    var swatch=document.createElement('div'); swatch.style.cssText='width:18px;height:18px;border-radius:50%;background:'+color+';border:2px solid rgba(255,255,255,0.3);flex-shrink:0';
+    var cpick=document.createElement('input'); cpick.type='color'; cpick.value=color.length===7?color:'#f7931a';
+    cpick.style.cssText='position:absolute;opacity:0;width:0;height:0';
+    cpick.dataset.ip=ip;
+    cpick.onfocus=function(){ refreshPaused=true; };
+    cpick.onchange=function(){ setMinerColor(this.dataset.ip,this.value); };
+    cpick.onblur=function(){ refreshPaused=false; refreshing=false; manualRefresh(); };
+    clbl.appendChild(swatch); clbl.appendChild(cpick);
+    hdr.appendChild(dotEl); hdr.appendChild(ipEl); hdr.appendChild(hrEl); hdr.appendChild(rmEl); hdr.appendChild(clbl);
+    card.appendChild(hdr);
+
+    // Avg/share calculation
+    var avgStr='—';
+    // Can't calc from API alone, show last diff and target like windows
+    var lastDiff=d.bestSessionDiff?fmtD(parseDiffStr(d.bestSessionDiff)):'—';
+    // Avg/share from Windows session data
+    var avgStr=(sessionData[ip]&&sessionData[ip].avgShare)?sessionData[ip].avgShare:'—';
+    // Prefer session data from Windows for live stats
+    var sd=sessionData[ip]||{};
+    var winHR=sd.hashrate!=null?sd.hashrate:hr;
+    var winShares=sd.shares!=null?sd.shares:(d.sharesAccepted!=null?d.sharesAccepted:null);
+    var winRej=sd.rejected!=null?sd.rejected:(d.sharesRejected||0);
+    var winBest=sd.bestDiff!=null?sd.bestDiff:d.bestDiff;
+    var winSess=sd.sessionBest!=null?sd.sessionBest:d.bestSessionDiff;
+    var winUp=sd.uptime!=null?sd.uptime:d.uptimeSeconds;
+    var winStatus=sd.status!=null?sd.status:(isLive?'Live':'Offline');
+    var winIsLive=winStatus==='Live';
+    var winLast=sd.lastDiff!=null?fmtD(sd.lastDiff):'—';
+    var winRejPct=winShares>0?((winRej/winShares)*100).toFixed(2):'0.00';
+    var winRejStr=winShares>0?winRej+' ('+winRejPct+'%)':String(winRej);
+    var rows=[
+      ['All-Time Best',  fmtD(parseDiffStr(winBest)), 'orange'],
+      ['Session Best',   fmtD(parseDiffStr(winSess)), ''],
+      ['Status',         (winIsLive?'Live':'Offline')+(winUp?' ('+fmtUp(winUp)+')':''), winIsLive?'green':'red'],
+      ['Shares',         winShares!=null?winShares:'—', 'green'],
+      ['Rej',            winRejStr, 'red'],
+      ['Avg/share',      avgStr, ''],
+      ['HR',             fmtHR(winHR), 'green'],
+      ['Last',           winLast, ''],
+      ['Frequency',      d.frequency?d.frequency+' MHz':'—', ''],
+      ['Voltage',        d.coreVoltage?d.coreVoltage+' mV':'—', ''],
+      ['Fan Speed',      d.fanspeed!=null?Math.round(d.fanspeed)+'%':(d.autofanspeed?'Auto':'—'), ''],
+    ];
+    var rowKeys=['atbest','sessbest','status','shares','rej','avg','hr','last','freq','volt','fan'];
+    rows.forEach(function(row,ri){
+      var r=document.createElement('div'); r.className='stat-row';
+      var rk=rowKeys[ri]||('r'+ri);
+      r.innerHTML='<div class="stat-lbl">'+row[0]+'</div>'+
+        '<div class="stat-val'+(row[2]?' '+row[2]:'')+'" id="sv-'+key+'-'+rk+'">'+row[1]+'</div>';
+      card.appendChild(r);
+    });
+
+    // Temps
+    // Use temps from Windows session data if available, fallback to API
+    var sd2=sessionData[ip]||{};
+    var temps=[];
+    if(sd2.temps&&sd2.temps.length){
+      temps=sd2.temps; // already formatted as [{label,val}]
+    } else {
+      if(d.temp>0) temps.push({label:'ASIC 1',val:d.temp,isVR:false});
+      for(var i=2;i<=8;i++){if(d['temp'+i]>0) temps.push({label:'ASIC '+i,val:d['temp'+i],isVR:false});}
+      if(d.vrTemp>0) temps.push({label:'VR',val:d.vrTemp,isVR:true});
+    }
+    // Normalize - add isVR if missing
+    temps=temps.map(function(t){return {label:t.label,val:t.val,isVR:t.isVR||(t.label==='VR')};});
+    if(temps.length){
+      var ts=document.createElement('div'); ts.className='temp-section';
+      ts.innerHTML='<div class="temp-sec-lbl">Temperatures</div>';
+      temps.forEach(function(t){
+        var tc=tempColor(t.val,t.isVR);
+        var pct=Math.min(100,(t.val/85)*100);
+        var tkey3=key+'_'+t.label.replace(/ /g,'_');
+      ts.innerHTML+='<div class="temp-row">'+
+          '<div class="temp-lbl">'+t.label+'</div>'+
+          '<div class="temp-bar-wrap"><div class="temp-bar" id="tbar-'+tkey3+'" style="width:'+pct+'%;background:'+tc+'"></div></div>'+
+          '<div class="temp-val" id="tval-'+tkey3+'" style="color:'+tc+'">'+t.val.toFixed(1)+'°</div>'+
+          '</div>';
+      });
+      card.appendChild(ts);
+    }
+
+    c.appendChild(card);
+  });
+
+  // ── All charts below all stats ────────────────────────────────────────────
+  // ── Difficulty Charts ──────────────────────────────────────────────────────
+  var diffHdr=document.createElement('div');
+  diffHdr.style.cssText='font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:4px 0 10px 0;padding-left:2px';
+  diffHdr.textContent='Difficulty Charts';
+  c.appendChild(diffHdr);
+
+  minerIPs.forEach(function(ip){
+    var color=getMinerColor(ip);
+    var chartCard=document.createElement('div'); chartCard.className='chart-card';
+    var chartHdr2=document.createElement('div'); chartHdr2.className='chart-card-hdr';
+    chartHdr2.innerHTML='<div class="chart-card-title">'+
+      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+color+'"></span>'+
+      ' '+ip+' — Difficulty</div>'+
+      '<div class="chart-card-sub">Last 60 shares</div>';
+    chartCard.appendChild(chartHdr2);
+    var chartWrap=document.createElement('div'); chartWrap.className='chart-wrap';
+    var canvas=document.createElement('canvas'); canvas.className='diff-chart';
+    canvas.id='chart-'+ip.replace(/\./g,'_'); canvas.height=120;
+    chartWrap.appendChild(canvas);
+    chartCard.appendChild(chartWrap);
+    c.appendChild(chartCard);
+    setTimeout(function(){ drawDiffChart(ip, color); }, 80);
+  });
+
+  // ── Hashrate / Temp Charts ─────────────────────────────────────────────────
+  var hashHdr=document.createElement('div');
+  hashHdr.style.cssText='font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 10px 0;padding-left:2px';
+  hashHdr.textContent='Hashrate / Temp Charts';
+  c.appendChild(hashHdr);
+
+  minerIPs.forEach(function(ip){
+    var color=getMinerColor(ip);
+    var hcard=document.createElement('div'); hcard.className='chart-card';
+    var hhdr=document.createElement('div'); hhdr.className='chart-card-hdr';
+    hhdr.innerHTML='<div class="chart-card-title">'+
+      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+color+'"></span>'+
+      ' '+ip+' — Hashrate &amp; Temp</div>'+
+      '<div class="chart-card-sub">Last 200 samples</div>';
+    hcard.appendChild(hhdr);
+    var hwrap=document.createElement('div'); hwrap.className='chart-wrap';
+    var hcanvas=document.createElement('canvas'); hcanvas.className='diff-chart';
+    hcanvas.id='hchart-'+ip.replace(/\./g,'_'); hcanvas.height=140;
+    hwrap.appendChild(hcanvas);
+    hcard.appendChild(hwrap);
+    c.appendChild(hcard);
+    setTimeout(function(){ drawHashTempChart(ip, color); }, 100);
+  });
+
+  // Update header
+  document.getElementById('hdr-sub').textContent=minerIPs.length+' miner'+(minerIPs.length!==1?'s':'')+' • '+
+    new Date().toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit'});
+}
+
+
+function drawHashTempChart(ip, color){
+  var key=ip.replace(/\./g,'_');
+  var canvas=document.getElementById('hchart-'+key);
+  if(!canvas) return;
+  var sd=sessionData[ip]||{};
+  var data=(sd.hashSeries||[]);
+  var dpr=devicePixelRatio||1;
+  var W=canvas.offsetWidth*dpr||600;
+  var H=140*dpr;
+  canvas.width=W; canvas.height=H;
+  var ctx=canvas.getContext('2d');
+  ctx.fillStyle='#07111f'; ctx.fillRect(0,0,W,H);
+
+  if(!data.length){
+    ctx.fillStyle='#8ab4cc';
+    ctx.font=(11*dpr)+'px -apple-system,sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('No hashrate data yet',W/2,H/2);
+    return;
+  }
+
+  var hrVals=data.map(function(p){return p.hr;}).filter(function(v){return v>0;});
+  if(!hrVals.length) return;
+  var hrMin=Math.min.apply(null,hrVals)*0.97, hrMax=Math.max.apply(null,hrVals)*1.03;
+  if(hrMin===hrMax){hrMin*=0.95;hrMax*=1.05;}
+
+  var tempVals=data.flatMap?data.flatMap(function(p){return (p.temps||[]).map(function(t){return t.val;});}):[];
+  var tMin=tempVals.length?Math.min.apply(null,tempVals)-3:40;
+  var tMax=tempVals.length?Math.max.apply(null,tempVals)+3:100;
+
+  var PL=44*dpr, PR=36*dpr, PT=10*dpr, PB=10*dpr;
+  var CW=W-PL-PR, CH=H-PT-PB;
+  var xOf=function(i){return PL+(i/(data.length-1||1))*CW;};
+  var yHr=function(v){return PT+CH-((v-hrMin)/(hrMax-hrMin))*CH;};
+  var yT=function(v){return PT+CH-((v-tMin)/(tMax-tMin))*CH;};
+
+  // Grid lines + Y labels
+  ctx.font=(9*dpr)+'px -apple-system,sans-serif';
+  [0,0.5,1].forEach(function(f){
+    var hrV=hrMin+f*(hrMax-hrMin), y=yHr(hrV);
+    ctx.strokeStyle='#1a3550'; ctx.lineWidth=0.5;
+    ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(W-PR,y); ctx.stroke();
+    ctx.fillStyle='#8ab4cc'; ctx.textAlign='right';
+    ctx.fillText(hrV>=1000?(hrV/1000).toFixed(1)+'T':hrV.toFixed(0)+'G', PL-3*dpr, y+3*dpr);
+    var tV=tMin+f*(tMax-tMin);
+    ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.textAlign='left';
+    ctx.fillText(tV.toFixed(0)+'°', W-PR+3*dpr, y+3*dpr);
+  });
+
+  // Hashrate fill + line
+  ctx.beginPath();
+  data.forEach(function(p,i){var x=xOf(i),y=yHr(p.hr);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.lineTo(xOf(data.length-1),PT+CH); ctx.lineTo(xOf(0),PT+CH); ctx.closePath();
+  ctx.fillStyle=hexRgba(color,0.15); ctx.fill();
+  ctx.beginPath(); ctx.lineWidth=2*dpr; ctx.strokeStyle=color;
+  data.forEach(function(p,i){var x=xOf(i),y=yHr(p.hr);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.stroke();
+
+  // Temp lines - colored by value like Windows
+  var tempLabels=data[0]&&data[0].temps?data[0].temps.map(function(t){return t.label;}):[];
+  tempLabels.forEach(function(lbl,li){
+    ctx.beginPath(); ctx.lineWidth=1.5*dpr;
+    var drawn=false;
+    data.forEach(function(p,i){
+      if(!p.temps||!p.temps[li]) return;
+      var tv=p.temps[li].val;
+      var isVR=lbl==='VR';
+      var tc=isVR?(tv>80?'#f45060':tv>70?'#f7931a':'#22d37a'):(tv>=70?'#f45060':tv>=65?'#f7931a':'#22d37a');
+      ctx.strokeStyle=tc;
+      if(!drawn){ctx.moveTo(xOf(i),yT(tv));drawn=true;}
+      else ctx.lineTo(xOf(i),yT(tv));
+    });
+    ctx.stroke();
+  });
+
+  // Border
+  ctx.strokeStyle='#152d4a'; ctx.lineWidth=1; ctx.strokeRect(PL,PT,CW,CH);
+}
+
+function drawDiffChart(ip, color){
+  var key=ip.replace(/\./g,'_');
+  var canvas=document.getElementById('chart-'+key);
+  if(!canvas) return;
+  // Use live session series from Windows (time ordered), fall back to alltime
+  var sd=sessionData[ip]||{};
+  var data=[];
+  if(sd.series&&sd.series.length){
+    data=sd.series.slice(-60); // already time ordered from Windows
+  } else {
+    var raw=(allTimeData[ip]||[]).slice();
+    raw.sort(function(a,b){return (a.ts||0)-(b.ts||0);});
+    data=raw.slice(-60);
+  }
+  var dpr=devicePixelRatio||1;
+  var W=canvas.offsetWidth*dpr||600;
+  var H=130*dpr;
+  canvas.width=W; canvas.height=H;
+  var ctx=canvas.getContext('2d');
+  ctx.fillStyle='#07111f'; ctx.fillRect(0,0,W,H);
+
+  if(!data.length){
+    ctx.fillStyle='#8ab4cc';
+    ctx.font=(11*dpr)+'px -apple-system,sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('No data yet — shares will appear here',W/2,H/2);
+    return;
+  }
+
+  var vals=data.map(function(p){return p.found;});
+  var mn=Math.min.apply(null,vals)*0.9;
+  var mx=Math.max.apply(null,vals)*1.1;
+  if(mn===mx){mn*=0.9;mx*=1.1;}
+
+  // Padding for Y labels on left
+  var PL=48*dpr, PR=6*dpr, PT=8*dpr, PB=8*dpr;
+  var CW=W-PL-PR, CH=H-PT-PB;
+  var xOf=function(i){return PL+(i/(data.length-1||1))*CW;};
+  var yOf=function(v){return PT+CH-((v-mn)/(mx-mn))*CH;};
+
+  // Y axis labels (3 levels: min, mid, max)
+  ctx.font=(10*dpr)+'px -apple-system,sans-serif';
+  ctx.textAlign='right';
+  var yLevels=[mn, mn+(mx-mn)*0.5, mx];
+  yLevels.forEach(function(v){
+    var y=yOf(v);
+    ctx.fillStyle='#1a3550';
+    ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(W-PR,y); ctx.stroke();
+    ctx.fillStyle='#8ab4cc';
+    ctx.fillText(fmtD(v), PL-4*dpr, y+4*dpr);
+  });
+
+  // Grid line style
+  ctx.strokeStyle='#1a3550'; ctx.lineWidth=0.5;
+  yLevels.forEach(function(v){
+    var y=yOf(v);
+    ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(W-PR,y); ctx.stroke();
+  });
+
+  // Fill under line
+  ctx.beginPath();
+  data.forEach(function(p,i){var x=xOf(i),y=yOf(p.found);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.lineTo(xOf(data.length-1),PT+CH); ctx.lineTo(xOf(0),PT+CH); ctx.closePath();
+  ctx.fillStyle=hexRgba(color,0.15); ctx.fill();
+
+  // Line
+  ctx.beginPath(); ctx.lineWidth=2*dpr; ctx.strokeStyle=color;
+  data.forEach(function(p,i){var x=xOf(i),y=yOf(p.found);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.stroke();
+
+  // Dots
+  var step=Math.max(1,Math.floor(data.length/12));
+  data.forEach(function(p,i){
+    if(i%step===0||i===data.length-1){
+      ctx.beginPath();
+      ctx.arc(xOf(i),yOf(p.found),3.5*dpr,0,Math.PI*2);
+      ctx.fillStyle=p.accepted?'#22d37a':color;
+      ctx.fill();
+    }
+  });
+}
+
+
+// ── SESSION TOP 10 TAB (best shares from current session via alltime) ─────────
+function renderTop10(){
+  var c=document.getElementById('tab-top10');
+  // Selector header
+  var existing=document.getElementById('top10-topn-bar');
+  if(!existing){
+    var bar=document.createElement('div');
+    bar.id='top10-topn-bar';
+    bar.style.cssText='display:flex;gap:8px;align-items:center;margin-bottom:12px';
+    bar.innerHTML='<span style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Show:</span>';
+    [10,25,50,100].forEach(function(n){
+      var btn=document.createElement('button');
+      btn.textContent=n;
+      btn.dataset.n=n;
+      btn.style.cssText='background:'+(mobTopN===n?'var(--orange)':'var(--surf2)')+';border:1px solid '+(mobTopN===n?'var(--orange)':'var(--bdr)')+';color:'+(mobTopN===n?'#000':'#e8f4ff')+';font-family:inherit;font-size:.72rem;padding:4px 12px;border-radius:6px;cursor:pointer';
+      btn.onclick=function(){mobTopN=parseInt(this.dataset.n);renderTop10();};
+      bar.appendChild(btn);
+    });
+    c.innerHTML='';
+    c.appendChild(bar);
+  } else {
+    // Update button styles
+    document.querySelectorAll('#top10-topn-bar button').forEach(function(btn){
+      var n=parseInt(btn.dataset.n);
+      btn.style.background=mobTopN===n?'var(--orange)':'var(--surf2)';
+      btn.style.borderColor=mobTopN===n?'var(--orange)':'var(--bdr)';
+      btn.style.color=mobTopN===n?'#000':'#e8f4ff';
+    });
+    // Remove old cards but keep bar
+    var children=Array.from(c.children);
+    children.forEach(function(ch){ if(ch.id!=='top10-topn-bar') c.removeChild(ch); });
+  }
+  var sessionIPs=Object.keys(sessionData).filter(function(ip){return ip&&ip!=='undefined';});
+  if(!sessionIPs.length){
+    var nd=document.createElement('div');nd.className='loading';
+    nd.textContent='No session data yet — open Windows app';
+    c.appendChild(nd); return;
+  }
+  sessionIPs.forEach(function(ip){
+    var color=getMinerColor(ip);
+    // Use live session top10 from Windows app
+    var entries=(sessionData[ip]&&sessionData[ip].top10)?sessionData[ip].top10.slice(0,mobTopN):[];
+    var card=document.createElement('div'); card.className='card';
+    card.innerHTML='<div class="top10-hdr" style="color:'+color+'">▸ '+ip+'</div>'+
+      (entries.length?entries.map(function(e,i){
+        return '<div class="top10-row">'+
+          '<div class="top10-rank">'+(i<3?MEDALS[i]:i+1)+'</div>'+
+          '<div class="top10-diff" style="color:'+color+'">'+fmtD(e.found)+'</div>'+
+          '<div class="top10-meta">'+
+            '<div class="'+(e.accepted?'acc':'')+'">'+( e.accepted?'✓':'✗')+'</div>'+
+            '<div>'+(e.ts?new Date(e.ts).toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit'}):'—')+'</div>'+
+          '</div></div>';
+      }).join(''):'<div class="top10-row"><div style="color:var(--muted);font-size:.78rem;padding:4px 0">No session data yet — open Windows app</div></div>');
+    c.appendChild(card);
+  });
+}
+
+// ── ALL-TIME TOP 10 TAB ───────────────────────────────────────────────────────
+var mobAllTimeN=10;
+function renderAllTime(){
+  var c=document.getElementById('tab-alltime');
+  var ips=Object.keys(allTimeData).filter(function(ip){return allTimeData[ip]&&allTimeData[ip].length;});
+  // Selector bar
+  var existBar=document.getElementById('alltime-topn-bar');
+  if(!existBar){
+    var bar2=document.createElement('div');
+    bar2.id='alltime-topn-bar';
+    bar2.style.cssText='display:flex;gap:8px;align-items:center;margin-bottom:12px';
+    bar2.innerHTML='<span style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Show:</span>';
+    [10,25,50,100].forEach(function(n){
+      var btn=document.createElement('button');
+      btn.textContent=n;btn.dataset.n=n;
+      btn.style.cssText='background:'+(mobAllTimeN===n?'var(--orange)':'var(--surf2)')+';border:1px solid '+(mobAllTimeN===n?'var(--orange)':'var(--bdr)')+';color:'+(mobAllTimeN===n?'#000':'#e8f4ff')+';font-family:inherit;font-size:.72rem;padding:4px 12px;border-radius:6px;cursor:pointer';
+      btn.onclick=function(){mobAllTimeN=parseInt(this.dataset.n);renderAllTime();};
+      bar2.appendChild(btn);
+    });
+    c.innerHTML='';c.appendChild(bar2);
+  } else {
+    document.querySelectorAll('#alltime-topn-bar button').forEach(function(btn){
+      var n=parseInt(btn.dataset.n);
+      btn.style.background=mobAllTimeN===n?'var(--orange)':'var(--surf2)';
+      btn.style.borderColor=mobAllTimeN===n?'var(--orange)':'var(--bdr)';
+      btn.style.color=mobAllTimeN===n?'#000':'#e8f4ff';
+    });
+    var ch2=Array.from(c.children);
+    ch2.forEach(function(ch){ if(ch.id!=='alltime-topn-bar') c.removeChild(ch); });
+  }
+  if(!ips.length){
+    var nd=document.createElement('div');nd.className='loading';nd.textContent='No all-time data yet';
+    c.appendChild(nd);return;
+  }
+  ips.forEach(function(ip){
+    var color=getMinerColor(ip);
+    var entries=(allTimeData[ip]||[]).slice(0,mobAllTimeN);
+    var total=(allTimeData[ip]||[]).length;
+    var card=document.createElement('div'); card.className='card';
+    // Summary bar
+    var summ='<div style="padding:8px 16px;border-bottom:1px solid var(--muted2);font-size:.72rem;color:var(--muted)">'+
+      'Best: <span style="color:'+color+';font-weight:700">'+fmtD(entries[0]?entries[0].found:0)+'</span>'+
+      ' &nbsp; Total recorded: <span style="color:var(--txt)">'+total+'</span></div>';
+    card.innerHTML='<div class="top10-hdr" style="color:'+color+'">▸ '+ip+'</div>'+summ+
+      entries.map(function(e,i){
+        return '<div class="top10-row">'+
+          '<div class="top10-rank">'+(i<3?MEDALS[i]:i+1)+'</div>'+
+          '<div class="top10-diff" style="color:'+color+'">'+fmtD(e.found)+'</div>'+
+          '<div class="top10-meta">'+
+            '<div class="'+(e.accepted||e.fromAxeOS?'acc':'')+'">'+
+              (e.fromAxeOS?'<span style="color:#38bdf8">AxeOS</span>':e.accepted?'✓':'✗')+'</div>'+
+            '<div>'+(e.ts?new Date(e.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}):'—')+'</div>'+
+          '</div></div>';
+      }).join('');
+    c.appendChild(card);
+  });
+}
+
+
+// POOL TAB
+async function renderPool(){
+  var c=document.getElementById('tab-pool');
+  c.innerHTML='';
+  if(!minerIPs.length){c.innerHTML='<div class="loading">No miners configured</div>';return;}
+  for(var pi=0;pi<minerIPs.length;pi++){
+    (function(ip){
+      var d=minerData[ip]||{};
+      var color=getMinerColor(ip);
+      var key=ip.replace(/[.]/g,'_');
+      var card=document.createElement('div'); card.className='card';
+      var hd=document.createElement('div'); hd.className='set-hdr'; hd.style.color=color; hd.textContent='> '+ip;
+      card.appendChild(hd);
+      var bd=document.createElement('div'); bd.className='set-body';
+      var ss='font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--bdr);padding-bottom:5px;margin:4px 0 12px 0';
+      var ps=document.createElement('div');ps.style.cssText=ss;ps.textContent='Primary Pool';bd.appendChild(ps);
+      var fields=[
+        ['phost-'+key,'Stratum Host',d.stratumURL,'text'],
+        ['pport-'+key,'Stratum Port',d.stratumPort,'number'],
+        ['puser-'+key,'Stratum User (BTC Address)',d.stratumUser,'text'],
+        ['ppass-'+key,'Stratum Password',d.stratumPassword,'text']
+      ];
+      var fbfields=[
+        ['fbhost-'+key,'Fallback Stratum Host',d.fallbackStratumURL,'text'],
+        ['fbport-'+key,'Fallback Stratum Port',d.fallbackStratumPort,'number'],
+        ['fbuser-'+key,'Fallback Stratum User',d.fallbackStratumUser,'text'],
+        ['fbpass-'+key,'Fallback Stratum Password',d.fallbackStratumPassword,'text']
+      ];
+      fields.concat([null]).concat(fbfields).forEach(function(f){
+        if(!f){var fb=document.createElement('div');fb.style.cssText=ss;fb.textContent='Fallback Pool';bd.appendChild(fb);return;}
+        var fg=document.createElement('div'); fg.className='field-group';
+        var fl=document.createElement('label'); fl.className='field-lbl'; fl.textContent=f[1]; fg.appendChild(fl);
+        var fi=document.createElement('input'); fi.className='field-input'; fi.type=f[3]; fi.id=f[0]; fi.value=(f[2]!=null?f[2]:''); fg.appendChild(fi);
+        bd.appendChild(fg);
+      });
+      // Advanced Options
+      var advDiv=document.createElement('div');advDiv.style.cssText=ss;advDiv.textContent='Advanced Options';bd.appendChild(advDiv);
+
+      // Suggested Difficulty
+      var sdFg=document.createElement('div');sdFg.className='field-group';
+      var sdLbl=document.createElement('label');sdLbl.className='field-lbl';sdLbl.textContent='Suggested Difficulty';sdFg.appendChild(sdLbl);
+      var sdInp=document.createElement('input');sdInp.className='field-input';sdInp.type='number';sdInp.id='sugdiff-'+key;sdInp.value=(d.stratumSuggestedDifficulty!=null?d.stratumSuggestedDifficulty:'');sdInp.placeholder='e.g. 4100';sdFg.appendChild(sdInp);
+      bd.appendChild(sdFg);
+
+      // Extranonce Subscribe toggle
+      var enRow=document.createElement('div');enRow.className='toggle-row';enRow.style.marginBottom='12px';
+      enRow.innerHTML='<span class="toggle-lbl">Enable Extranonce Subscribe</span><input type="checkbox" class="toggle" id="extranonce-'+key+'" '+(d.stratumExtranonceSubscribe?'checked':'')+'/>';
+      bd.appendChild(enRow);
+
+      // Decode Coinbase Tx toggle
+      var dcChecked=(d.decodeCoinbaseTx!=null?!!d.decodeCoinbaseTx:true);
+      var dcRow=document.createElement('div');dcRow.className='toggle-row';dcRow.style.marginBottom='14px';
+      dcRow.innerHTML='<span class="toggle-lbl">Decode Coinbase Tx</span><input type="checkbox" class="toggle" id="decodecb-'+key+'" '+(dcChecked?'checked':'')+'/>';
+      bd.appendChild(dcRow);
+
+      // Connection Security
+      var csLblEl=document.createElement('label');csLblEl.className='field-lbl';csLblEl.textContent='Connection Security';bd.appendChild(csLblEl);
+      var connSec=(d.stratumConnectionSecurity!=null?d.stratumConnectionSecurity:0);
+      var csDiv=document.createElement('div');csDiv.style.cssText='display:flex;flex-direction:column;gap:10px;margin-bottom:14px';
+      [['0','No TLS'],['1','TLS (System certificate)'],['2','TLS (Custom CA certificate)']].forEach(function(opt){
+        var rl=document.createElement('label');rl.style.cssText='display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--txt)';
+        var rb=document.createElement('input');rb.type='radio';rb.name='connsec-'+key;rb.value=opt[0];rb.checked=(String(connSec)===opt[0]);rb.style.cssText='accent-color:var(--grn);width:18px;height:18px;flex-shrink:0';
+        rl.appendChild(rb);rl.appendChild(document.createTextNode(opt[1]));csDiv.appendChild(rl);
+      });
+      bd.appendChild(csDiv);
+
+      var br=document.createElement('div'); br.className='btn-row';
+      var sv=document.createElement('button'); sv.className='btn-save'; sv.textContent='Save'; sv.dataset.ip=ip; sv.onclick=function(){poolSave(this.dataset.ip);};
+      var rs=document.createElement('button'); rs.className='btn-restart'; rs.textContent='Restart'; rs.dataset.ip=ip; rs.onclick=function(){poolRestart(this.dataset.ip);};
+      br.appendChild(sv); br.appendChild(rs); bd.appendChild(br);
+      var mg=document.createElement('div'); mg.className='set-msg'; mg.id='pmsg-'+key; bd.appendChild(mg);
+      card.appendChild(bd); c.appendChild(card);
+    })(minerIPs[pi]);
+  }
+}
+async function poolSave(ip){
+  var key=ip.replace(/[.]/g,'_');
+  var msg=document.getElementById('pmsg-'+key);
+  var phost=document.getElementById('phost-'+key).value.trim();
+  if(!phost){msg.style.color='var(--red)';msg.textContent='Stratum Host required.';return;}
+  var csEl2=document.querySelector('input[name="connsec-'+key+'"]:checked');
+  var payload={
+    stratumURL:phost,
+    stratumPort:parseInt(document.getElementById('pport-'+key).value)||3333,
+    stratumUser:document.getElementById('puser-'+key).value.trim(),
+    stratumPassword:document.getElementById('ppass-'+key).value,
+    fallbackStratumURL:document.getElementById('fbhost-'+key).value.trim(),
+    fallbackStratumPort:parseInt(document.getElementById('fbport-'+key).value)||3333,
+    fallbackStratumUser:document.getElementById('fbuser-'+key).value.trim(),
+    fallbackStratumPassword:document.getElementById('fbpass-'+key).value,
+    stratumSuggestedDifficulty:parseInt(document.getElementById('sugdiff-'+key).value)||0,
+    stratumExtranonceSubscribe:document.getElementById('extranonce-'+key).checked?1:0,
+    decodeCoinbaseTx:document.getElementById('decodecb-'+key).checked?1:0,
+    stratumConnectionSecurity:csEl2?parseInt(csEl2.value):0
+  };
+  msg.style.color='var(--muted)';msg.textContent='Saving...';
+  try{
+    var res=await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000),headers:{'X-Body':JSON.stringify(payload)}});
+    if(res.ok){msg.style.color='var(--grn)';msg.textContent='Saved! Restart to apply.';}
+    else{msg.style.color='var(--red)';msg.textContent='Failed ('+res.status+')';}
+  }catch(e){msg.style.color='var(--red)';msg.textContent='Error: '+e.message;}
+}
+async function poolRestart(ip){
+  var key=ip.replace(/[.]/g,'_');
+  var msg=document.getElementById('pmsg-'+key);
+  msg.style.color='var(--muted)';msg.textContent='Restarting...';
+  try{
+    var res=await fetch(SERVER+'/restart?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(6000)});
+    if(res.ok){msg.style.color='var(--grn)';msg.textContent='Restart sent!';}
+    else{msg.style.color='var(--red)';msg.textContent='Failed.';}
+  }catch(e){msg.style.color='var(--red)';msg.textContent='Error: '+e.message;}
+}
+// ── SETTINGS TAB ──────────────────────────────────────────────────────────────
+function renderSettings(){
+  var c=document.getElementById('tab-settings');
+  if(!minerIPs.length){c.innerHTML='<div class="loading">No miners configured</div>';return;}
+  c.innerHTML='';
+  // Add Miner button card
+  var addCard=document.createElement('div'); addCard.className='card';
+  addCard.style.marginBottom='14px';
+  addCard.innerHTML='<div style="padding:14px 16px">'+
+    '<div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Add Miner</div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<input id="mob-add-ip" type="text" inputmode="decimal" placeholder="192.168.1.100" '+
+        'style="flex:1;background:var(--bg);border:1px solid var(--bdr);color:var(--txt);'+
+        'border-radius:8px;padding:9px 12px;font-size:.88rem;font-family:inherit">'+
+      '<button onclick="mobAddMiner()" '+
+        'style="background:var(--orange);border:none;color:#000;font-weight:700;'+
+        'padding:9px 16px;border-radius:8px;font-size:.82rem;cursor:pointer;white-space:nowrap">+ Add</button>'+
+    '</div>'+
+    '<div id="mob-add-msg" style="font-size:.7rem;color:var(--muted);min-height:16px;margin-top:6px"></div>'+
+  '</div>';
+  c.appendChild(addCard);
+
+  // Total hashrate summary card
+  var totalHR=0;
+  minerIPs.forEach(function(ip){
+    var sd=sessionData[ip]||{};
+    var d=minerData[ip]||{};
+    var hr=sd.hashrate!=null?sd.hashrate:(d.hashRate_1m||d.hashRate||0);
+    totalHR+=hr;
+  });
+  if(minerIPs.length>1){
+    var sumCard=document.createElement('div'); sumCard.className='card';
+    sumCard.style.marginBottom='14px';
+    sumCard.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">'+
+      '<div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Total Hashrate</div>'+
+      '<div style="font-size:1.1rem;font-weight:700;color:var(--grn)" id="mob-totalhr">'+
+        (totalHR>=1000?(totalHR/1000).toFixed(2)+' TH/s':totalHR.toFixed(1)+' GH/s')+
+      '</div></div>';
+    c.appendChild(sumCard);
+  }
+
+  minerIPs.forEach(function(ip){
+    var d=minerData[ip]||{};
+    var color=getMinerColor(ip);
+    var key=ip.replace(/\./g,'_');
+    var autoFan=d.autofanspeed!=null?d.autofanspeed:1;
+
+    var card=document.createElement('div'); card.className='card';
+    card.innerHTML='<div class="set-hdr" style="color:'+color+'">▸ '+ip+'</div>';
+
+    var body=document.createElement('div'); body.className='set-body';
+
+    // Info row
+    var info=document.createElement('div');
+    info.style.cssText='font-size:.75rem;color:var(--muted);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--bdr)';
+    info.innerHTML='Hashrate: <span style="color:var(--txt);font-weight:600">'+fmtHR(d.hashRate_1m||d.hashRate||0)+'</span>'+
+      ' &nbsp; Uptime: <span style="color:var(--txt);font-weight:600">'+fmtUp(d.uptimeSeconds)+'</span>';
+    body.appendChild(info);
+
+    // Performance section
+    var ps=document.createElement('div'); ps.className='set-sec'; ps.textContent='Performance'; body.appendChild(ps);
+
+    body.innerHTML+=
+      '<div class="field-group"><label class="field-lbl">Frequency (MHz)</label>'+
+      '<input class="field-input" type="number" id="m-freq-'+key+'" value="'+(d.frequency||'')+'" placeholder="e.g. 500"></div>'+
+      '<div class="field-group"><label class="field-lbl">Core Voltage (mV)</label>'+
+      '<input class="field-input" type="number" id="m-volt-'+key+'" value="'+(d.coreVoltage||'')+'" placeholder="e.g. 1200"></div>';
+
+    // Fan section
+    var fs=document.createElement('div'); fs.className='set-sec'; fs.textContent='Fan Control';
+    body.appendChild(fs);
+
+    body.innerHTML+=
+      '<div class="toggle-row"><span class="toggle-lbl">Auto Fan Speed</span>'+
+      '<input type="checkbox" class="toggle" id="m-autofan-'+key+'" '+(autoFan?'checked':'')+
+      ' onchange="toggleFan(\''+key+'\',this.checked)"></div>'+
+      '<div id="m-fanauto-'+key+'" style="display:'+(autoFan?'block':'none')+'">'+
+        '<div class="field-group"><label class="field-lbl">Target Temp (35–66°C)</label>'+
+        '<input class="field-input" type="number" id="m-temptgt-'+key+'" value="'+(d.temptarget||60)+'" min="35" max="66"></div>'+
+        '<div class="field-group"><label class="field-lbl">Min Fan Speed (0–99%)</label>'+
+        '<input class="field-input" type="number" id="m-minfan-'+key+'" value="'+(d.minFanSpeed||35)+'" min="0" max="99"></div>'+
+      '</div>'+
+      '<div id="m-fanmanual-'+key+'" style="display:'+(autoFan?'none':'block')+'">'+
+        '<div class="field-group"><label class="field-lbl">Manual Fan Speed (0–100%)</label>'+
+        '<input class="field-input" type="number" id="m-fanspd-'+key+'" value="'+(d.manualFanSpeed||d.fanspeed||100)+'" min="0" max="100"></div>'+
+      '</div>'+
+      '<div class="btn-row">'+
+        '<button class="btn-save" onclick="mSave(\''+ip+'\')">✓ Save</button>'+
+        '<button class="btn-restart" onclick="mRestart(\''+ip+'\')">↻ Restart</button>'+
+      '</div>'+
+      '<div class="set-msg" id="m-msg-'+key+'"></div>';
+
+    card.appendChild(body);
+    c.appendChild(card);
+  });
+}
+
+function toggleFan(key, checked){
+  document.getElementById('m-fanauto-'+key).style.display=checked?'block':'none';
+  document.getElementById('m-fanmanual-'+key).style.display=checked?'none':'block';
+}
+
+async function mSave(ip){
+  var key=ip.replace(/\./g,'_');
+  var msg=document.getElementById('m-msg-'+key);
+  var freq=parseInt(document.getElementById('m-freq-'+key).value);
+  var volt=parseInt(document.getElementById('m-volt-'+key).value);
+  if(isNaN(freq)||isNaN(volt)){msg.style.color='var(--red)';msg.textContent='Enter valid numbers.';return;}
+  var autoFan=document.getElementById('m-autofan-'+key).checked?1:0;
+  var body={frequency:freq,coreVoltage:volt,overclockEnabled:1,autofanspeed:autoFan};
+  if(autoFan){
+    var tt=document.getElementById('m-temptgt-'+key);
+    var mf=document.getElementById('m-minfan-'+key);
+    if(tt) body.temptarget=parseInt(tt.value);
+    if(mf) body.minfanspeed=parseInt(mf.value);
+  } else {
+    var fs=document.getElementById('m-fanspd-'+key);
+    if(fs) body.fanspeed=parseInt(fs.value);
+  }
+  msg.style.color='var(--muted)'; msg.textContent='Saving…';
+  try{
+    var r=await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000),headers:{'X-Body':JSON.stringify(body)}});
+    if(r.ok){msg.style.color='var(--grn)';msg.textContent='Saved! Restart to apply.';}
+    else{msg.style.color='var(--red)';msg.textContent='Failed ('+r.status+')';}
+  }catch(e){msg.style.color='var(--red)';msg.textContent='Error: '+e.message;}
+}
+
+async function mRestart(ip){
+  var key=ip.replace(/\./g,'_');
+  var msg=document.getElementById('m-msg-'+key);
+  msg.style.color='var(--muted)'; msg.textContent='Restarting…';
+  try{
+    var r=await fetch(SERVER+'/restart?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(6000)});
+    if(r.ok){msg.style.color='var(--grn)';msg.textContent='Restart sent!';}
+    else{msg.style.color='var(--red)';msg.textContent='Failed.';}
+  }catch(e){msg.style.color='var(--red)';msg.textContent='Error: '+e.message;}
+}
+
+// ── REFRESH ───────────────────────────────────────────────────────────────────
+
+function mobAddMiner(){
+  var input=document.getElementById('mob-add-ip');
+  var msg=document.getElementById('mob-add-msg');
+  var ip=(input.value||'').trim();
+  if(!ip){msg.style.color='var(--red)';msg.textContent='Enter an IP address.';return;}
+  if(minerIPs.indexOf(ip)>=0){msg.style.color='var(--muted)';msg.textContent='Already added.';return;}
+  minerIPs.push(ip);
+  input.value='';
+  msg.style.color='var(--grn)';msg.textContent='Added '+ip+'!';
+  manualRefresh();
+}
+function mobRemoveMiner(ip){
+  if(!confirm('Remove '+ip+'?')) return;
+  var i=minerIPs.indexOf(ip);
+  if(i<0) return;
+  minerIPs.splice(i,1);
+  delete sessionData[ip];
+  delete allTimeData[ip];
+  manualRefresh();
+}
+
+var minersBuilt=false, lastIPStr='';
+var mobTopN=10;
+
+// Pause refresh when any input/select/textarea is focused
+document.addEventListener('focusin', function(e){
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA'){
+    refreshPaused=true;
+  }
+});
+document.addEventListener('focusout', function(e){
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA'){
+    // Small delay so rapid field-to-field tabbing doesn't trigger a refresh mid-form
+    setTimeout(function(){ if(!document.activeElement||
+      (document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='SELECT'&&document.activeElement.tagName!=='TEXTAREA')){
+      refreshPaused=false;
+    }},300);
+  }
+});
+
+function updateMinerData(){
+  minerIPs.forEach(function(ip){
+    var d=minerData[ip]||{};
+    var sd=sessionData[ip]||{};
+    var color=getMinerColor(ip);
+    var key=ip.replace(/[.]/g,'_');
+    var isLive=(d.hashRate_1m>0)||(d.hashRate>0);
+    var hr=d.hashRate_1m||d.hashRate||0;
+    var winHR=sd.hashrate!=null?sd.hashrate:hr;
+    var winShares=sd.shares!=null?sd.shares:(d.sharesAccepted!=null?d.sharesAccepted:null);
+    var winRej=sd.rejected!=null?sd.rejected:(d.sharesRejected||0);
+    var winBest=sd.bestDiff!=null?sd.bestDiff:d.bestDiff;
+    var winSess=sd.sessionBest!=null?sd.sessionBest:d.bestSessionDiff;
+    var winUp=sd.uptime!=null?sd.uptime:d.uptimeSeconds;
+    var winStatus=sd.status!=null?sd.status:(isLive?'Live':'Offline');
+    var winIsLive=winStatus==='Live';
+    var winLast=sd.lastDiff!=null?fmtD(sd.lastDiff):'—';
+    var winRejPct=winShares>0?((winRej/winShares)*100).toFixed(2):'0.00';
+    var winRejStr=winShares>0?winRej+' ('+winRejPct+'%)':String(winRej);
+    var avgStr=(sd.avgShare)?sd.avgShare:'—';
+    function sv(sfx,val,cls){
+      var el=document.getElementById('sv-'+key+'-'+sfx);
+      if(el){el.textContent=val;if(cls!==undefined)el.className='stat-val'+(cls?' '+cls:'');}
+    }
+    sv('atbest',  fmtD(parseDiffStr(winBest)),'orange');
+    sv('sessbest',fmtD(parseDiffStr(winSess)),'');
+    sv('status',  (winIsLive?'Live':'Offline')+(winUp?' ('+fmtUp(winUp)+')':''),winIsLive?'green':'red');
+    sv('shares',  winShares!=null?String(winShares):'—','green');
+    sv('rej',     winRejStr,'red');
+    sv('avg',     avgStr,'');
+    sv('hr',      fmtHR(winHR),'green');
+    sv('last',    winLast,'');
+    sv('freq',    d.frequency?d.frequency+' MHz':'—','');
+    sv('volt',    d.coreVoltage?d.coreVoltage+' mV':'—','');
+    sv('fan',     d.fanspeed!=null?Math.round(d.fanspeed)+'%':(d.autofanspeed?'Auto':'—'),'');
+    var dotEl=document.getElementById('dot-'+key);
+    if(dotEl) dotEl.className='card-dot'+(winIsLive?' live':d.error?' err':'');
+    var hrB=document.getElementById('hrbadge-'+key);
+    if(hrB) hrB.textContent=fmtHR(winHR);
+    var sd2=sessionData[ip]||{};
+    var temps=[];
+    if(sd2.temps&&sd2.temps.length){
+      temps=sd2.temps.map(function(t){return {label:t.label,val:t.val,isVR:t.isVR||(t.label==='VR')};});
+    } else {
+      if(d.temp>0) temps.push({label:'ASIC 1',val:d.temp,isVR:false});
+      for(var ti=2;ti<=8;ti++){if(d['temp'+ti]>0) temps.push({label:'ASIC '+ti,val:d['temp'+ti],isVR:false});}
+      if(d.vrTemp>0) temps.push({label:'VR',val:d.vrTemp,isVR:true});
+    }
+    temps.forEach(function(t){
+      var tc=tempColor(t.val,t.isVR);
+      var tkey=key+'_'+t.label.replace(/ /g,'_');
+      var pct=Math.min(100,(t.val/85)*100);
+      var b=document.getElementById('tbar-'+tkey);
+      var v=document.getElementById('tval-'+tkey);
+      if(b){b.style.width=pct+'%';b.style.background=tc;}
+      if(v){v.textContent=t.val.toFixed(1)+'°';v.style.color=tc;}
+    });
+    drawDiffChart(ip,color);
+    drawHashTempChart(ip,color);
+  });
+}
+
+async function doRefresh(){
+  if(refreshing||refreshPaused) return;
+  refreshing=true;
+  document.getElementById('refresh-btn').classList.add('spinning');
+  try{
+    await Promise.all([loadAllTime(),loadSession()]);
+    await loadMiners();
+    await loadAllMinerData();
+    var ipStr=minerIPs.slice().sort().join(',');
+    if(!minersBuilt||ipStr!==lastIPStr){
+      renderMiners();
+      minersBuilt=minerIPs.length>0;
+      lastIPStr=ipStr;
+    } else {
+      updateMinerData();
+    }
+    // Always re-render active tab to keep data fresh
+    if(activeTab==='top10') renderTop10();
+    else if(activeTab==='alltime') renderAllTime();
+    else if(activeTab==='pool') renderPool();
+    else if(activeTab==='settings') renderSettings();
+  }catch(e){}
+  document.getElementById('refresh-btn').classList.remove('spinning');
+  refreshing=false;
+}
+function manualRefresh(){ minersBuilt=false; doRefresh(); }
+
+setInterval(doRefresh, 5000);
+doRefresh();
+</script>
+<div id="mob-donate-overlay" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'"><div style="background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:20px;max-width:420px;width:92%;max-height:85vh;overflow-y:auto"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><h2 style="font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;color:#f7931a">💛 Support This Project</h2><button onclick="document.getElementById('mob-donate-overlay').style.display='none'" style="background:transparent;border:1px solid var(--muted2);color:var(--muted);font-family:inherit;font-size:.68rem;padding:4px 12px;border-radius:6px;cursor:pointer">✕</button></div><p style="font-size:.76rem;color:var(--muted);margin-bottom:14px;line-height:1.6">If this app has helped your mining operation, any donation is greatly appreciated. Tap any address to copy it.</p><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#f7931a;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BTC</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('bc1q7cddtk0leg6n7phpe8ershfx5ue6ksd2lgut0s').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">bc1q7cddtk0leg6n7phpe8ershfx5ue6ksd2lgut0s</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#8dc351;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BCH</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('qru9pw3v76wk8m4taac4670dmnlyk5c6kceu763rnm').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">qru9pw3v76wk8m4taac4670dmnlyk5c6kceu763rnm</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#627eea;font-weight:700;letter-spacing:.1em;margin-bottom:6px">ETH</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('0x8d89ad340A131429fE76bBeC547476e6a6Ae16db').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">0x8d89ad340A131429fE76bBeC547476e6a6Ae16db</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#bfbbbb;font-weight:700;letter-spacing:.1em;margin-bottom:6px">LTC</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('ltc1q4jeadmeunm397vqmuycxvpdhasvzatx7te5z2g').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">ltc1q4jeadmeunm397vqmuycxvpdhasvzatx7te5z2g</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#f3ba2f;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BNB</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('0x8d89ad340A131429fE76bBeC547476e6a6Ae16db').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">0x8d89ad340A131429fE76bBeC547476e6a6Ae16db</div></div><div id="mob-donate-copied" style="text-align:center;color:var(--grn);font-size:.8rem;min-height:18px;margin-top:6px"></div></div></div>
+</body>
+</html>
