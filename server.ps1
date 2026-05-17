@@ -206,7 +206,8 @@ while ($running -and $listener.IsListening) {
             try {
                 $obj2 = $body2 | ConvertFrom-Json
                 $script:minerIPs = @($obj2.ips)
-                Write-Host "  [Mobile] Miner IPs updated: $($script:minerIPs -join ', ')" -ForegroundColor Cyan
+                if ($obj2.names) { $script:minerNames = $obj2.names }
+                Write-Host "  [Sync] Miner IPs: $($script:minerIPs -join ', ')" -ForegroundColor Cyan
             } catch {}
             $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
             $b = [System.Text.Encoding]::UTF8.GetBytes("ok")

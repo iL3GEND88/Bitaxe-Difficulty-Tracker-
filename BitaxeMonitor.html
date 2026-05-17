@@ -76,7 +76,7 @@ button.opt.on{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,.08)
 #cards{overflow-y:auto;flex:1;padding:8px 8px;scrollbar-width:thin;scrollbar-color:var(--bdr) transparent;display:block;width:100%}
 .mcard{background:var(--bg);border-radius:5px;padding:6px 8px 0 8px;margin-bottom:7px;border-left:3px solid var(--muted2);transition:border-color .4s;overflow:hidden;min-height:52px;display:flex;flex-direction:column;width:100%;box-sizing:border-box}
 .mcard.live{border-left-color:var(--clr,#f7931a)}.mcard.lerr{border-left-color:var(--red)}
-.mcip{font-size:1em;margin-bottom:4px;font-weight:bold}
+.mcip{font-size:1.25em;margin-bottom:4px;font-weight:bold}
 .mcst{font-size:.85em;color:var(--muted);line-height:1.9}
 .mv{color:#f0f8ff}.mg{color:var(--grn)}.mr{color:var(--red)}
 #slog{height:150px;flex-shrink:0;display:flex;flex-direction:column;border-top:1px solid var(--bdr);padding:7px 10px}
@@ -516,7 +516,7 @@ function renderCards(){
     const d=document.createElement('div');
     d.className='mcard'+(m.status==='Live'?' live':m.status==='Error'?' lerr':'');
     d.style.setProperty('--clr',m.color); d.id='card-'+m.id;
-    d.innerHTML=`<div class="mcip" style="color:${m.color};margin-bottom:5px">${m.ip||'—'}</div>
+    d.innerHTML=`<div class="mcip" id="mcip-${m.id}" style="color:${m.color};margin-bottom:5px;font-size:1.05em">${(m.name&&m.name.trim())?m.name:(m.ip||'—')}</div>
     <div class="best-banner">
       <div><span class="lbl">All-time best: </span><span class="val" id="cb-at-${m.id}" style="color:${m.color}">—</span></div>
       <div><span class="lbl">Session best:  </span><span class="val" id="cb-ss-${m.id}" style="color:var(--grn)">—</span></div>
@@ -721,9 +721,10 @@ function renderMinerList(){
       <span class="mdot" id="dot-${m.id}"></span>
       <span class="swatch" id="sw-${m.id}" style="background:${m.color}" title="Change color"></span>
       <input type="color" class="cpicker" id="pk-${m.id}" value="${m.color}">
-      <input type="text" class="ip-in" id="ip-${m.id}" value="${m.ip}" placeholder="192.168.x.x" spellcheck="false">
+      <input type="text" class="ip-in" id="ip-${m.id}" value="${m.ip}" placeholder="192.168.x.x" spellcheck="false" style="${(m.name&&m.name.trim())?'display:none':''}">
+      <input type="text" id="name-${m.id}" value="${m.name||''}" placeholder="✏ Name" spellcheck="false" style="font-size:.78rem;background:transparent;border:none;border-bottom:1px solid var(--muted2);color:#e8f4ff;font-family:inherit;padding:1px 4px;width:90px;outline:none;${(m.name&&m.name.trim())?'':''}">
       <button class="rm-btn" data-id="${m.id}">✕</button>
-      <button class="ar-btn" id="ar-btn-${m.id}" data-id="${m.id}" style="background:transparent;border:1px solid var(--muted2);color:#e8f4ff;font-family:inherit;font-size:.58rem;padding:1px 6px;border-radius:3px;cursor:pointer;white-space:nowrap" title="Auto-restart: off">⟳ auto</button>`;
+      <button class="ar-btn" id="ar-btn-${m.id}" data-id="${m.id}" title="Auto restart miner if 0 hashrate/0 shares for >5 min. Auto will stop if miner is restarted >3 times in 1 hour and you will be alerted." style="background:transparent;border:1px solid var(--muted2);color:#e8f4ff;font-family:inherit;font-size:.58rem;padding:1px 6px;border-radius:3px;cursor:pointer;white-space:nowrap" title="Auto-restart: off">⟳ auto</button>`;
     list.appendChild(tag);
     document.getElementById('sw-'+m.id).onclick=()=>document.getElementById('pk-'+m.id).click();
     document.getElementById('pk-'+m.id).oninput=e=>{
@@ -749,6 +750,20 @@ function renderMinerList(){
         }
       };
     }
+    // Wire name input to update card header live
+    (function(mid, miner){
+      var nameIn = document.getElementById('name-'+mid);
+      if(nameIn){
+        nameIn.oninput = function(){
+          miner.name = this.value;
+          saveMiners();
+          var h = document.getElementById('mcip-'+mid);
+          if(h) h.textContent = (miner.name&&miner.name.trim()) ? miner.name : (miner.ip||'—');
+          var ipInput = document.getElementById('ip-'+mid);
+          if(ipInput) ipInput.style.display = (miner.name&&miner.name.trim()) ? 'none' : '';
+        };
+      }
+    })(m.id, m);
     tag.querySelector('.rm-btn').onclick=e=>{
       const id=e.target.dataset.id;
       disconnectMiner(miners[id]); delete miners[id];
@@ -813,9 +828,9 @@ function connectAll(){
   saveMiners(); // save any IP changes that happened before connect was clicked
 }
 
-function addMiner(ip='', savedColor=null, savedAutoRestart=false){
+function addMiner(ip='', savedColor=null, savedAutoRestart=false, savedName=''){
   const id=nextId++;
-  miners[id]={ id,ip,color:savedColor||COLORS[id%COLORS.length],ws:null,retry:null,series:[],
+  miners[id]={ id,ip,name:savedName,color:savedColor||COLORS[id%COLORS.length],ws:null,retry:null,series:[],
     sharesFound:0,sharesAccepted:0,bestDiff:0,sessionBest:0,lastDiff:0,lastTarget:0,status:'—',
     axeOSBestDiff:null,axeOSSessionBest:null,poolDifficulty:null,axeOSRejected:0,axeOSShares:null,axeOSUptime:null,axeOSHashrate:null,noAxeOS:false,autoRestart:savedAutoRestart,restartLog:[],restartWarning:false,lastFoundTs:null,hashSeries:[],temps:[] };
   renderMinerList(); renderCards(); buildPanels(); saveMiners();
@@ -2041,58 +2056,74 @@ async function renderPoolPanel(){
         var extraNonce=info&&info.stratumExtranonceSubscribe?1:0;
         var decodeCb=info&&info.decodeCoinbaseTx!=null?info.decodeCoinbaseTx:1;
         var connSec=info&&info.stratumConnectionSecurity!=null?info.stratumConnectionSecurity:0;
+        var fbSugDiff=info&&info.fallbackStratumSuggestedDifficulty!=null?info.fallbackStratumSuggestedDifficulty:'';
+        var fbExtraNonce=info&&info.fallbackStratumExtranonceSubscribe?1:0;
+        var fbDecodeCb=info&&info.fallbackDecodeCoinbaseTx!=null?info.fallbackDecodeCoinbaseTx:1;
+        var fbConnSec=info&&info.fallbackStratumConnectionSecurity!=null?info.fallbackStratumConnectionSecurity:0;
 
-        var allFields=[
-          {sec:'Primary Pool'},
-          {id:'phost-'+key,lbl:'Stratum Host',val:sHost,type:'text'},
-          {id:'pport-'+key,lbl:'Stratum Port',val:sPort,type:'number'},
-          {id:'puser-'+key,lbl:'Stratum User (BTC Address)',val:sUser,type:'text'},
-          {id:'ppass-'+key,lbl:'Stratum Password',val:sPass,type:'text'},
-          {sec:'Fallback Pool'},
-          {id:'fbhost-'+key,lbl:'Fallback Stratum Host',val:fbHost,type:'text'},
-          {id:'fbport-'+key,lbl:'Fallback Stratum Port',val:fbPort,type:'number'},
-          {id:'fbuser-'+key,lbl:'Fallback Stratum User',val:fbUser,type:'text'},
-          {id:'fbpass-'+key,lbl:'Fallback Stratum Password',val:fbPass,type:'text'}
-        ];
-        allFields.forEach(function(f){
-          if(f.sec){var s=document.createElement('div');s.style.cssText=secS;s.textContent=f.sec;frm.appendChild(s);return;}
-          var l=document.createElement('label');l.style.cssText=lS;l.textContent=f.lbl;frm.appendChild(l);
-          var inp=document.createElement('input');inp.type=f.type;inp.id=f.id;inp.value=f.val||'';inp.style.cssText=iS;frm.appendChild(inp);
-        });
 
-        // Advanced Options section
-        var advSec=document.createElement('div');advSec.style.cssText=secS;advSec.textContent='Advanced Options';frm.appendChild(advSec);
-
-        // Suggested Difficulty
-        var sdLbl=document.createElement('label');sdLbl.style.cssText=lS;sdLbl.textContent='Suggested Difficulty';frm.appendChild(sdLbl);
-        var sdInp=document.createElement('input');sdInp.type='number';sdInp.id='sugdiff-'+key;sdInp.value=sugDiff;sdInp.placeholder='e.g. 4100';sdInp.style.cssText=iS;frm.appendChild(sdInp);
-
-        // Checkboxes row
-        var cbRow=document.createElement('div');cbRow.style.cssText='display:flex;gap:20px;margin-bottom:14px;flex-wrap:wrap';
-
-        // Enable Extranonce Subscribe
-        var enLabel=document.createElement('label');enLabel.style.cssText='display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--txt);cursor:pointer';
-        var enChk=document.createElement('input');enChk.type='checkbox';enChk.id='extranonce-'+key;enChk.checked=!!extraNonce;enChk.style.cssText='width:16px;height:16px;accent-color:var(--grn);cursor:pointer';
-        enLabel.appendChild(enChk);enLabel.appendChild(document.createTextNode('Enable Extranonce Subscribe'));
-        cbRow.appendChild(enLabel);
-
-        // Decode Coinbase Tx
-        var dcLabel=document.createElement('label');dcLabel.style.cssText='display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--txt);cursor:pointer';
-        var dcChk=document.createElement('input');dcChk.type='checkbox';dcChk.id='decodecb-'+key;dcChk.checked=!!decodeCb;dcChk.style.cssText='width:16px;height:16px;accent-color:var(--grn);cursor:pointer';
-        dcLabel.appendChild(dcChk);dcLabel.appendChild(document.createTextNode('Decode Coinbase Tx'));
-        cbRow.appendChild(dcLabel);
-        frm.appendChild(cbRow);
-
-        // Connection Security
-        var csLbl=document.createElement('label');csLbl.style.cssText=lS;csLbl.textContent='Connection Security';frm.appendChild(csLbl);
-        var csRow=document.createElement('div');csRow.style.cssText='display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap';
+        var s=document.createElement('div');s.style.cssText=secS;s.textContent='Primary Pool';frm.appendChild(s);
+        var l=document.createElement('label');l.style.cssText=lS;l.textContent='Stratum Host';frm.appendChild(l);
+        var inp=document.createElement('input');inp.type='text';inp.id='phost-'+key;inp.value=sHost||'';inp.style.cssText=iS;frm.appendChild(inp);
+        var l=document.createElement('label');l.style.cssText=lS;l.textContent='Stratum Port';frm.appendChild(l);
+        var inp=document.createElement('input');inp.type='number';inp.id='pport-'+key;inp.value=sPort||'';inp.style.cssText=iS;frm.appendChild(inp);
+        var l=document.createElement('label');l.style.cssText=lS;l.textContent='Stratum User (BTC Address)';frm.appendChild(l);
+        var inp=document.createElement('input');inp.type='text';inp.id='puser-'+key;inp.value=sUser||'';inp.style.cssText=iS;frm.appendChild(inp);
+        var l=document.createElement('label');l.style.cssText=lS;l.textContent='Stratum Password';frm.appendChild(l);
+        var inp=document.createElement('input');inp.type='text';inp.id='ppass-'+key;inp.value=sPass||'';inp.style.cssText=iS;frm.appendChild(inp);
+        var s=document.createElement('div');s.style.cssText=secS;s.textContent='Primary Advanced Options';frm.appendChild(s);
+        var p_sdLbl=document.createElement('label');p_sdLbl.style.cssText=lS;p_sdLbl.textContent='Suggested Difficulty';frm.appendChild(p_sdLbl);
+        var p_sdInp=document.createElement('input');p_sdInp.type='number';p_sdInp.id='sugdiff-'+key;p_sdInp.value=sugDiff;p_sdInp.placeholder='e.g. 4100';p_sdInp.style.cssText=iS;frm.appendChild(p_sdInp);
+        var p_cbRow=document.createElement('div');p_cbRow.style.cssText='display:flex;gap:20px;margin-bottom:14px;flex-wrap:wrap';
+        var p_enLabel=document.createElement('label');p_enLabel.style.cssText='display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--txt);cursor:pointer';
+        var p_enChk=document.createElement('input');p_enChk.type='checkbox';p_enChk.id='extranonce-'+key;p_enChk.checked=!!extraNonce;p_enChk.style.cssText='width:16px;height:16px;accent-color:var(--grn);cursor:pointer';
+        p_enLabel.appendChild(p_enChk);p_enLabel.appendChild(document.createTextNode('Enable Extranonce Subscribe'));
+        p_cbRow.appendChild(p_enLabel);
+        var p_dcLabel=document.createElement('label');p_dcLabel.style.cssText='display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--txt);cursor:pointer';
+        var p_dcChk=document.createElement('input');p_dcChk.type='checkbox';p_dcChk.id='decodecb-'+key;p_dcChk.checked=!!decodeCb;p_dcChk.style.cssText='width:16px;height:16px;accent-color:var(--grn);cursor:pointer';
+        p_dcLabel.appendChild(p_dcChk);p_dcLabel.appendChild(document.createTextNode('Decode Coinbase Tx'));
+        p_cbRow.appendChild(p_dcLabel);
+        frm.appendChild(p_cbRow);
+        var p_csLbl=document.createElement('label');p_csLbl.style.cssText=lS;p_csLbl.textContent='Connection Security';frm.appendChild(p_csLbl);
+        var p_csRow=document.createElement('div');p_csRow.style.cssText='display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap';
         [['0','No TLS'],['1','TLS (System certificate)'],['2','TLS (Custom CA certificate)']].forEach(function(opt){
           var rl=document.createElement('label');rl.style.cssText='display:flex;align-items:center;gap:5px;font-size:.8rem;color:var(--txt);cursor:pointer';
           var rb=document.createElement('input');rb.type='radio';rb.name='connsec-'+key;rb.value=opt[0];rb.checked=(connSec==opt[0]);rb.style.cssText='accent-color:var(--grn);cursor:pointer';
           rl.appendChild(rb);rl.appendChild(document.createTextNode(opt[1]));
-          csRow.appendChild(rl);
+          p_csRow.appendChild(rl);
         });
-        frm.appendChild(csRow);
+        frm.appendChild(p_csRow);
+        var s=document.createElement('div');s.style.cssText=secS;s.textContent='Fallback Pool';frm.appendChild(s);
+        var l=document.createElement('label');l.style.cssText=lS;l.textContent='Fallback Stratum Host';frm.appendChild(l);
+        var inp=document.createElement('input');inp.type='text';inp.id='fbhost-'+key;inp.value=fbHost||'';inp.style.cssText=iS;frm.appendChild(inp);
+        var l=document.createElement('label');l.style.cssText=lS;l.textContent='Fallback Stratum Port';frm.appendChild(l);
+        var inp=document.createElement('input');inp.type='number';inp.id='fbport-'+key;inp.value=fbPort||'';inp.style.cssText=iS;frm.appendChild(inp);
+        var l=document.createElement('label');l.style.cssText=lS;l.textContent='Fallback Stratum User';frm.appendChild(l);
+        var inp=document.createElement('input');inp.type='text';inp.id='fbuser-'+key;inp.value=fbUser||'';inp.style.cssText=iS;frm.appendChild(inp);
+        var l=document.createElement('label');l.style.cssText=lS;l.textContent='Fallback Stratum Password';frm.appendChild(l);
+        var inp=document.createElement('input');inp.type='text';inp.id='fbpass-'+key;inp.value=fbPass||'';inp.style.cssText=iS;frm.appendChild(inp);
+        var s=document.createElement('div');s.style.cssText=secS;s.textContent='Fallback Advanced Options';frm.appendChild(s);
+        var fb_sdLbl=document.createElement('label');fb_sdLbl.style.cssText=lS;fb_sdLbl.textContent='Suggested Difficulty';frm.appendChild(fb_sdLbl);
+        var fb_sdInp=document.createElement('input');fb_sdInp.type='number';fb_sdInp.id='fbsugdiff-'+key;fb_sdInp.value=fbSugDiff;fb_sdInp.placeholder='e.g. 4100';fb_sdInp.style.cssText=iS;frm.appendChild(fb_sdInp);
+        var fb_cbRow=document.createElement('div');fb_cbRow.style.cssText='display:flex;gap:20px;margin-bottom:14px;flex-wrap:wrap';
+        var fb_enLabel=document.createElement('label');fb_enLabel.style.cssText='display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--txt);cursor:pointer';
+        var fb_enChk=document.createElement('input');fb_enChk.type='checkbox';fb_enChk.id='fbextranonce-'+key;fb_enChk.checked=!!fbExtraNonce;fb_enChk.style.cssText='width:16px;height:16px;accent-color:var(--grn);cursor:pointer';
+        fb_enLabel.appendChild(fb_enChk);fb_enLabel.appendChild(document.createTextNode('Enable Extranonce Subscribe'));
+        fb_cbRow.appendChild(fb_enLabel);
+        var fb_dcLabel=document.createElement('label');fb_dcLabel.style.cssText='display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--txt);cursor:pointer';
+        var fb_dcChk=document.createElement('input');fb_dcChk.type='checkbox';fb_dcChk.id='fbdecodecb-'+key;fb_dcChk.checked=!!fbDecodeCb;fb_dcChk.style.cssText='width:16px;height:16px;accent-color:var(--grn);cursor:pointer';
+        fb_dcLabel.appendChild(fb_dcChk);fb_dcLabel.appendChild(document.createTextNode('Decode Coinbase Tx'));
+        fb_cbRow.appendChild(fb_dcLabel);
+        frm.appendChild(fb_cbRow);
+        var fb_csLbl=document.createElement('label');fb_csLbl.style.cssText=lS;fb_csLbl.textContent='Connection Security';frm.appendChild(fb_csLbl);
+        var fb_csRow=document.createElement('div');fb_csRow.style.cssText='display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap';
+        [['0','No TLS'],['1','TLS (System certificate)'],['2','TLS (Custom CA certificate)']].forEach(function(opt){
+          var rl=document.createElement('label');rl.style.cssText='display:flex;align-items:center;gap:5px;font-size:.8rem;color:var(--txt);cursor:pointer';
+          var rb=document.createElement('input');rb.type='radio';rb.name='fbconnsec-'+key;rb.value=opt[0];rb.checked=(fbConnSec==opt[0]);rb.style.cssText='accent-color:var(--grn);cursor:pointer';
+          rl.appendChild(rb);rl.appendChild(document.createTextNode(opt[1]));
+          fb_csRow.appendChild(rl);
+        });
+        frm.appendChild(fb_csRow);
         var rw=document.createElement('div');rw.style.cssText='display:flex;gap:10px;margin-top:4px;margin-bottom:8px';
         var sb=document.createElement('button');sb.style.cssText='flex:1;background:var(--grn);border:none;color:#000;font-family:inherit;font-size:.75rem;font-weight:bold;padding:9px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase';sb.textContent='Save';sb.dataset.ip=m.ip;sb.onclick=function(){poolPanelSave(this.dataset.ip);};rw.appendChild(sb);
         var rb=document.createElement('button');rb.style.cssText='flex:1;background:transparent;border:1px solid var(--red);color:var(--red);font-family:inherit;font-size:.75rem;padding:9px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase';rb.textContent='Restart';rb.dataset.ip=m.ip;rb.onclick=function(){poolPanelRestart(this.dataset.ip);};rw.appendChild(rb);
@@ -2109,19 +2140,24 @@ async function poolPanelSave(ip){
   var phost=document.getElementById('phost-'+key).value.trim();
   if(!phost){if(msg){msg.style.color='var(--red)';msg.textContent='Stratum Host is required.';}return;}
   var csEl=document.querySelector('input[name="connsec-'+key+'"]:checked');
+  var fb_csEl=document.querySelector('input[name="fbconnsec-'+key+'"]:checked');
   var payload={
     stratumURL:phost,
     stratumPort:parseInt(document.getElementById('pport-'+key).value)||3333,
     stratumUser:document.getElementById('puser-'+key).value.trim(),
     stratumPassword:document.getElementById('ppass-'+key).value,
+    stratumSuggestedDifficulty:parseInt(document.getElementById('sugdiff-'+key).value)||0,
+    stratumExtranonceSubscribe:document.getElementById('extranonce-'+key).checked?1:0,
+    decodeCoinbaseTx:document.getElementById('decodecb-'+key).checked?1:0,
+    stratumConnectionSecurity:csEl?parseInt(csEl.value):0,
     fallbackStratumURL:document.getElementById('fbhost-'+key).value.trim(),
     fallbackStratumPort:parseInt(document.getElementById('fbport-'+key).value)||3333,
     fallbackStratumUser:document.getElementById('fbuser-'+key).value.trim(),
     fallbackStratumPassword:document.getElementById('fbpass-'+key).value,
-    stratumSuggestedDifficulty:parseInt(document.getElementById('sugdiff-'+key).value)||0,
-    stratumExtranonceSubscribe:document.getElementById('extranonce-'+key).checked?1:0,
-    decodeCoinbaseTx:document.getElementById('decodecb-'+key).checked?1:0,
-    stratumConnectionSecurity:csEl?parseInt(csEl.value):0
+    fallbackStratumSuggestedDifficulty:parseInt(document.getElementById('fbsugdiff-'+key).value)||0,
+    fallbackStratumExtranonceSubscribe:document.getElementById('fbextranonce-'+key).checked?1:0,
+    fallbackDecodeCoinbaseTx:document.getElementById('fbdecodecb-'+key).checked?1:0,
+    fallbackStratumConnectionSecurity:fb_csEl?parseInt(fb_csEl.value):0
   };
   if(msg){msg.style.color='var(--muted)';msg.textContent='Saving...';}
   try{var res=await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(payload)}});if(msg){if(res.ok){msg.style.color='var(--grn)';msg.textContent='Saved! Restart to apply.';}else{msg.style.color='var(--red)';msg.textContent='Failed ('+res.status+').';}}}catch(e){if(msg){msg.style.color='var(--red)';msg.textContent='Error: '+e.message;}}
@@ -2138,7 +2174,7 @@ document.getElementById('pool-close').onclick=function(){document.getElementById
 var _syncRunning=false;// ── Persist miner IPs in localStorage ────────────────────────────────────────
 function saveMiners(){
   try {
-    const data = Object.values(miners).map(m=>({ ip:m.ip, color:m.color, autoRestart:m.autoRestart||false }));
+    const data = Object.values(miners).map(m=>({ ip:m.ip, color:m.color, autoRestart:m.autoRestart||false, name:m.name||'' }));
     // Always save, even if empty - use a wrapper so we can tell "saved empty" from "never saved"
     localStorage.setItem('bitaxe_miners', JSON.stringify({ saved:true, miners:data }));
   } catch(e){}
@@ -2152,7 +2188,7 @@ function loadMiners(){
       const data = Array.isArray(obj) ? obj : (obj && obj.saved ? obj.miners : null);
       if(Array.isArray(obj)) { try{ localStorage.setItem('bitaxe_miners', JSON.stringify({saved:true, miners:obj})); }catch(e){} }
       if(data !== null && data.length > 0){
-        data.forEach(d => addMiner(d.ip, d.color, d.autoRestart||false));
+        data.forEach(d => addMiner(d.ip, d.color, d.autoRestart||false, d.name||''));
         return true;
       } else if(data !== null && data.length === 0){
         return true; // intentionally empty - user removed all miners
@@ -2319,8 +2355,10 @@ pollAllAxeOS();
 pollAllTemps();
 // Push miner IPs to server for mobile
 try{
-  var bootIps=Object.values(miners).filter(function(m){return m.ip;}).map(function(m){return m.ip;});
-  fetch(SERVER+'/setminers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ips:bootIps})}).catch(function(){});
+  var bootMiners=Object.values(miners).filter(function(m){return m.ip;});
+  var bootIps=bootMiners.map(function(m){return m.ip;});
+  var bootNames={};bootMiners.forEach(function(m){if(m.name&&m.name.trim())bootNames[m.ip]=m.name.trim();});
+  fetch(SERVER+'/setminers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ips:bootIps,names:bootNames})}).catch(function(){});
 }catch(e){}
 </script>
 

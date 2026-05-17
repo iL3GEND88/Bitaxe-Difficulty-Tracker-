@@ -114,6 +114,7 @@ input[type=checkbox].toggle{width:20px;height:20px;accent-color:var(--grn);curso
 
 <div id="nav">
   <div class="nav-tab on" onclick="showTab('miners')">⛏ Miners</div>
+  <div class="nav-tab" onclick="showTab('addminer')">➕ Add</div>
   <div class="nav-tab" onclick="showTab('top10')">📋 Session</div>
   <div class="nav-tab" onclick="showTab('alltime')">⭐ All-Time</div>
   <div class="nav-tab" onclick="showTab('pool')">⛁ Pool</div>
@@ -122,6 +123,7 @@ input[type=checkbox].toggle{width:20px;height:20px;accent-color:var(--grn);curso
 
 <div id="main">
   <div id="tab-miners" class="section on"><div class="loading">Loading…</div></div>
+  <div id="tab-addminer" class="section"><div class="loading">Loading…</div></div>
   <div id="tab-top10" class="section"><div class="loading">Loading…</div></div>
   <div id="tab-alltime" class="section"><div class="loading">Loading…</div></div>
   <div id="tab-pool" class="section"><div class="loading">Loading...</div></div>
@@ -178,6 +180,13 @@ function setMinerColor(ip, color){
 }
 loadMobileColors();
 
+var minerNames={};
+function loadMinerNames(){ try{var s=localStorage.getItem('mob_names');if(s)minerNames=JSON.parse(s);}catch(e){} }
+function saveMinerNames(){ try{localStorage.setItem('mob_names',JSON.stringify(minerNames));}catch(e){} }
+function getMinerName(ip){ return minerNames[ip]||''; }
+loadMinerNames();
+
+
 
 function parseDiffStr(v){
   if(!v) return 0; if(typeof v==='number') return v;
@@ -189,9 +198,10 @@ function parseDiffStr(v){
 
 function showTab(name){
   activeTab = name;
-  document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('on',['miners','top10','alltime','pool','settings'][i]===name));
+  document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('on',['miners','addminer','top10','alltime','pool','settings'][i]===name));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('on'));
   document.getElementById('tab-'+name).classList.add('on');
+  if(name==='addminer') renderAddMiner();
   if(name==='top10') renderTop10();
   if(name==='alltime') renderAllTime();
   if(name==='pool') renderPool();
@@ -235,23 +245,7 @@ function renderMiners(){
   c.innerHTML='';
   var totalShares=0, globalBest=0;
 
-  // Add Miner button card
-  var addCard=document.createElement('div'); addCard.className='card';
-  addCard.style.marginBottom='14px';
-  addCard.innerHTML='<div style="padding:14px 16px">'+
-    '<div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Add Miner</div>'+
-    '<div style="display:flex;gap:8px">'+
-      '<input id="mob-add-ip" type="text" inputmode="decimal" placeholder="192.168.1.100" '+
-        'style="flex:1;background:var(--bg);border:1px solid var(--bdr);color:var(--txt);'+
-        'border-radius:8px;padding:9px 12px;font-size:.88rem;font-family:inherit">'+
-      '<button onclick="mobAddMiner()" '+
-        'style="background:var(--orange);border:none;color:#000;font-weight:700;'+
-        'padding:9px 16px;border-radius:8px;font-size:.82rem;cursor:pointer;white-space:nowrap">+ Add</button>'+
-    '</div>'+
-    '<div id="mob-add-msg" style="font-size:.7rem;color:var(--muted);min-height:16px;margin-top:6px"></div>'+
-  '</div>';
-  c.appendChild(addCard);
-
+  
   // Total hashrate summary card
   var totalHR=0;
   minerIPs.forEach(function(ip){
@@ -289,7 +283,11 @@ function renderMiners(){
 
     var hdr=document.createElement('div'); hdr.className='card-hdr';
     var dotEl=document.createElement('div'); dotEl.id='dot-'+key; dotEl.className='card-dot'+(isLive?' live':d.error?' err':'');
-    var ipEl=document.createElement('div'); ipEl.className='card-ip'; ipEl.style.color=color; ipEl.style.flex='1'; ipEl.textContent=ip;
+    var nameVal=getMinerName(ip);
+    var ipEl=document.createElement('div'); ipEl.style.flex='1'; ipEl.style.minWidth='0';
+    var nameSpan=document.createElement('div'); nameSpan.className='card-ip'; nameSpan.style.color=color;
+    nameSpan.textContent=nameVal||ip;
+    ipEl.appendChild(nameSpan);
     var hrEl=document.createElement('div'); hrEl.className='card-hr'; hrEl.id='hrbadge-'+key; hrEl.textContent=fmtHR(winHR);
     var rmEl=document.createElement('button'); rmEl.dataset.ip=ip;
     rmEl.style.cssText='background:transparent;border:none;color:var(--muted);font-size:1rem;cursor:pointer;padding:0 2px 0 8px;flex-shrink:0';
@@ -597,6 +595,85 @@ function drawDiffChart(ip, color){
 }
 
 
+
+// ── ADD MINER TAB ─────────────────────────────────────────────────────────────
+function renderAddMiner(){
+  var c=document.getElementById('tab-addminer');
+  c.innerHTML='';
+
+  // Current miners list
+  var listCard=document.createElement('div'); listCard.className='card';
+  listCard.style.marginBottom='14px';
+  var listHdr=document.createElement('div');
+  listHdr.style.cssText='padding:12px 16px;border-bottom:1px solid var(--bdr);font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em';
+  listHdr.textContent='Current Miners';
+  listCard.appendChild(listHdr);
+  if(minerIPs.length){
+    minerIPs.forEach(function(ip){
+      var nameVal=getMinerName(ip);
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--muted2);gap:10px';
+      var color=getMinerColor(ip);
+      var label=document.createElement('div');
+      label.style.cssText='flex:1;font-size:.85rem;color:'+color;
+      label.textContent=nameVal?nameVal:ip;
+      if(nameVal){
+        var sub=document.createElement('div');
+        sub.style.cssText='font-size:.65rem;color:var(--muted);margin-top:1px';
+        sub.textContent=ip;
+        label.appendChild(sub);
+      }
+      // Rename button
+      var rnBtn=document.createElement('button');
+      rnBtn.style.cssText='background:transparent;border:1px solid var(--bdr);color:var(--muted);font-size:.68rem;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit';
+      rnBtn.textContent='✏ Rename';
+      rnBtn.dataset.ip=ip;
+      rnBtn.onclick=function(){
+        var cur=getMinerName(this.dataset.ip)||'';
+        var n=prompt('Name for '+this.dataset.ip+':',cur);
+        if(n===null) return;
+        minerNames[this.dataset.ip]=n.trim();
+        saveMinerNames();
+        minersBuilt=false;
+        renderAddMiner();
+        doRefresh();
+      };
+      // Remove button
+      var rmBtn=document.createElement('button');
+      rmBtn.style.cssText='background:transparent;border:1px solid var(--red);color:var(--red);font-size:.68rem;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit';
+      rmBtn.textContent='✕';
+      rmBtn.dataset.ip=ip;
+      rmBtn.onclick=function(){
+        mobRemoveMiner(this.dataset.ip);
+      };
+      row.appendChild(label); row.appendChild(rnBtn); row.appendChild(rmBtn);
+      listCard.appendChild(row);
+    });
+  } else {
+    var empty=document.createElement('div');
+    empty.style.cssText='padding:14px 16px;color:var(--muted);font-size:.8rem';
+    empty.textContent='No miners added yet.';
+    listCard.appendChild(empty);
+  }
+  c.appendChild(listCard);
+
+  // Add miner form
+  var addCard=document.createElement('div'); addCard.className='card';
+  var addHdr=document.createElement('div');
+  addHdr.style.cssText='padding:12px 16px;border-bottom:1px solid var(--bdr);font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em';
+  addHdr.textContent='Add Miner';
+  addCard.appendChild(addHdr);
+  var addBody=document.createElement('div'); addBody.style.cssText='padding:14px 16px';
+  addBody.innerHTML=
+    '<div class="field-group"><label class="field-lbl">IP Address</label>'+
+    '<input id="mob-add-ip" class="field-input" type="text" inputmode="decimal" placeholder="e.g. 10.0.0.140"></div>'+
+    '<div class="field-group"><label class="field-lbl">Name (optional)</label>'+
+    '<input id="mob-add-name" class="field-input" type="text" placeholder="e.g. Living Room Miner"></div>'+
+    '<button onclick="mobAddMiner()" style="width:100%;background:var(--orange);border:none;color:#000;font-weight:700;padding:11px;border-radius:8px;font-size:.82rem;cursor:pointer;font-family:inherit">+ Add Miner</button>'+
+    '<div id="mob-add-msg" style="font-size:.7rem;color:var(--muted);min-height:16px;margin-top:8px;text-align:center"></div>';
+  addCard.appendChild(addBody);
+  c.appendChild(addCard);
+}
 // ── SESSION TOP 10 TAB (best shares from current session via alltime) ─────────
 function renderTop10(){
   var c=document.getElementById('tab-top10');
@@ -729,27 +806,23 @@ async function renderPool(){
       var bd=document.createElement('div'); bd.className='set-body';
       var ss='font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--bdr);padding-bottom:5px;margin:4px 0 12px 0';
       var ps=document.createElement('div');ps.style.cssText=ss;ps.textContent='Primary Pool';bd.appendChild(ps);
-      var fields=[
-        ['phost-'+key,'Stratum Host',d.stratumURL,'text'],
-        ['pport-'+key,'Stratum Port',d.stratumPort,'number'],
-        ['puser-'+key,'Stratum User (BTC Address)',d.stratumUser,'text'],
-        ['ppass-'+key,'Stratum Password',d.stratumPassword,'text']
-      ];
-      var fbfields=[
-        ['fbhost-'+key,'Fallback Stratum Host',d.fallbackStratumURL,'text'],
-        ['fbport-'+key,'Fallback Stratum Port',d.fallbackStratumPort,'number'],
-        ['fbuser-'+key,'Fallback Stratum User',d.fallbackStratumUser,'text'],
-        ['fbpass-'+key,'Fallback Stratum Password',d.fallbackStratumPassword,'text']
-      ];
-      fields.concat([null]).concat(fbfields).forEach(function(f){
-        if(!f){var fb=document.createElement('div');fb.style.cssText=ss;fb.textContent='Fallback Pool';bd.appendChild(fb);return;}
-        var fg=document.createElement('div'); fg.className='field-group';
-        var fl=document.createElement('label'); fl.className='field-lbl'; fl.textContent=f[1]; fg.appendChild(fl);
-        var fi=document.createElement('input'); fi.className='field-input'; fi.type=f[3]; fi.id=f[0]; fi.value=(f[2]!=null?f[2]:''); fg.appendChild(fi);
+      function addFld(id,lbl,val,type){
+        var fg=document.createElement('div');fg.className='field-group';
+        var fl=document.createElement('label');fl.className='field-lbl';fl.textContent=lbl;fg.appendChild(fl);
+        var fi=document.createElement('input');fi.className='field-input';fi.type=type||'text';fi.id=id;fi.value=(val!=null?val:'');fg.appendChild(fi);
         bd.appendChild(fg);
-      });
-      // Advanced Options
-      var advDiv=document.createElement('div');advDiv.style.cssText=ss;advDiv.textContent='Advanced Options';bd.appendChild(advDiv);
+      }
+      function addSecMob(t){var s=document.createElement('div');s.style.cssText=ss;s.textContent=t;bd.appendChild(s);}
+
+      // Primary Pool
+      addFld('phost-'+key,'Stratum Host',d.stratumURL);
+      addFld('pport-'+key,'Stratum Port',d.stratumPort,'number');
+      addFld('puser-'+key,'Stratum User (BTC Address)',d.stratumUser);
+      addFld('ppass-'+key,'Stratum Password',d.stratumPassword);
+
+      // Primary Advanced Options
+      addSecMob('Primary Advanced Options');
+      // (primary adv follows)
 
       // Suggested Difficulty
       var sdFg=document.createElement('div');sdFg.className='field-group';
@@ -830,23 +903,7 @@ function renderSettings(){
   var c=document.getElementById('tab-settings');
   if(!minerIPs.length){c.innerHTML='<div class="loading">No miners configured</div>';return;}
   c.innerHTML='';
-  // Add Miner button card
-  var addCard=document.createElement('div'); addCard.className='card';
-  addCard.style.marginBottom='14px';
-  addCard.innerHTML='<div style="padding:14px 16px">'+
-    '<div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Add Miner</div>'+
-    '<div style="display:flex;gap:8px">'+
-      '<input id="mob-add-ip" type="text" inputmode="decimal" placeholder="192.168.1.100" '+
-        'style="flex:1;background:var(--bg);border:1px solid var(--bdr);color:var(--txt);'+
-        'border-radius:8px;padding:9px 12px;font-size:.88rem;font-family:inherit">'+
-      '<button onclick="mobAddMiner()" '+
-        'style="background:var(--orange);border:none;color:#000;font-weight:700;'+
-        'padding:9px 16px;border-radius:8px;font-size:.82rem;cursor:pointer;white-space:nowrap">+ Add</button>'+
-    '</div>'+
-    '<div id="mob-add-msg" style="font-size:.7rem;color:var(--muted);min-height:16px;margin-top:6px"></div>'+
-  '</div>';
-  c.appendChild(addCard);
-
+  
   // Total hashrate summary card
   var totalHR=0;
   minerIPs.forEach(function(ip){
@@ -930,6 +987,17 @@ function toggleFan(key, checked){
 async function mSave(ip){
   var key=ip.replace(/\./g,'_');
   var msg=document.getElementById('m-msg-'+key);
+  var nameEl=document.getElementById('mob-name-'+key);
+  var nameChanged=false;
+  if(nameEl){ 
+    var newName=nameEl.value.trim();
+    if(newName!==(minerNames[ip]||'')){ minerNames[ip]=newName; saveMinerNames(); nameChanged=true; }
+  }
+  // If only name changed (no freq/volt), just update name and refresh card
+  if(nameChanged && document.getElementById('m-freq-'+key) && isNaN(parseInt(document.getElementById('m-freq-'+key).value))){
+    msg.style.color='var(--grn)'; msg.textContent='Name saved!';
+    minersBuilt=false; doRefresh(); return;
+  }
   var freq=parseInt(document.getElementById('m-freq-'+key).value);
   var volt=parseInt(document.getElementById('m-volt-'+key).value);
   if(isNaN(freq)||isNaN(volt)){msg.style.color='var(--red)';msg.textContent='Enter valid numbers.';return;}
@@ -947,8 +1015,10 @@ async function mSave(ip){
   msg.style.color='var(--muted)'; msg.textContent='Saving…';
   try{
     var r=await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000),headers:{'X-Body':JSON.stringify(body)}});
-    if(r.ok){msg.style.color='var(--grn)';msg.textContent='Saved! Restart to apply.';}
-    else{msg.style.color='var(--red)';msg.textContent='Failed ('+r.status+')';}
+    if(r.ok){
+      msg.style.color='var(--grn)';msg.textContent='Saved! Restart to apply.';
+      if(nameChanged){ minersBuilt=false; } // rebuild cards to show new name
+    } else{msg.style.color='var(--red)';msg.textContent='Failed ('+r.status+')';}
   }catch(e){msg.style.color='var(--red)';msg.textContent='Error: '+e.message;}
 }
 
@@ -967,13 +1037,20 @@ async function mRestart(ip){
 
 function mobAddMiner(){
   var input=document.getElementById('mob-add-ip');
+  var nameInput=document.getElementById('mob-add-name');
   var msg=document.getElementById('mob-add-msg');
   var ip=(input.value||'').trim();
   if(!ip){msg.style.color='var(--red)';msg.textContent='Enter an IP address.';return;}
   if(minerIPs.indexOf(ip)>=0){msg.style.color='var(--muted)';msg.textContent='Already added.';return;}
   minerIPs.push(ip);
+  if(nameInput&&nameInput.value.trim()){
+    minerNames[ip]=nameInput.value.trim();
+    saveMinerNames();
+    nameInput.value='';
+  }
   input.value='';
   msg.style.color='var(--grn)';msg.textContent='Added '+ip+'!';
+  renderAddMiner();
   manualRefresh();
 }
 function mobRemoveMiner(ip){
@@ -1084,6 +1161,7 @@ async function doRefresh(){
       updateMinerData();
     }
     // Always re-render active tab to keep data fresh
+    if(activeTab==='addminer') renderAddMiner();
     if(activeTab==='top10') renderTop10();
     else if(activeTab==='alltime') renderAllTime();
     else if(activeTab==='pool') renderPool();
