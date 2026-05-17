@@ -316,7 +316,7 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
     <option value="100">100</option>
   </select>
   <div class="sep"></div>
-  <button class="tbtn" id="btn-fulllist">🏆 Fullscreen List</button>
+  <button class="tbtn" id="btn-fulllist">📋 Session Best</button>
   <button class="tbtn" id="btn-alltime">⭐ All-Time List</button>
   <button class="tbtn" id="btn-settings">⚙ Settings</button>
   <button class="tbtn" id="btn-pool">⛁ Pool</button>
@@ -1191,7 +1191,7 @@ function handleMouseMove(e, canvas, panel){
     const p=best.pt, m=best.miner;
     const time=new Date(p.ts).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
     tooltip.innerHTML=
-      `<div class="tt-ip" style="color:${m.color}">▸ ${m.ip}</div>`+
+      `<div class="tt-ip" style="color:${m.color}">▸ ${(m.name&&m.name.trim())?m.name:m.ip}</div>`+
       `<div class="tt-diff" style="color:${m.color}">${fmtD(p.found)}</div>`+
       `<div class="${p.accepted?'tt-acc':'tt-rej'}">${p.accepted?'✅ Accepted':'· Not accepted'}</div>`+
       `<div class="tt-tgt">target: ${fmtD(p.target)}</div>`+
@@ -1475,7 +1475,7 @@ function renderLeaderboard(){
       `<span class="lb-diff" style="color:${entry.miner.color}">${fmtD(entry.found)}</span>`+
       `<div class="lb-meta">
         <div style="color:${entry.accepted?'var(--grn)':'var(--muted)'}">${entry.accepted?'✅ accepted':'not accepted'}</div>
-        <div>${entry.miner.ip}</div>
+        <div>${entry.miner.name&&entry.miner.name.trim()?entry.miner.name:entry.miner.ip}</div>
         <div>${time}</div>
       </div>`;
     list.appendChild(row);
@@ -1709,7 +1709,7 @@ function renderBloList(){
     col.className='blo-miner-col';
     const medals=['🥇','🥈','🥉'];
     col.innerHTML=`
-      <div class="blo-miner-hdr" style="color:${m.color}">▸ ${m.ip||'Miner'}</div>
+      <div class="blo-miner-hdr" style="color:${m.color}">▸ ${(m.name&&m.name.trim())?m.name:(m.ip||'Miner')}</div>
       <div class="blo-best-banner">
         <div><span class="lbl">All-time best: </span><span class="val" style="color:${m.color}">${m.axeOSBestDiff!=null?fmtD(parseDiff(m.axeOSBestDiff)):fmtD(m.bestDiff)||'—'}</span></div>
         <div style="margin-left:16px"><span class="lbl">Session best: </span><span class="val" style="color:var(--grn)">${m.axeOSSessionBest!=null?fmtD(parseDiff(m.axeOSSessionBest)):fmtD(m.sessionBest)||'—'}</span></div>
@@ -1912,7 +1912,7 @@ async function renderSettingsPanel(){
     var upStr=up?(Math.floor(up/86400)+'d '+Math.floor((up%86400)/3600)+'h '+Math.floor((up%3600)/60)+'m'):'---';
     var hrStr=hr>=1000?(hr/1000).toFixed(2)+' TH/s':hr.toFixed(1)+' GH/s';
     var col=document.createElement('div');col.style.cssText='flex:1;min-width:300px;max-width:460px;background:var(--surf);border:1px solid var(--bdr);border-radius:8px;overflow:hidden;margin-bottom:8px';
-    var hd=document.createElement('div');hd.style.cssText='padding:10px 16px;border-bottom:1px solid var(--bdr);font-size:.85rem;font-weight:bold;color:'+m.color;hd.textContent='▸ '+m.ip;col.appendChild(hd);
+    var hd=document.createElement('div');hd.style.cssText='padding:10px 16px;border-bottom:1px solid var(--bdr);font-size:.85rem;font-weight:bold;color:'+m.color;hd.textContent='▸ '+(m.name&&m.name.trim()?m.name:m.ip);col.appendChild(hd);
     var id2=document.createElement('div');id2.style.cssText='padding:8px 16px;font-size:.76rem;color:var(--muted);border-bottom:1px solid var(--bdr)';id2.innerHTML='Hashrate: <span style="color:var(--txt)">'+hrStr+'</span> &nbsp; Uptime: <span style="color:var(--txt)">'+upStr+'</span>';col.appendChild(id2);
     var frm=document.createElement('div');frm.style.cssText='padding:14px 16px';
     var iS='width:100%;background:var(--bg);border:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:.95rem;padding:8px 10px;border-radius:4px;margin-bottom:14px;box-sizing:border-box';
@@ -2275,7 +2275,7 @@ function renderAtList(){
     // Header
     const hdr = document.createElement('div');
     hdr.style.cssText = 'padding:10px 14px;border-bottom:1px solid var(--bdr);font-size:.82rem;font-weight:bold;color:'+color;
-    hdr.textContent = '▸ ' + ip;
+    hdr.textContent = '▸ ' + (miner&&miner.name&&miner.name.trim()?miner.name:ip);
     col.appendChild(hdr);
 
     // Summary bar

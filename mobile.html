@@ -717,7 +717,7 @@ function renderTop10(){
     // Use live session top10 from Windows app
     var entries=(sessionData[ip]&&sessionData[ip].top10)?sessionData[ip].top10.slice(0,mobTopN):[];
     var card=document.createElement('div'); card.className='card';
-    card.innerHTML='<div class="top10-hdr" style="color:'+color+'">▸ '+ip+'</div>'+
+    card.innerHTML='<div class="top10-hdr" style="color:'+color+'">▸ '+(getMinerName(ip)||ip)+'</div>'+
       (entries.length?entries.map(function(e,i){
         return '<div class="top10-row">'+
           '<div class="top10-rank">'+(i<3?MEDALS[i]:i+1)+'</div>'+
@@ -774,7 +774,7 @@ function renderAllTime(){
     var summ='<div style="padding:8px 16px;border-bottom:1px solid var(--muted2);font-size:.72rem;color:var(--muted)">'+
       'Best: <span style="color:'+color+';font-weight:700">'+fmtD(entries[0]?entries[0].found:0)+'</span>'+
       ' &nbsp; Total recorded: <span style="color:var(--txt)">'+total+'</span></div>';
-    card.innerHTML='<div class="top10-hdr" style="color:'+color+'">▸ '+ip+'</div>'+summ+
+    card.innerHTML='<div class="top10-hdr" style="color:'+color+'">▸ '+(getMinerName(ip)||ip)+'</div>'+summ+
       entries.map(function(e,i){
         return '<div class="top10-row">'+
           '<div class="top10-rank">'+(i<3?MEDALS[i]:i+1)+'</div>'+
@@ -801,7 +801,7 @@ async function renderPool(){
       var color=getMinerColor(ip);
       var key=ip.replace(/[.]/g,'_');
       var card=document.createElement('div'); card.className='card';
-      var hd=document.createElement('div'); hd.className='set-hdr'; hd.style.color=color; hd.textContent='> '+ip;
+      var hd=document.createElement('div'); hd.className='set-hdr'; hd.style.color=color; hd.textContent='> '+(getMinerName(ip)||ip);
       card.appendChild(hd);
       var bd=document.createElement('div'); bd.className='set-body';
       var ss='font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--bdr);padding-bottom:5px;margin:4px 0 12px 0';
