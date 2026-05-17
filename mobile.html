@@ -322,6 +322,7 @@ function renderMiners(){
     var winStatus=sd.status!=null?sd.status:(isLive?'Live':'Offline');
     var winIsLive=winStatus==='Live';
     var winLast=sd.lastDiff!=null?fmtD(sd.lastDiff):'—';
+    var winTarget=sd.lastTarget!=null?fmtD(sd.lastTarget):'—';
     var winRejPct=winShares>0?((winRej/winShares)*100).toFixed(2):'0.00';
     var winRejStr=winShares>0?winRej+' ('+winRejPct+'%)':String(winRej);
     var rows=[
@@ -333,6 +334,7 @@ function renderMiners(){
       ['Avg/share',      avgStr, ''],
       ['HR',             fmtHR(winHR), 'green'],
       ['Last',           winLast, ''],
+      ['Target',         winTarget, ''],
       ['Frequency',      d.frequency?d.frequency+' MHz':'—', ''],
       ['Voltage',        d.coreVoltage?d.coreVoltage+' mV':'—', ''],
       ['Fan Speed',      d.fanspeed!=null?Math.round(d.fanspeed)+'%':(d.autofanspeed?'Auto':'—'), ''],
@@ -1099,6 +1101,7 @@ function updateMinerData(){
     var winStatus=sd.status!=null?sd.status:(isLive?'Live':'Offline');
     var winIsLive=winStatus==='Live';
     var winLast=sd.lastDiff!=null?fmtD(sd.lastDiff):'—';
+    var winTarget=sd.lastTarget!=null?fmtD(sd.lastTarget):'—';
     var winRejPct=winShares>0?((winRej/winShares)*100).toFixed(2):'0.00';
     var winRejStr=winShares>0?winRej+' ('+winRejPct+'%)':String(winRej);
     var avgStr=(sd.avgShare)?sd.avgShare:'—';
