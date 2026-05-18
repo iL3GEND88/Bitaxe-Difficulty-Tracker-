@@ -2,7 +2,7 @@
 
 A real-time share difficulty monitor and full dashboard for home Bitcoin miners running AxeOS firmware — Bitaxe, NerdQaxe++, Titan, and compatible devices.
 
-No cloud. No accounts. No installs beyond the files in this zip. Runs entirely on your local network. Full companion mobile app for iPhone via Safari over WiFi.
+No cloud. No accounts. No installs beyond the files in this zip. Runs entirely on your local network. Full companion mobile app for iPhone via Safari over WiFi or Tailscale.
 
 ---
 
@@ -14,6 +14,19 @@ No cloud. No accounts. No installs beyond the files in this zip. Runs entirely o
 4. On iPhone: open Safari and go to the IP shown in yellow in the console window (e.g. `http://10.0.0.145:19248`)
 
 > **Running as administrator is required** so the server can bind to your network interface and allow your phone to connect.
+
+---
+
+## Remote Access via Tailscale
+
+To access your app from anywhere (not just home WiFi):
+
+1. Install [Tailscale](https://tailscale.com) on your Windows PC and iPhone
+2. Sign in with the same account on both devices
+3. Note your PC's Tailscale IP (e.g. `100.x.x.x`) from the Tailscale app
+4. On iPhone: open Safari and go to `http://100.x.x.x:19248`
+
+Your PC must be on and the server must be running. Tailscale does **not** route all your iPhone traffic through your home — only traffic to your PC's Tailscale IP.
 
 ---
 
@@ -84,20 +97,25 @@ netsh advfirewall firewall add rule name="Bitaxe Monitor" dir=in action=allow pr
 ### Stats Column (per miner)
 - Resizable — font scales with width, saves between sessions
 - All-Time Best, Session Best, Status/Uptime
-- Shares, Rejected (with %), Avg/share, HR, Last diff, Pool Target
+- Shares, Rejected (with %), Avg/share, HR, Error Rate, Last diff, Pool Target
 - ASIC and VR temperatures with color coding:
   - ASIC: green <65°C, orange 65–69°C, red ≥70°C
   - VR: green ≤70°C, orange 71–80°C, red >80°C
 - Top N best difficulties this session (10/25/50/100)
 
 ### 📊 Stats Visibility Dropdown
-Show or hide individual stat sections per miner card:
-Best Difficulty banner, Status/Uptime, Shares/Rejected/Last, Temperatures, Top Diffs List
+Show or hide individual elements per miner card:
+Best Difficulty, Status/Uptime, Shares, Rejected, Hashrate, Error Rate, Avg/Share, Target, Last, Temperatures, Top Diffs List, Live Log
+
+### 📋 Session Best (Fullscreen)
+- Full-screen overlay of top session shares across all miners
+- Selectable top 10/25/50/100
 
 ### ⭐ All-Time Hall of Fame
 - Stores up to 500 best shares per miner — persists forever
+- Integrates with AxeOS Scoreboard — imports entries automatically on connect and every 30 seconds
 - Synced to server so iPhone reads the same list
-- Selectable top 10/25/50/100 view, reset button
+- Selectable top 10/25/50/100 view
 
 ### ⚙ Settings Panel
 Full-screen overlay per miner:
@@ -108,20 +126,30 @@ Full-screen overlay per miner:
 
 ### ⛁ Pool Settings Panel
 Full-screen overlay per miner:
-- Primary + Fallback: Stratum Host, Port, User, Password
-- Advanced: Suggested Difficulty, Extranonce Subscribe, Decode Coinbase Tx
-- Connection Security: No TLS / TLS System cert / TLS Custom CA
+- Primary Pool: Stratum Host, Port, User, Password
+- Primary Advanced: Suggested Difficulty, Extranonce Subscribe, Decode Coinbase Tx, Connection Security
+- Fallback Pool: same fields
+- Fallback Advanced: same fields
 - Save and Restart buttons
 
+### Miner Names
+- Name each miner — shows instead of IP everywhere in the app
+- Names pushed to server so Safari loads them automatically on first open
+
 ### Auto-Restart
-- Per-miner toggle — saves between sessions
-- Requires **both**: no shares for 5 min **and** hashrate near zero
-- Max 3 restarts per hour — red warning when limit reached
+- Per-miner toggle — saves between sessions, controllable from Safari
+- Fires after **5 minutes with no shares**
+- Max 3 restarts per hour — shows ⚠ warning when limit reached
+
+### Live Log
+- Real-time stream of miner log output
+- Show/hide via Stats dropdown — pauses writes when hidden to prevent freeze on re-show
 
 ### Other
 - Block Found full-screen alert with audio beep
 - Total Hashrate chip in header (combined all miners)
-- Unlimited miners, custom colors, add/remove with ✕
+- Unlimited miners, custom colors, nameable, add/remove with ✕
+- 💛 Donate button for BTC/BCH/ETH/LTC/BNB
 - ⏻ Close App shuts down server cleanly
 
 ---
@@ -131,13 +159,22 @@ Full-screen overlay per miner:
 Opening the server address in iPhone Safari automatically loads the mobile app.
 
 ### ⛏ Miners Tab
-- Card per miner with all live stats from Windows:
-  All-Time Best, Session Best, Status/Uptime, Shares, Rejected %, Avg/share, HR, Last, Frequency, Voltage, Fan Speed
-- Temperature bars (color coded)
+- Card per miner with live stats pushed from Windows every 2 seconds:
+  All-Time Best, Session Best, Status/Uptime, Shares/Rej, Avg/share, Target, Last, Frequency, Voltage, Fan Speed
+- Hashrate and error rate displayed in the card header
+- 🌡 Temps-only toggle per miner — tap to collapse everything except temperature bars
+- **A** button per miner — toggles auto-restart on/off, syncs to Windows
+- Temperature bars with color coding, collapsible per miner
 - Color picker per miner (tap the colored circle)
-- Remove miner with ✕ button, Add Miner input at top
-- Total Hashrate card (2+ miners)
-- Difficulty chart (last 60 shares) and Hashrate/Temp chart (last 200 samples) per miner
+- Remove miner with ✕, rename by tapping the miner name
+- Total bar — watts on the left, total hashrate on the right
+- Difficulty chart (last 60 shares) and Hashrate/Temp chart per miner
+- Block finding odds card at the bottom — per hour / day / month / year based on your total hashrate vs the Bitcoin network
+- In-app notifications for miner restarts, auto-restart warnings, block found
+
+### ➕ Add Tab
+- Add miners by IP and name
+- Lists current miners with rename and remove options
 
 ### 📋 Session Tab
 - Top 10/25/50/100 best shares this session
@@ -148,19 +185,20 @@ Opening the server address in iPhone Safari automatically loads the mobile app.
 - Same data as Windows hall of fame
 
 ### ⛁ Pool Tab
-- Primary + Fallback stratum settings
-- Advanced options, Connection Security
+- Primary + Fallback stratum settings with advanced options
 - Save and Restart per miner
+- Settings freeze until Save is tapped to prevent accidental overwrites
 
 ### ⚙ Settings Tab
 - Frequency, Voltage, Fan control per miner
 - Save and Restart per miner
+- Settings freeze until Save is tapped to prevent accidental overwrites
 
 ### General
 - Auto-refreshes every 5 seconds
 - Pauses when any input is focused
-- Color picker auto-refreshes on color selection
 - Manual Refresh button in header
+- Miners and names sync from Windows on first load
 
 ---
 
@@ -182,7 +220,8 @@ The `.bat` launches a PowerShell HTTP server on port 19248 that:
 - Serves the dashboard and mobile app to browsers on your local network
 - Redirects iPhone/iPad to the mobile app automatically
 - Proxies WebSocket connections and REST API calls to your miners
-- Stores shared state in memory: miner list, all-time data, live session data
+- Fetches the AxeOS Scoreboard and merges entries into your all-time list
+- Stores shared state in memory: miner list, all-time data, live session data, notifications
 - All traffic stays on your local network — nothing leaves your home
 
 ---

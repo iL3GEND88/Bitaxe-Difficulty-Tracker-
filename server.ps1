@@ -1,4 +1,4 @@
-# Bitaxe Monitor - Proxy Server with auto-shutdown when Edge closes
+# Bitaxe Monitor - Proxy Server
 param()
 $PORT = 19248
 $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -8,7 +8,7 @@ Write-Host ""
 Write-Host "  ===========================================" -ForegroundColor Cyan
 Write-Host "   AxeOS Difficulty Tracker - Server" -ForegroundColor Cyan
 Write-Host "   http://localhost:$PORT" -ForegroundColor Green
-Write-Host "   Close this window OR close Edge to stop." -ForegroundColor Yellow
+Write-Host "   Close this window to stop the server." -ForegroundColor Yellow
 Write-Host "  ===========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -39,17 +39,8 @@ try {
     Write-Host "  [NOTE] Run as Administrator for iPhone access" -ForegroundColor Yellow
 }
 
-# Launch Edge and capture its process
-Start-Sleep -Milliseconds 700
-$edgeProc = $null
-foreach ($ep in @("C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe","C:\Program Files\Microsoft\Edge\Application\msedge.exe")) {
-    if (Test-Path $ep) {
-        $edgeProc = Start-Process $ep "http://localhost:$PORT/" -PassThru
-        Write-Host "  [OK] Launched Edge (PID $($edgeProc.Id))" -ForegroundColor Green
-        break
-    }
-}
-if (-not $edgeProc) { Write-Host "  Open Edge to: http://localhost:$PORT/" -ForegroundColor Yellow }
+# Browser launched by the .bat file
+Write-Host "  [OK] Open your browser to: http://localhost:$PORT/" -ForegroundColor Green
 
 Write-Host "  [OK] Ready" -ForegroundColor Green
 Write-Host ""
@@ -182,6 +173,48 @@ while ($running -and $listener.IsListening) {
             continue
         }
 
+        if ($path -eq "/notifications") {
+            try {
+                if ($req.HttpMethod -eq "POST") {
+                    try {
+                        $sr2 = New-Object System.IO.StreamReader($req.InputStream)
+                        $nj = $sr2.ReadToEnd(); $sr2.Dispose()
+                        if ($nj -and $nj.Length -gt 2) { $script:pendingNotifs = $nj }
+                    } catch {}
+                    $nb = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+                    $resp.ContentType = "application/json"
+                    $resp.ContentLength64 = $nb.Length
+                    $resp.OutputStream.Write($nb, 0, $nb.Length)
+                } else {
+                    $nout = if ($script:pendingNotifs) { $script:pendingNotifs } else { '[]' }
+                    $script:pendingNotifs = $null
+                    $nb2 = [System.Text.Encoding]::UTF8.GetBytes($nout)
+                    $resp.ContentType = "application/json"
+                    $resp.ContentLength64 = $nb2.Length
+                    $resp.OutputStream.Write($nb2, 0, $nb2.Length)
+                }
+            } catch { Write-Host "  [Notif] Error: $_" -ForegroundColor Yellow }
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/scoreboard" -and $ip) {
+            try {
+                $wc2 = New-Object System.Net.WebClient
+                $wc2.Headers.Add("Accept","application/json")
+                $sb = $wc2.DownloadData("http://$ip/api/system/scoreboard")
+                $resp.ContentType="application/json"
+                $resp.Headers.Add("Access-Control-Allow-Origin","*")
+                $resp.ContentLength64=$sb.Length
+                $resp.OutputStream.Write($sb,0,$sb.Length)
+            } catch {
+                $b=[System.Text.Encoding]::UTF8.GetBytes("[]")
+                $resp.ContentType="application/json"
+                $resp.ContentLength64=$b.Length
+                $resp.OutputStream.Write($b,0,$b.Length)
+            }
+            $resp.Close(); continue
+        }
+
         if ($path -eq "/api" -and $ip) {
             try {
                 $wc = New-Object System.Net.WebClient
@@ -197,9 +230,71 @@ while ($running -and $listener.IsListening) {
                 Write-Host "  [API] $ip FAILED: $_" -ForegroundColor Red
             }
             $resp.Close(); continue
+
+
+        # /scoreboard - proxy to miner scoreboard API
+        if ($path -eq "/notifications") {
+            try {
+                if ($req.HttpMethod -eq "POST") {
+                    try {
+                        $sr2 = New-Object System.IO.StreamReader($req.InputStream)
+                        $nj = $sr2.ReadToEnd(); $sr2.Dispose()
+                        if ($nj -and $nj.Length -gt 2) { $script:pendingNotifs = $nj }
+                    } catch {}
+                    $nb = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+                    $resp.ContentType = "application/json"
+                    $resp.ContentLength64 = $nb.Length
+                    $resp.OutputStream.Write($nb, 0, $nb.Length)
+                } else {
+                    $nout = if ($script:pendingNotifs) { $script:pendingNotifs } else { '[]' }
+                    $script:pendingNotifs = $null
+                    $nb2 = [System.Text.Encoding]::UTF8.GetBytes($nout)
+                    $resp.ContentType = "application/json"
+                    $resp.ContentLength64 = $nb2.Length
+                    $resp.OutputStream.Write($nb2, 0, $nb2.Length)
+                }
+            } catch { Write-Host "  [Notif] Error: $_" -ForegroundColor Yellow }
+            $resp.Close(); continue
         }
 
+        if ($path -eq "/scoreboard" -and $ip) {
+            try {
+                $wc2 = New-Object System.Net.WebClient
+                $wc2.Headers.Add("Accept","application/json")
+                $sb = $wc2.DownloadData("http://$ip/api/system/scoreboard")
+                $resp.ContentType="application/json"
+                $resp.Headers.Add("Access-Control-Allow-Origin","*")
+                $resp.ContentLength64=$sb.Length
+                $resp.OutputStream.Write($sb,0,$sb.Length)
+            } catch {
+                $b=[System.Text.Encoding]::UTF8.GetBytes("[]")
+                $resp.ContentType="application/json"
+                $resp.ContentLength64=$b.Length
+                $resp.OutputStream.Write($b,0,$b.Length)
+            }
+            $resp.Close(); continue
+        }        }
+
         # /setminers POST - desktop posts current miner IPs
+        if ($path -eq "/setautorestart" -and $req.HttpMethod -eq "POST") {
+            try {
+                $body = New-Object System.IO.StreamReader($req.InputStream)
+                $json = $body.ReadToEnd()
+                $obj = $json | ConvertFrom-Json
+                $script:pendingAutoRestart = $obj
+                $b=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+                $resp.ContentType="application/json"
+                $resp.ContentLength64=$b.Length
+                $resp.OutputStream.Write($b,0,$b.Length)
+            } catch {
+                $b=[System.Text.Encoding]::UTF8.GetBytes('{"ok":false}')
+                $resp.ContentType="application/json"
+                $resp.ContentLength64=$b.Length
+                $resp.OutputStream.Write($b,0,$b.Length)
+            }
+            $resp.Close(); continue
+        }
+
         if ($path -eq "/setminers" -and $req.HttpMethod -eq "POST") {
             $reader = New-Object System.IO.StreamReader($req.InputStream)
             $body2 = $reader.ReadToEnd(); $reader.Close()
@@ -274,6 +369,21 @@ while ($running -and $listener.IsListening) {
         }
 
         # /alltime GET - return cached all-time data
+        if ($path -eq "/getautorestart") {
+            if ($script:pendingAutoRestart) {
+                $json = $script:pendingAutoRestart | ConvertTo-Json -Compress
+                $script:pendingAutoRestart = $null
+$script:pendingNotifs = $null
+            } else {
+                $json = 'null'
+            }
+            $b=[System.Text.Encoding]::UTF8.GetBytes($json)
+            $resp.ContentType="application/json"
+            $resp.ContentLength64=$b.Length
+            $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+
         if ($path -eq "/alltime" -and $req.HttpMethod -eq "GET") {
             $data = if ($script:allTimeCache) { $script:allTimeCache } else { '{}' }
             $resp.StatusCode = 200; $resp.ContentType = "application/json"

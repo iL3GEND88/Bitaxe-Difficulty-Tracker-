@@ -43,7 +43,7 @@ html,body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkM
 .card-dot.live{background:var(--grn);box-shadow:0 0 6px var(--grn)}
 .card-dot.err{background:var(--red)}
 .card-ip{font-size:.92rem;font-weight:700;flex:1}
-.card-hr{font-size:.75rem;color:var(--grn);font-weight:600}
+.card-hr{font-size:.95rem;color:var(--grn);font-weight:700}
 
 /* STAT ROWS */
 .stat-row{display:flex;align-items:center;padding:9px 16px;border-bottom:1px solid var(--muted2);font-size:.8rem}
@@ -98,6 +98,21 @@ input[type=checkbox].toggle{width:20px;height:20px;accent-color:var(--grn);curso
 .set-msg{font-size:.7rem;text-align:center;min-height:18px;margin-top:10px;color:var(--muted)}
 
 .loading{text-align:center;padding:40px;color:var(--muted);font-size:.82rem}
+
+#mob-notif-wrap{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+.mob-notif{display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border-radius:10px;background:var(--surf2);border-left:4px solid var(--orange);box-shadow:0 4px 16px rgba(0,0,0,.5);}
+.mob-notif.ok{border-left-color:var(--grn);}.mob-notif.err{border-left-color:var(--red);}
+.mob-notif-body{flex:1;}.mob-notif-title{font-weight:700;color:var(--txt);font-size:.84rem;margin-bottom:1px;}
+.mob-notif-msg{color:var(--muted);font-size:.74rem;}
+.mob-notif-x{background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;padding:0 0 0 4px;line-height:1;flex-shrink:0;}
+
+.card.temps-only .mob-stats-grid,
+.card.temps-only .stat-row,
+.card.temps-only .top10-wrap,
+.card.temps-only .diff-chart-wrap,
+.card.temps-only .hash-chart-wrap {
+  display: none !important;
+}
 </style>
 </head>
 <body>
@@ -122,7 +137,7 @@ input[type=checkbox].toggle{width:20px;height:20px;accent-color:var(--grn);curso
 </div>
 
 <div id="main">
-  <div id="tab-miners" class="section on"><div class="loading">Loading…</div></div>
+  <div id="tab-miners" class="section on"><div id="mob-notif-wrap"></div><div class="loading">Loading…</div></div>
   <div id="tab-addminer" class="section"><div class="loading">Loading…</div></div>
   <div id="tab-top10" class="section"><div class="loading">Loading…</div></div>
   <div id="tab-alltime" class="section"><div class="loading">Loading…</div></div>
@@ -241,8 +256,8 @@ async function loadSession(){
 // ── MINERS TAB ────────────────────────────────────────────────────────────────
 function renderMiners(){
   var c=document.getElementById('tab-miners');
-  if(!minerIPs.length){c.innerHTML='<div class="loading">No miners configured</div>';return;}
-  c.innerHTML='';
+  if(!minerIPs.length){c.innerHTML='<div id="mob-notif-wrap"></div><div class="loading">No miners configured</div>';return;}
+  c.innerHTML='<div id="mob-notif-wrap"></div>';
   var totalShares=0, globalBest=0;
 
   
@@ -257,11 +272,7 @@ function renderMiners(){
   if(minerIPs.length>1){
     var sumCard=document.createElement('div'); sumCard.className='card';
     sumCard.style.marginBottom='14px';
-    sumCard.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">'+
-      '<div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Total Hashrate</div>'+
-      '<div style="font-size:1.1rem;font-weight:700;color:var(--grn)" id="mob-totalhr">'+
-        (totalHR>=1000?(totalHR/1000).toFixed(2)+' TH/s':totalHR.toFixed(1)+' GH/s')+
-      '</div></div>';
+    sumCard.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">'+'<div style="font-size:1.05rem;font-weight:700;color:var(--muted)" id="mob-totalwatts">'+(function(){var w=0;minerIPs.forEach(function(ip){var p=(sessionData[ip]||{}).power;if(p!=null)w+=p;});return w>0?w.toFixed(1)+'W':'\u2014W';})()+'</div>'+'<div style="font-size:1.05rem;font-weight:700;color:var(--grn)" id="mob-totalhr">'+(totalHR>=1000?(totalHR/1000).toFixed(2)+' TH/s':totalHR.toFixed(1)+' GH/s')+'</div></div>';
     c.appendChild(sumCard);
   }
 
@@ -289,8 +300,13 @@ function renderMiners(){
     nameSpan.textContent=nameVal||ip;
     ipEl.appendChild(nameSpan);
     var hrEl=document.createElement('div'); hrEl.className='card-hr'; hrEl.id='hrbadge-'+key; hrEl.textContent=fmtHR(winHR);
+    var errEl=document.createElement('div');
+    errEl.id='errbadge-'+key;
+    errEl.style.cssText='font-size:.72em;color:var(--red);white-space:nowrap;align-self:center;margin:0';
+    var winErr=sd&&sd.errorRate!=null?sd.errorRate:null;
+    errEl.textContent=winErr!=null?'('+winErr.toFixed(2)+'%)':'';
     var rmEl=document.createElement('button'); rmEl.dataset.ip=ip;
-    rmEl.style.cssText='background:transparent;border:none;color:var(--muted);font-size:1rem;cursor:pointer;padding:0 2px 0 8px;flex-shrink:0';
+    rmEl.style.cssText='background:transparent;border:none;color:var(--muted);font-size:.8rem;cursor:pointer;padding:0 0 0 2px;flex-shrink:0';
     rmEl.textContent='✕';
     rmEl.onclick=function(e){e.stopPropagation();mobRemoveMiner(this.dataset.ip);};
     var clbl=document.createElement('label'); clbl.style.cssText='display:flex;align-items:center;cursor:pointer;margin-left:8px';
@@ -302,7 +318,34 @@ function renderMiners(){
     cpick.onchange=function(){ setMinerColor(this.dataset.ip,this.value); };
     cpick.onblur=function(){ refreshPaused=false; refreshing=false; manualRefresh(); };
     clbl.appendChild(swatch); clbl.appendChild(cpick);
-    hdr.appendChild(dotEl); hdr.appendChild(ipEl); hdr.appendChild(hrEl); hdr.appendChild(rmEl); hdr.appendChild(clbl);
+        var arEl=document.createElement('button');
+    arEl.id='mob-ar-'+key;
+    var _localAR=mobGetARState(ip); var arOn=_localAR!==null?_localAR:(((sessionData[ip]||{}).autoRestart)||false);
+    arEl.textContent='A';
+    arEl.title='Auto-Restart';
+    arEl.style.cssText='background:transparent;border:1px solid '+(arOn?'var(--grn)':'var(--muted)')+';border-radius:3px;color:'+(arOn?'var(--grn)':'var(--muted)')+';font-size:.65rem;cursor:pointer;padding:0 2px;margin-left:1px;flex-shrink:0';
+    arEl.dataset.on=arOn?'1':'0';
+    arEl.onclick=function(){
+      var newVal=this.dataset.on!=='1';
+      this.dataset.on=newVal?'1':'0';
+      this.style.color=newVal?'var(--grn)':'var(--muted)';
+      this.style.borderColor=newVal?'var(--grn)':'var(--muted)';
+      this.textContent='A';
+      mobSetAutoRestart(ip, newVal);
+    };
+    var thermEl=document.createElement('button');
+    thermEl.textContent='🌡';
+    thermEl.title='Toggle temps-only view';
+    thermEl.style.cssText='background:transparent;border:none;font-size:.75rem;cursor:pointer;padding:0;flex-shrink:0;opacity:0.7';
+    thermEl.onclick=(function(cardEl, btn, mip){
+      return function(){
+        var on=cardEl.classList.toggle('temps-only');
+        btn.style.opacity=on?'1':'0.5';
+        if(on) _mobTempsOnly.add(mip); else _mobTempsOnly.delete(mip);
+      };
+    })(card, thermEl, ip);
+    thermEl.className='therm-btn';
+    hdr.appendChild(ipEl); hdr.appendChild(hrEl); hdr.appendChild(errEl); hdr.appendChild(arEl); hdr.appendChild(thermEl); hdr.appendChild(rmEl); hdr.appendChild(clbl);
     card.appendChild(hdr);
 
     // Avg/share calculation
@@ -329,24 +372,35 @@ function renderMiners(){
       ['All-Time Best',  fmtD(parseDiffStr(winBest)), 'orange'],
       ['Session Best',   fmtD(parseDiffStr(winSess)), ''],
       ['Status',         (winIsLive?'Live':'Offline')+(winUp?' ('+fmtUp(winUp)+')':''), winIsLive?'green':'red'],
-      ['Shares',         winShares!=null?winShares:'—', 'green'],
-      ['Rej',            winRejStr, 'red'],
-      ['Avg/share',      avgStr, ''],
-      ['HR',             fmtHR(winHR), 'green'],
-      ['Last',           winLast, ''],
-      ['Target',         winTarget, ''],
+      ['Shares/Rej',    winShares!=null?winShares:'—', 'green'],
       ['Frequency',      d.frequency?d.frequency+' MHz':'—', ''],
+      ['Avg/share',      avgStr, ''],
       ['Voltage',        d.coreVoltage?d.coreVoltage+' mV':'—', ''],
+      ['Target',         winTarget, ''],
       ['Fan Speed',      d.fanspeed!=null?Math.round(d.fanspeed)+'%':(d.autofanspeed?'Auto':'—'), ''],
+      ['Last',           winLast, ''],
     ];
-    var rowKeys=['atbest','sessbest','status','shares','rej','avg','hr','last','freq','volt','fan'];
+    var rowKeys=['atbest','sessbest','status','shares','freq','avg','volt','target','fan','last'];
+    // Render stats in 2-column grid (pairs of rows)
+    var statsGrid=document.createElement('div');
+    statsGrid.className='mob-stats-grid';
+    statsGrid.style.cssText='display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--bdr)';
     rows.forEach(function(row,ri){
-      var r=document.createElement('div'); r.className='stat-row';
+      var cell=document.createElement('div');
+      cell.style.cssText='padding:7px 12px;border-bottom:1px solid var(--muted2);border-right:'+(ri%2===0?'1px solid var(--muted2)':'none');
       var rk=rowKeys[ri]||('r'+ri);
-      r.innerHTML='<div class="stat-lbl">'+row[0]+'</div>'+
-        '<div class="stat-val'+(row[2]?' '+row[2]:'')+'" id="sv-'+key+'-'+rk+'">'+row[1]+'</div>';
-      card.appendChild(r);
+      if(rk==='shares'){
+        cell.innerHTML='<div style="font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Shares/Rej</div>'+
+          '<div style="font-size:.82rem"><span class="stat-val green" id="sv-'+key+'-shares">'+row[1]+'</span>'+
+          '<span style="color:var(--muted)">/</span>'+
+          '<span class="stat-val red" id="sv-'+key+'-rej">'+winRejStr+'</span></div>';
+      } else {
+        cell.innerHTML='<div style="font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">'+row[0]+'</div>'+
+          '<div class="stat-val'+(row[2]?' '+row[2]:'')+'" id="sv-'+key+'-'+rk+'" style="font-size:.82rem">'+row[1]+'</div>';
+      }
+      statsGrid.appendChild(cell);
     });
+    card.appendChild(statsGrid);
 
     // Temps
     // Use temps from Windows session data if available, fallback to API
@@ -378,7 +432,17 @@ function renderMiners(){
     }
 
     c.appendChild(card);
+    // Restore temps-only after append
+    if(_mobTempsOnly.has(ip)){ card.classList.add('temps-only'); thermEl.style.opacity='1'; }
   });
+
+  // ── Block Odds Card ──────────────────────────────────────────────────────────
+  var oddsCard=document.createElement('div');
+  oddsCard.id='mob-odds-card';
+  oddsCard.className='card';
+  oddsCard.style.marginTop='14px';
+  c.appendChild(oddsCard);
+  updateOddsCard();
 
   // ── All charts below all stats ────────────────────────────────────────────
   // ── Difficulty Charts ──────────────────────────────────────────────────────
@@ -903,8 +967,8 @@ async function poolRestart(ip){
 // ── SETTINGS TAB ──────────────────────────────────────────────────────────────
 function renderSettings(){
   var c=document.getElementById('tab-settings');
-  if(!minerIPs.length){c.innerHTML='<div class="loading">No miners configured</div>';return;}
-  c.innerHTML='';
+  if(!minerIPs.length){c.innerHTML='<div id="mob-notif-wrap"></div><div class="loading">No miners configured</div>';return;}
+  c.innerHTML='<div id="mob-notif-wrap"></div>';
   
   // Total hashrate summary card
   var totalHR=0;
@@ -917,11 +981,7 @@ function renderSettings(){
   if(minerIPs.length>1){
     var sumCard=document.createElement('div'); sumCard.className='card';
     sumCard.style.marginBottom='14px';
-    sumCard.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">'+
-      '<div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Total Hashrate</div>'+
-      '<div style="font-size:1.1rem;font-weight:700;color:var(--grn)" id="mob-totalhr">'+
-        (totalHR>=1000?(totalHR/1000).toFixed(2)+' TH/s':totalHR.toFixed(1)+' GH/s')+
-      '</div></div>';
+    sumCard.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">'+'<div style="font-size:1.05rem;font-weight:700;color:var(--muted)" id="mob-totalwatts">'+(function(){var w=0;minerIPs.forEach(function(ip){var p=(sessionData[ip]||{}).power;if(p!=null)w+=p;});return w>0?w.toFixed(1)+'W':'\u2014W';})()+'</div>'+'<div style="font-size:1.05rem;font-weight:700;color:var(--grn)" id="mob-totalhr">'+(totalHR>=1000?(totalHR/1000).toFixed(2)+' TH/s':totalHR.toFixed(1)+' GH/s')+'</div></div>';
     c.appendChild(sumCard);
   }
 
@@ -1055,6 +1115,96 @@ function mobAddMiner(){
   renderAddMiner();
   manualRefresh();
 }
+
+var _mobARState={};
+var _mobTempsOnly={
+  _data: (function(){try{return JSON.parse(localStorage.getItem('mob_tempsonly')||'[]');}catch(e){return [];}}()),
+  has:function(ip){return this._data.indexOf(ip)>=0;},
+  add:function(ip){if(!this.has(ip)){this._data.push(ip);this._save();}},
+  delete:function(ip){this._data=this._data.filter(function(x){return x!==ip;});this._save();},
+  _save:function(){try{localStorage.setItem('mob_tempsonly',JSON.stringify(this._data));}catch(e){}}
+};
+function mobGetARState(ip){
+  if(_mobARState[ip]!==undefined) return _mobARState[ip];
+  try{ var s=localStorage.getItem('mob_ar'); if(s){var d=JSON.parse(s);if(d[ip]!==undefined)return d[ip];} }catch(e){}
+  return null;
+}
+function mobSetAutoRestart(ip, val){
+  _mobARState[ip]=val;
+  try{ var s={}; try{s=JSON.parse(localStorage.getItem('mob_ar')||'{}')}catch(e){} s[ip]=val; localStorage.setItem('mob_ar',JSON.stringify(s)); }catch(e){}
+  fetch(SERVER+'/setautorestart',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ip:ip, autoRestart:val})
+  }).catch(function(){});
+}
+
+var _lastNotifTs=0;
+function showMobNotif(title,msg,type){
+  var wrap=document.getElementById('mob-notif-wrap');
+  if(!wrap){wrap=document.createElement('div');wrap.id='mob-notif-wrap';var tm=document.getElementById('tab-miners');if(tm)tm.insertBefore(wrap,tm.firstChild);}
+  var n=document.createElement('div');n.className='mob-notif '+(type||'warn');
+  n.innerHTML='<div class="mob-notif-body"><div class="mob-notif-title">'+title+'</div><div class="mob-notif-msg">'+msg+'</div></div><button class="mob-notif-x" onclick="this.parentNode.remove()">✕</button>';
+  wrap.insertBefore(n,wrap.firstChild);
+}
+async function pollNotifications(){
+  try{
+    var r=await fetch(SERVER+'/notifications',{signal:AbortSignal.timeout(3000)});
+    if(!r.ok)return;
+    var arr=await r.json();
+    if(!Array.isArray(arr))return;
+    arr.forEach(function(n){if(n&&n.ts>_lastNotifTs){showMobNotif(n.title,n.msg,n.type);_lastNotifTs=n.ts;}});
+  }catch(e){}
+}
+setInterval(pollNotifications,5000);
+
+// Network hashrate in TH/s (~970 EH/s)
+var NETWORK_HASHRATE_THS = 970e6; // 970 EH/s in TH/s, updated periodically
+
+function updateOddsCard(){
+  var card=document.getElementById('mob-odds-card');
+  if(!card) return;
+
+  // Sum total hashrate from session data
+  var totalTHs=0;
+  minerIPs.forEach(function(ip){
+    var sd=sessionData[ip]||{};
+    var hr=sd.hashrate!=null?sd.hashrate:(minerData[ip]||{}).hashRate_1m||(minerData[ip]||{}).hashRate||0;
+    totalTHs+=hr; // already in GH/s from AxeOS
+  });
+  // Convert GH/s to TH/s
+  totalTHs=totalTHs/1000;
+
+  if(totalTHs<=0){
+    card.innerHTML='<div style="padding:14px 16px;color:var(--muted);font-size:.8rem;text-align:center">Mining odds — waiting for hashrate data</div>';
+    return;
+  }
+
+  // Blocks per period = (your TH/s / network TH/s) * (period seconds / 600)
+  var share=totalTHs/NETWORK_HASHRATE_THS;
+  var blocksPerHour=share*6;
+  var blocksPerDay=share*144;
+  var blocksPerMonth=share*144*30;
+  var blocksPerYear=share*144*365;
+
+  function oddsStr(bpp){
+    if(bpp<=0) return '—';
+    var oneIn=Math.round(1/bpp);
+    var pct=(bpp*100).toFixed(7);
+    return '1 in '+oneIn.toLocaleString()+' <span style="color:var(--muted);font-size:.72rem">('+pct+'%)</span>';
+  }
+
+  card.innerHTML=
+    '<div style="padding:12px 16px 6px 16px;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--bdr);margin-bottom:10px">⛏ Block Finding Odds · '+
+      (totalTHs>=1000?(totalTHs/1000).toFixed(2)+' PH/s':totalTHs.toFixed(3)+' TH/s')+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;padding:0 16px 14px 16px;font-size:.82rem;align-items:baseline">'+
+      '<span style="color:var(--muted)">Per hour</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(blocksPerHour)+'</span>'+
+      '<span style="color:var(--muted)">Per day</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(blocksPerDay)+'</span>'+
+      '<span style="color:var(--muted)">Per month</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(blocksPerMonth)+'</span>'+
+      '<span style="color:var(--muted)">Per year</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(blocksPerYear)+'</span>'+
+    '</div>';
+}
 function mobRemoveMiner(ip){
   if(!confirm('Remove '+ip+'?')) return;
   var i=minerIPs.indexOf(ip);
@@ -1115,8 +1265,8 @@ function updateMinerData(){
     sv('shares',  winShares!=null?String(winShares):'—','green');
     sv('rej',     winRejStr,'red');
     sv('avg',     avgStr,'');
-    sv('hr',      fmtHR(winHR),'green');
     sv('last',    winLast,'');
+    sv('target',  winTarget,'');
     sv('freq',    d.frequency?d.frequency+' MHz':'—','');
     sv('volt',    d.coreVoltage?d.coreVoltage+' mV':'—','');
     sv('fan',     d.fanspeed!=null?Math.round(d.fanspeed)+'%':(d.autofanspeed?'Auto':'—'),'');
@@ -1124,6 +1274,9 @@ function updateMinerData(){
     if(dotEl) dotEl.className='card-dot'+(winIsLive?' live':d.error?' err':'');
     var hrB=document.getElementById('hrbadge-'+key);
     if(hrB) hrB.textContent=fmtHR(winHR);
+    // Auto-restart button state is managed locally, not from session data
+    var errB=document.getElementById('errbadge-'+key);
+    if(errB){ var errRate=sd.errorRate!=null?sd.errorRate:null; errB.textContent=errRate!=null?'('+errRate.toFixed(2)+'%)':''; }
     var sd2=sessionData[ip]||{};
     var temps=[];
     if(sd2.temps&&sd2.temps.length){
@@ -1170,6 +1323,22 @@ async function doRefresh(){
     else if(activeTab==='pool') renderPool();
     else if(activeTab==='settings') renderSettings();
   }catch(e){}
+  // Update odds card
+  updateOddsCard();
+
+  // Update total bar
+  var hrEl=document.getElementById('mob-totalhr');
+  var wEl=document.getElementById('mob-totalwatts');
+  if(hrEl){
+    var thr=0;
+    minerIPs.forEach(function(ip){var sd2=sessionData[ip]||{};var hr2=sd2.hashrate!=null?sd2.hashrate:(minerData[ip]||{}).hashRate_1m||(minerData[ip]||{}).hashRate||0;thr+=hr2;});
+    hrEl.textContent=thr>=1000?(thr/1000).toFixed(2)+' TH/s':thr.toFixed(1)+' GH/s';
+  }
+  if(wEl){
+    var tw=0;
+    minerIPs.forEach(function(ip){var p=(sessionData[ip]||{}).power;if(p!=null)tw+=p;});
+    wEl.textContent=tw>0?tw.toFixed(1)+'W':'—W';
+  }
   document.getElementById('refresh-btn').classList.remove('spinning');
   refreshing=false;
 }

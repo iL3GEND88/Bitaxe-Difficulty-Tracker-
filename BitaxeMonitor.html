@@ -320,7 +320,7 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
   <button class="tbtn" id="btn-alltime">⭐ All-Time List</button>
   <button class="tbtn" id="btn-settings">⚙ Settings</button>
   <button class="tbtn" id="btn-pool">⛁ Pool</button>
-  <div id="stats-dropdown-wrap"><button class="tbtn on" id="btn-toggletemps">📊 Stats ▾</button><div id="stats-dropdown-menu"><div class="sdrop-item"><input type="checkbox" id="sdrop-best" checked><label for="sdrop-best">Best Difficulty</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-status" checked><label for="sdrop-status">Status / Uptime</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-stats" checked><label for="sdrop-stats">Shares / Rejected / Last</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-temps" checked><label for="sdrop-temps">Temperatures</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-top10" checked><label for="sdrop-top10">Top Diffs List</label></div></div></div>
+  <div id="stats-dropdown-wrap"><button class="tbtn on" id="btn-toggletemps">📊 Stats ▾</button><div id="stats-dropdown-menu"><div class="sdrop-item"><input type="checkbox" id="sdrop-best" checked><label for="sdrop-best">Best Difficulty</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-status" checked><label for="sdrop-status">Status / Uptime</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-stats" checked><label for="sdrop-stats">Shares / Rejected / Last</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-temps" checked><label for="sdrop-temps">Temperatures</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-top10" checked><label for="sdrop-top10">Top Diffs List</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-log" checked onchange="statsVis.log=this.checked;saveStatsVis();var s=document.getElementById('slog');if(s)s.style.display=this.checked?'block':'none';" ><label for="sdrop-log">Live Log</label></div></div></div>
 </div>
 
 <div id="body">
@@ -497,6 +497,7 @@ function globalTsRange(){
 // ═══════════════════════════════════════════════════════════════════════════════
 const rlog=document.getElementById('rlog');
 function addLog(cls,msg,col){
+  if(!statsVis.log) return; // skip DOM write when log is hidden
   const el=document.createElement('div');
   el.className='le '+cls; el.style.color=col||'';
   el.textContent='['+nowStr()+'] '+msg;
@@ -529,6 +530,7 @@ function renderCards(){
         Shares:<span class="mg" id="cs-${m.id}"> —</span><br>
         <div style="display:flex;align-items:baseline;gap:0;white-space:nowrap">Rej:<span class="mr" id="cr-${m.id}"> —</span><span id="crpct-${m.id}" style="font-size:.75em;color:#8ab4cc;margin-left:3px"></span></div>
         <div style="display:flex;align-items:baseline;white-space:nowrap">HR:<span class="mg" id="chr-${m.id}"> —</span></div>
+        <div style="display:flex;align-items:baseline;white-space:nowrap;font-size:.8em;color:var(--muted)">Err:<span id="cerr-${m.id}" style="margin-left:2px;color:var(--red)"> —</span></div>
       </div>
       <div style="width:1px;background:var(--bdr);flex-shrink:0"></div>
       <div style="min-width:0;color:var(--muted);line-height:1.95;padding-left:18px">
@@ -562,6 +564,15 @@ function updateCardStats(m){
       var hrStr=hr>=1000?(hr/1000).toFixed(2)+' TH/s':hr.toFixed(1)+' GH/s';
       g('chr-'+m.id).textContent=' '+hrStr;
     }else{g('chr-'+m.id).textContent=' —';}
+  }
+  var _cerrEl=g('cerr-'+m.id);
+  if(_cerrEl&&m.axeOSErrorRate!=null){
+    _cerrEl.textContent=' '+m.axeOSErrorRate.toFixed(2)+'%';
+  }
+  var cerrEl=g('cerr-'+m.id);
+  if(cerrEl){
+    if(m.axeOSErrorRate!=null){ cerrEl.textContent=' '+m.axeOSErrorRate.toFixed(2)+'%'; }
+    else{ cerrEl.textContent=' —'; }
   }
   if(g('cup-'+m.id)){if(m.axeOSUptime!=null){var up=m.axeOSUptime,ud=Math.floor(up/86400),uh=Math.floor((up%86400)/3600),um=Math.floor((up%3600)/60);g('cup-'+m.id).textContent='('+(ud>0?ud+'d '+uh+'h':uh>0?uh+'h '+um+'m':um+'m')+')';}else{g('cup-'+m.id).textContent='';}}
   // Show/hide stats section (two-col shares/rejected/last/target)
@@ -703,11 +714,11 @@ function updateHeader(){
     if(m.lastTarget>target) target=m.lastTarget;
     if(m.axeOSHashrate) totalHR+=m.axeOSHashrate;
   });
-  document.getElementById('h-shares').textContent=shares;
+  var hshares=document.getElementById('h-shares'); if(hshares) hshares.textContent=shares;
   const hrEl=document.getElementById('h-totalhr');
   if(hrEl) hrEl.textContent=totalHR>0?(totalHR>=1000?(totalHR/1000).toFixed(2)+' TH/s':totalHR.toFixed(1)+' GH/s'):'—';
-  document.getElementById('h-best').textContent=best?fmtD(best):'—';
-  document.getElementById('h-target').textContent=target?fmtD(target):'—';
+  var hbest=document.getElementById('h-best'); if(hbest) hbest.textContent=best?fmtD(best):'—';
+  var htarget=document.getElementById('h-target'); if(htarget) htarget.textContent=target?fmtD(target):'—';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -736,7 +747,11 @@ function renderMinerList(){
     document.getElementById('ip-'+m.id).onkeydown=e=>{ if(e.key==='Enter'){ m.ip=e.target.value.trim(); saveMiners(); connectMiner(m); }};
     const arBtn=document.getElementById('ar-btn-'+m.id);
     if(arBtn){
-      if(m.autoRestart){arBtn.style.borderColor='var(--grn)';arBtn.style.color='var(--grn)';arBtn.textContent='⟳ ON';}
+      if(m.autoRestart){
+        arBtn.style.borderColor='var(--grn)';arBtn.style.color='var(--grn)';arBtn.textContent='⟳ ON';
+      } else {
+        arBtn.style.borderColor='var(--muted2)';arBtn.style.color='#e8f4ff';arBtn.textContent='⟳ auto';
+      }
       arBtn.onclick=e=>{
         e.stopPropagation();
         const id=e.currentTarget.dataset.id;const mn=miners[id];if(!mn)return;
@@ -779,6 +794,7 @@ function connectMiner(m){
   disconnectMiner(m);
   if(!m.ip) return;
   m.status='Connecting…'; setDot(m.id,'wait'); updateCardStats(m);
+  setTimeout(function(){fetchScoreboard(m);},2000); // fetch scoreboard on connect
   const es=new EventSource(`${SERVER}/stream?ip=${encodeURIComponent(m.ip)}`);
   m.ws=es;
   es.onmessage=ev=>{
@@ -1516,6 +1532,8 @@ async function pollAxeOSBests(m){
     }
     if(d.sharesAccepted  != null) m.axeOSShares      = d.sharesAccepted;
     if(d.sharesRejected  != null) m.axeOSRejected    = d.sharesRejected;
+    if(d.errorPercentage != null) m.axeOSErrorRate   = d.errorPercentage;
+    if(d.errorPercentage != null) m.axeOSErrorRate   = d.errorPercentage;
     if(d.uptimeSeconds   != null) m.axeOSUptime      = d.uptimeSeconds;
     if(d.hashRate_1m    != null) m.axeOSHashrate    = d.hashRate_1m;
     else if(d.hashRate != null) m.axeOSHashrate    = d.hashRate;
@@ -1591,7 +1609,9 @@ async function pollTemps(m){
     }
     if(d.sharesAccepted  != null) m.axeOSShares      = d.sharesAccepted;
     if(d.sharesRejected  != null) m.axeOSRejected    = d.sharesRejected;
+    if(d.errorPercentage != null) m.axeOSErrorRate   = d.errorPercentage;
 
+    if(d.power           != null) m.axeOSPower       = d.power;
     atRecordAxeOSBest(m);
     updateCardStats(m);
     markDirty();
@@ -1746,6 +1766,8 @@ setInterval(()=>{
 
 // ── Persistent toast notifications ───────────────────────────────────────────
 function showToast(title, msg, type){
+  _mobNotifQueue.push({title:String(title||''),msg:String(msg||'').replace(/<[^>]+>/g,' '),type:String(type||'warn'),ts:Date.now()});
+  if(_mobNotifQueue.length>20) _mobNotifQueue.shift();
   const container = document.getElementById('toast-container');
   const t = document.createElement('div');
   t.className = 'toast ' + (type||'warn');
@@ -1792,9 +1814,6 @@ setInterval(()=>{
   Object.values(miners).forEach(m=>{
     if(!m.autoRestart||m.noAxeOS||m.status!=='Live'||m.restartWarning||!m.lastFoundTs)return;
     if(now-m.lastFoundTs<STALL_MS)return;
-    // Only restart if hashrate is also near zero (confirms miner is actually stalled)
-    var hr=m.axeOSHashrate||0;
-    if(hr>5) return; // hashrate still healthy - just a lucky/unlucky streak, don't restart
     m.restartLog=(m.restartLog||[]).filter(t=>now-t<RESTART_WINDOW);
     if(m.restartLog.length>=MAX_RESTARTS){
       m.restartWarning=true;
@@ -1844,7 +1863,8 @@ document.getElementById('btn-mode-hash').onclick=function(){
 };
 
 // ── Stats visibility dropdown ─────────────────────────────────────────────────
-var statsVis = {best:true, status:true, stats:true, temps:true, top10:true};
+var _mobNotifQueue=[];
+var statsVis = {best:true, status:true, stats:true, temps:true, top10:true, log:true};
 
 function loadStatsVis(){
   try{
@@ -1856,12 +1876,13 @@ function saveStatsVis(){
   try{ localStorage.setItem('bitaxe_statsvis',JSON.stringify(statsVis)); }catch(e){}
 }
 function applyStatsVis(){
-  // Apply checkboxes state from statsVis
   Object.keys(statsVis).forEach(function(k){
     var el=document.getElementById('sdrop-'+k);
     if(el) el.checked=statsVis[k];
   });
-  // Re-render all cards to show/hide sections
+  // Toggle live log
+  var slog=document.getElementById('slog');
+  if(slog) slog.style.display=statsVis.log?'':'none';
   Object.values(miners).forEach(function(m){ updateCardStats(m); });
 }
 
@@ -1882,6 +1903,9 @@ document.getElementById('stats-dropdown-menu').addEventListener('click',function
   if(el) el.onchange=function(){
     statsVis[k]=this.checked;
     saveStatsVis();
+    // Toggle live log
+    var slog=document.getElementById('slog');
+    if(slog) slog.style.display=statsVis.log?'':'none';
     Object.values(miners).forEach(function(m){ updateCardStats(m); });
   };
 });
@@ -2014,7 +2038,10 @@ function pushSessionData(){
         sessionBest:m.axeOSSessionBest,
         lastDiff:m.lastDiff,
         lastTarget:m.lastTarget,
+        errorRate:m.axeOSErrorRate,
+        power:m.axeOSPower,
         status:m.status,
+        autoRestart:m.autoRestart||false,
         color:m.color
       };
     });
@@ -2024,6 +2051,31 @@ function pushSessionData(){
 }
 // Push every 2 seconds matching poll rate
 setInterval(pushSessionData, 2000);
+setInterval(function(){if(!_mobNotifQueue.length)return;var n=_mobNotifQueue.splice(0);fetch(SERVER+'/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(n)}).catch(function(){});},2000);
+
+// Poll for autoRestart changes from Safari
+setInterval(function(){
+  fetch(SERVER+'/getautorestart').then(function(r){return r.json();}).then(function(d){
+    if(!d||!d.ip) return;
+    console.log('[AR] received from Safari:',d.ip,'autoRestart=',d.autoRestart);
+    var m=Object.values(miners).find(function(x){return x.ip===d.ip;});
+    if(m){
+      m.autoRestart=!!d.autoRestart;
+      saveMiners();
+      updateCardStats(m);
+      // Directly update the AR button since buildPanels owns its styling
+      var arBtn=document.getElementById('ar-btn-'+m.id);
+      if(arBtn){
+        if(m.autoRestart){
+          arBtn.style.borderColor='var(--grn)';arBtn.style.color='var(--grn)';arBtn.textContent='⟳ ON';
+        } else {
+          arBtn.style.borderColor='var(--muted2)';arBtn.style.color='#e8f4ff';arBtn.textContent='⟳ auto';
+        }
+      }
+    }
+  }).catch(function(){});
+},2000);
+
 
 async function renderPoolPanel(){
   var body=document.getElementById('pool-body');
@@ -2172,7 +2224,63 @@ async function poolPanelRestart(ip){
 document.getElementById('btn-pool').onclick=function(){document.getElementById('pool-overlay').style.display='flex';renderPoolPanel();};
 document.getElementById('pool-close').onclick=function(){document.getElementById('pool-overlay').style.display='none';};
 
-var _syncRunning=false;// ── Persist miner IPs in localStorage ────────────────────────────────────────
+var _syncRunning=false;
+// ── Fetch AxeOS scoreboard and merge into all-time list ──────────────────────
+async function fetchScoreboard(m){
+  if(!m.ip || m.noAxeOS) return;
+  try{
+    const res=await fetch(SERVER+'/scoreboard?ip='+encodeURIComponent(m.ip),
+      {signal:AbortSignal.timeout(5000)});
+    if(!res.ok) return;
+    const entries=await res.json();
+    if(!Array.isArray(entries)||!entries.length) return;
+    const data=atLoad();
+    if(!data[m.ip]) data[m.ip]=[];
+    let changed=false;
+    entries.forEach(function(e){
+      const found=e.difficulty;
+      if(!found||found<=0) return;
+      // Check if already in list (within 0.1% tolerance)
+      var matchIdx=-1;
+      data[m.ip].forEach(function(ex,i){
+        if(Math.abs(ex.found-found)/found < 0.001) matchIdx=i;
+      });
+      if(matchIdx>=0){
+        // Replace our number with the more precise scoreboard number
+        if(data[m.ip][matchIdx].found !== found){
+          data[m.ip][matchIdx].found=found;
+          data[m.ip][matchIdx].fromAxeOS=true;
+          changed=true;
+        }
+      } else {
+        data[m.ip].push({
+          found:found,
+          target:m.lastTarget||0,
+          accepted:true,
+          ts:Date.now(),
+          fromAxeOS:true
+        });
+        changed=true;
+      }
+    });
+    if(changed){
+      // Sort descending
+      data[m.ip].sort(function(a,b){return b.found-a.found;});
+      // Keep top 500
+      if(data[m.ip].length>500) data[m.ip]=data[m.ip].slice(0,500);
+      atSave(data);
+      renderAtList();
+      addLog('ok',m.ip+' — Imported '+entries.length+' scoreboard entries from AxeOS');
+    }
+  }catch(e){}
+}
+
+// Fetch scoreboard on connect and every 30 seconds
+function fetchAllScoreboards(){
+  Object.values(miners).forEach(function(m){ fetchScoreboard(m); });
+}
+setInterval(fetchAllScoreboards, 30000);
+// ── Persist miner IPs in localStorage ────────────────────────────────────────
 function saveMiners(){
   try {
     const data = Object.values(miners).map(m=>({ ip:m.ip, color:m.color, autoRestart:m.autoRestart||false, name:m.name||'' }));
@@ -2354,6 +2462,7 @@ buildPanels();
 connectAll();
 pollAllAxeOS();
 pollAllTemps();
+setTimeout(fetchAllScoreboards, 3000);
 // Push miner IPs to server for mobile
 try{
   var bootMiners=Object.values(miners).filter(function(m){return m.ip;});

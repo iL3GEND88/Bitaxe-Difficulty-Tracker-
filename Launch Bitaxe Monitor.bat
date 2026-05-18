@@ -20,6 +20,9 @@ if errorlevel 1 (
 :: This only needs to work once - if it fails we fall back to localhost only
 netsh http add urlacl url=http://+:19248/ user=Everyone >nul 2>&1
 
+:: Open in default browser
+start http://localhost:19248
+
 :: Start server
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0server.ps1"
 exit
