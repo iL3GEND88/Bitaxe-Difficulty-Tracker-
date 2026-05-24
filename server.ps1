@@ -2,7 +2,7 @@
 param()
 $PORT = 19248
 $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
-$HTML_FILE  = Join-Path $SCRIPT_DIR "BitaxeMonitor.html"
+$HTML_FILE  = Join-Path $SCRIPT_DIR "BitaxeDifficultyTracker.html"
 
 Write-Host ""
 Write-Host "  ===========================================" -ForegroundColor Cyan
@@ -179,7 +179,19 @@ while ($running -and $listener.IsListening) {
                     try {
                         $sr2 = New-Object System.IO.StreamReader($req.InputStream)
                         $nj = $sr2.ReadToEnd(); $sr2.Dispose()
-                        if ($nj -and $nj.Length -gt 2) { $script:pendingNotifs = $nj }
+                        if ($nj -and $nj.Length -gt 2) {
+                        try {
+                            $newNotifs = ConvertFrom-Json $nj
+                            if ($script:pendingNotifs) {
+                                $existing = ConvertFrom-Json $script:pendingNotifs
+                                $combined = @($existing) + @($newNotifs)
+                                if ($combined.Count -gt 50) { $combined = $combined[-50..-1] }
+                                $script:pendingNotifs = ConvertTo-Json $combined -Compress
+                            } else {
+                                $script:pendingNotifs = $nj
+                            }
+                        } catch { $script:pendingNotifs = $nj }
+                    }
                     } catch {}
                     $nb = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
                     $resp.ContentType = "application/json"
@@ -194,6 +206,51 @@ while ($running -and $listener.IsListening) {
                     $resp.OutputStream.Write($nb2, 0, $nb2.Length)
                 }
             } catch { Write-Host "  [Notif] Error: $_" -ForegroundColor Yellow }
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/setscripts") {
+            try {
+                $sr4 = New-Object System.IO.StreamReader($req.InputStream)
+                $sj4 = $sr4.ReadToEnd(); $sr4.Dispose()
+                if ($sj4 -and $sj4.Length -gt 2) {
+                    $script:scriptsCache = $sj4
+                    $script:pendingScripts = $sj4
+                }
+            } catch {}
+            $rb4=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+            $resp.ContentType="application/json"; $resp.ContentLength64=$rb4.Length
+            $resp.OutputStream.Write($rb4,0,$rb4.Length)
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/getscripts") {
+            # Return full scripts cache so Safari always has latest
+            $sout4 = if ($script:scriptsCache) { $script:scriptsCache } else { 'null' }
+            $sb4=[System.Text.Encoding]::UTF8.GetBytes($sout4)
+            $resp.ContentType="application/json"; $resp.ContentLength64=$sb4.Length
+            $resp.OutputStream.Write($sb4,0,$sb4.Length)
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/scripts") {
+            try {
+                if ($req.HttpMethod -eq "POST") {
+                    try {
+                        $sr3 = New-Object System.IO.StreamReader($req.InputStream)
+                        $sj = $sr3.ReadToEnd(); $sr3.Dispose()
+                        if ($sj -and $sj.Length -gt 2) { $script:scriptsCache = $sj }
+                    } catch {}
+                    $rb=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+                    $resp.ContentType="application/json"; $resp.ContentLength64=$rb.Length
+                    $resp.OutputStream.Write($rb,0,$rb.Length)
+                } else {
+                    $sout = if ($script:scriptsCache) { $script:scriptsCache } else { '[]' }
+                    $sb=[System.Text.Encoding]::UTF8.GetBytes($sout)
+                    $resp.ContentType="application/json"; $resp.ContentLength64=$sb.Length
+                    $resp.OutputStream.Write($sb,0,$sb.Length)
+                }
+            } catch {}
             $resp.Close(); continue
         }
 
@@ -239,7 +296,19 @@ while ($running -and $listener.IsListening) {
                     try {
                         $sr2 = New-Object System.IO.StreamReader($req.InputStream)
                         $nj = $sr2.ReadToEnd(); $sr2.Dispose()
-                        if ($nj -and $nj.Length -gt 2) { $script:pendingNotifs = $nj }
+                        if ($nj -and $nj.Length -gt 2) {
+                        try {
+                            $newNotifs = ConvertFrom-Json $nj
+                            if ($script:pendingNotifs) {
+                                $existing = ConvertFrom-Json $script:pendingNotifs
+                                $combined = @($existing) + @($newNotifs)
+                                if ($combined.Count -gt 50) { $combined = $combined[-50..-1] }
+                                $script:pendingNotifs = ConvertTo-Json $combined -Compress
+                            } else {
+                                $script:pendingNotifs = $nj
+                            }
+                        } catch { $script:pendingNotifs = $nj }
+                    }
                     } catch {}
                     $nb = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
                     $resp.ContentType = "application/json"
@@ -254,6 +323,51 @@ while ($running -and $listener.IsListening) {
                     $resp.OutputStream.Write($nb2, 0, $nb2.Length)
                 }
             } catch { Write-Host "  [Notif] Error: $_" -ForegroundColor Yellow }
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/setscripts") {
+            try {
+                $sr4 = New-Object System.IO.StreamReader($req.InputStream)
+                $sj4 = $sr4.ReadToEnd(); $sr4.Dispose()
+                if ($sj4 -and $sj4.Length -gt 2) {
+                    $script:scriptsCache = $sj4
+                    $script:pendingScripts = $sj4
+                }
+            } catch {}
+            $rb4=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+            $resp.ContentType="application/json"; $resp.ContentLength64=$rb4.Length
+            $resp.OutputStream.Write($rb4,0,$rb4.Length)
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/getscripts") {
+            # Return full scripts cache so Safari always has latest
+            $sout4 = if ($script:scriptsCache) { $script:scriptsCache } else { 'null' }
+            $sb4=[System.Text.Encoding]::UTF8.GetBytes($sout4)
+            $resp.ContentType="application/json"; $resp.ContentLength64=$sb4.Length
+            $resp.OutputStream.Write($sb4,0,$sb4.Length)
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/scripts") {
+            try {
+                if ($req.HttpMethod -eq "POST") {
+                    try {
+                        $sr3 = New-Object System.IO.StreamReader($req.InputStream)
+                        $sj = $sr3.ReadToEnd(); $sr3.Dispose()
+                        if ($sj -and $sj.Length -gt 2) { $script:scriptsCache = $sj }
+                    } catch {}
+                    $rb=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+                    $resp.ContentType="application/json"; $resp.ContentLength64=$rb.Length
+                    $resp.OutputStream.Write($rb,0,$rb.Length)
+                } else {
+                    $sout = if ($script:scriptsCache) { $script:scriptsCache } else { '[]' }
+                    $sb=[System.Text.Encoding]::UTF8.GetBytes($sout)
+                    $resp.ContentType="application/json"; $resp.ContentLength64=$sb.Length
+                    $resp.OutputStream.Write($sb,0,$sb.Length)
+                }
+            } catch {}
             $resp.Close(); continue
         }
 
@@ -374,6 +488,8 @@ while ($running -and $listener.IsListening) {
                 $json = $script:pendingAutoRestart | ConvertTo-Json -Compress
                 $script:pendingAutoRestart = $null
 $script:pendingNotifs = $null
+$script:scriptsCache = $null
+$script:pendingScripts = $null
             } else {
                 $json = 'null'
             }
@@ -407,13 +523,13 @@ $script:pendingNotifs = $null
             $resp.Close(); continue
         }
 
-        if ($path -eq "/" -or $path -eq "/index.html" -or $path -eq "/BitaxeMonitor.html") {
+        if ($path -eq "/" -or $path -eq "/index.html" -or $path -eq "/BitaxeDifficultyTracker.html") {
             if (Test-Path $HTML_FILE) {
                 $b=[System.IO.File]::ReadAllBytes($HTML_FILE)
                 $resp.ContentType="text/html; charset=utf-8"; $resp.ContentLength64=$b.Length
                 $resp.OutputStream.Write($b,0,$b.Length)
             } else {
-                $b=[System.Text.Encoding]::UTF8.GetBytes("BitaxeMonitor.html not found")
+                $b=[System.Text.Encoding]::UTF8.GetBytes("BitaxeDifficultyTracker.html not found")
                 $resp.StatusCode=404; $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
             }
             $resp.Close(); continue
@@ -435,8 +551,20 @@ $script:pendingNotifs = $null
                     $freq=$req.Headers["X-Freq"]; $voltage=$req.Headers["X-Voltage"]
                     $bodyJson='{"frequency":'+$freq+',"coreVoltage":'+$voltage+',"overclockEnabled":1}'
                 }
-                $wcp=New-Object System.Net.WebClient; $wcp.Headers.Add("Content-Type","application/json")
-                [void]$wcp.UploadString("http://$ip/api/system","PATCH",$bodyJson)
+                $patchReq=[System.Net.HttpWebRequest]::Create("http://$ip/api/system")
+                $patchReq.Method="PATCH"; $patchReq.ContentType="application/json"
+                $patchReq.Timeout=5000; $patchReq.ReadWriteTimeout=5000
+                $patchReq.ServicePoint.ConnectionLeaseTimeout=5000
+                $patchReq.ServicePoint.MaxIdleTime=5000
+                $patchBytes=[System.Text.Encoding]::UTF8.GetBytes($bodyJson)
+                $patchReq.ContentLength=$patchBytes.Length
+                try {
+                    $patchStream=$patchReq.GetRequestStream()
+                    $patchStream.Write($patchBytes,0,$patchBytes.Length)
+                    $patchStream.Close()
+                    $patchResp=$patchReq.GetResponse()
+                    $patchResp.Close()
+                } catch { }
                 $resp.StatusCode=200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
                 $b=[System.Text.Encoding]::UTF8.GetBytes("ok"); $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
                 Write-Host "  [PATCH] $ip OK" -ForegroundColor Cyan
@@ -451,15 +579,22 @@ $script:pendingNotifs = $null
         # /restart?ip=... - proxy POST to AxeOS restart endpoint
         if ($path -eq "/restart" -and $ip) {
             try {
-                $wc2 = New-Object System.Net.WebClient
-                $wc2.Headers.Add("Content-Type","application/json")
-                [void]$wc2.UploadString("http://$ip/api/system/restart","POST","")
+                $restartReq = [System.Net.HttpWebRequest]::Create("http://$ip/api/system/restart")
+                $restartReq.Method = "POST"
+                $restartReq.ContentType = "application/json"
+                $restartReq.ContentLength = 0
+                $restartReq.Timeout = 5000
+                $restartReq.ReadWriteTimeout = 5000
+                try {
+                    $restartResp=$restartReq.GetResponse()
+                    $restartResp.Close()
+                } catch { }
+                Write-Host "  [RESTART] Sent restart to $ip" -ForegroundColor Yellow
                 $resp.StatusCode = 200
                 $resp.Headers.Add("Access-Control-Allow-Origin","*")
                 $b = [System.Text.Encoding]::UTF8.GetBytes("ok")
                 $resp.ContentLength64 = $b.Length
                 $resp.OutputStream.Write($b, 0, $b.Length)
-                Write-Host "  [RESTART] Sent restart to $ip" -ForegroundColor Yellow
             } catch {
                 $b2 = [System.Text.Encoding]::UTF8.GetBytes("error: $_")
                 $resp.StatusCode = 502
@@ -472,8 +607,8 @@ $script:pendingNotifs = $null
 
         $resp.StatusCode=404; $resp.Close()
 
-    } catch [System.Net.HttpListenerException] { break }
-    catch { Write-Host "  [ERR] $_" -ForegroundColor Red }
+    } catch [System.Net.HttpListenerException] { if (!$listener.IsListening) { break }; continue }
+    catch { Write-Host "  [ERR] $_" -ForegroundColor Red; try{$resp.Close()}catch{} }
 }
 
 $listener.Stop()

@@ -9,7 +9,7 @@ No cloud. No accounts. No installs beyond the files in this zip. Runs entirely o
 ## Quick Start
 
 1. Download and unzip all files into the same folder
-2. Right-click **`Launch Bitaxe Monitor.bat`** → **Run as administrator**
+2. Right-click **`Launch Bitaxe Difficulty Tracker.bat`** → **Run as administrator**
 3. Edge opens automatically at `http://localhost:19248`
 4. On iPhone: open Safari and go to the IP shown in yellow in the console window (e.g. `http://10.0.0.145:19248`)
 
@@ -36,7 +36,7 @@ If Safari on your iPhone cannot reach the app, Windows Firewall may be blocking 
 
 **Option 1 — PowerShell (run as Administrator):**
 ```
-netsh advfirewall firewall add rule name="Bitaxe Monitor" dir=in action=allow protocol=TCP localport=19248
+netsh advfirewall firewall add rule name="Bitaxe Difficulty Tracker" dir=in action=allow protocol=TCP localport=19248
 ```
 
 **Option 2 — Manual:**
@@ -46,7 +46,7 @@ netsh advfirewall firewall add rule name="Bitaxe Monitor" dir=in action=allow pr
 4. Select **TCP**, enter `19248` → Next
 5. Select **Allow the connection** → Next
 6. Check **Private** (uncheck Public) → Next
-7. Name it `Bitaxe Monitor` → Finish
+7. Name it `Bitaxe Difficulty Tracker` → Finish
 
 ---
 
@@ -64,10 +64,10 @@ netsh advfirewall firewall add rule name="Bitaxe Monitor" dir=in action=allow pr
 
 | File | Purpose |
 |---|---|
-| `BitaxeMonitor.html` | Main Windows dashboard |
+| `Bitaxe Difficulty Tracker.html` | Main Windows dashboard |
 | `mobile.html` | iPhone Safari companion app |
 | `server.ps1` | PowerShell HTTP proxy server |
-| `Launch Bitaxe Monitor.bat` | Launcher — run as administrator |
+| `Launch Bitaxe Difficulty Tracker.bat` | Launcher — run as administrator |
 | `README.md` | This file |
 
 ---

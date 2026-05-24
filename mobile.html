@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#0d1117">
+  <meta name="color-scheme" content="dark">
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<title>AxeOS Tracker</title>
+<title>Bitaxe Difficulty Tracker</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -13,10 +15,10 @@
   --grn:#22d37a;--red:#f45060;--txt:#f0f8ff;--muted:#8ab4cc;--muted2:#1a3550;
   --orange:#f7931a;
 }
-html,body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'SF Pro',sans-serif;min-height:100vh;overflow-x:hidden}
+html,body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Roboto','Segoe UI',sans-serif;min-height:100vh;overflow-x:hidden}
 
 /* HEADER */
-#hdr{background:linear-gradient(135deg,#0b1929,#071520);border-bottom:1px solid var(--bdr);
+#hdr{background:var(--surf);border-bottom:1px solid var(--bdr);
   padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
 .axe{width:36px;height:36px;border-radius:8px;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 18px rgba(247,147,26,.5)}
 #hdr-title{flex:1}
@@ -113,6 +115,34 @@ input[type=checkbox].toggle{width:20px;height:20px;accent-color:var(--grn);curso
 .card.temps-only .hash-chart-wrap {
   display: none !important;
 }
+
+.mob-sc-card{background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.mob-sc-name{font-weight:600;font-size:.88rem;color:var(--txt);flex:1}
+.mob-sc-sub{font-size:.72rem;color:var(--muted);margin-top:2px}
+.mob-sc-tog{width:36px;height:20px;border-radius:10px;border:none;cursor:pointer;position:relative;flex-shrink:0;transition:background .2s}
+.mob-sc-tog.on{background:var(--grn)}.mob-sc-tog.off{background:var(--muted2)}
+.mob-sc-tog::after{content:'';position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s}
+.mob-sc-tog.on::after{left:18px}.mob-sc-tog.off::after{left:2px}
+.mob-sc-sec{background:var(--surf2);border-radius:8px;padding:11px 13px;margin-bottom:8px}
+.mob-sc-sec-t{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600}
+.mob-sc-fld{display:flex;flex-direction:column;gap:3px;margin-bottom:9px}
+.mob-sc-lbl{font-size:.7rem;color:var(--muted)}
+.mob-sc-inp{background:var(--surf);border:1px solid var(--bdr);border-radius:5px;color:var(--txt);font-size:.82rem;padding:6px 9px;width:100%;box-sizing:border-box}
+.mob-sc-sel{background:var(--surf);border:1px solid var(--bdr);border-radius:5px;color:var(--txt);font-size:.82rem;padding:5px 8px;width:100%;box-sizing:border-box}
+.mob-sc-crow,.mob-sc-arow{display:flex;gap:5px;align-items:center;margin-bottom:7px;flex-wrap:wrap}
+.mob-sc-add{background:transparent;border:1px solid var(--muted2);color:var(--muted);font-size:.74rem;padding:4px 10px;border-radius:5px;cursor:pointer;margin-top:2px}
+.mob-sc-rm{background:transparent;border:none;color:var(--muted);font-size:.9rem;cursor:pointer;padding:2px 5px;flex-shrink:0}
+  :root { color-scheme: dark; }
+  select { background-color: var(--surf) !important; color: var(--txt) !important; }
+  input[type="number"], input[type="text"], input { background-color: var(--surf) !important; color: var(--txt) !important; }
+
+#mob-block-banner{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.93);display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;}
+#mob-block-banner.show{display:flex;}
+.mob-block-emoji{font-size:5rem;margin-bottom:16px;animation:mob-pulse 1s ease-in-out infinite;}
+.mob-block-title{font-size:2rem;font-weight:900;color:#f7931a;letter-spacing:.05em;margin-bottom:8px;}
+.mob-block-sub{font-size:1rem;color:#fff;opacity:.8;margin-bottom:24px;}
+.mob-block-close{background:#f7931a;border:none;color:#000;font-weight:700;font-size:1rem;padding:12px 32px;border-radius:8px;cursor:pointer;}
+@keyframes mob-pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.15);}}
 </style>
 </head>
 <body>
@@ -120,7 +150,7 @@ input[type=checkbox].toggle{width:20px;height:20px;accent-color:var(--grn);curso
 <div id="hdr">
   <div class="axe">⛏</div>
   <div id="hdr-title">
-    <h1>AxeOS Tracker</h1>
+    <h1>Bitaxe Difficulty Tracker</h1>
     <p id="hdr-sub">Connecting…</p>
   </div>
   <button id="btn-donate-mob" onclick="document.getElementById('mob-donate-overlay').style.display='flex'" style="background:transparent;border:1px solid #f7931a;color:#f7931a;font-family:inherit;font-size:.62rem;padding:4px 10px;border-radius:6px;cursor:pointer;letter-spacing:.06em;white-space:nowrap">💛 Donate</button>
@@ -272,7 +302,14 @@ function renderMiners(){
   if(minerIPs.length>1){
     var sumCard=document.createElement('div'); sumCard.className='card';
     sumCard.style.marginBottom='14px';
-    sumCard.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">'+'<div style="font-size:1.05rem;font-weight:700;color:var(--muted)" id="mob-totalwatts">'+(function(){var w=0;minerIPs.forEach(function(ip){var p=(sessionData[ip]||{}).power;if(p!=null)w+=p;});return w>0?w.toFixed(1)+'W':'\u2014W';})()+'</div>'+'<div style="font-size:1.05rem;font-weight:700;color:var(--grn)" id="mob-totalhr">'+(totalHR>=1000?(totalHR/1000).toFixed(2)+' TH/s':totalHR.toFixed(1)+' GH/s')+'</div></div>';
+    var _mTotalW=0; minerIPs.forEach(function(ip){var p=(sessionData[ip]||{}).power;if(p!=null)_mTotalW+=p;});
+    var _mPwrRate=parseFloat(localStorage.getItem('mob_power_rate')||'0');
+    var _mCostDay=_mTotalW>0&&_mPwrRate>0?(_mTotalW/1000)*24*_mPwrRate:0;
+    var _mCostStr=_mCostDay>0?'$'+_mCostDay.toFixed(2)+'/day':'';
+    sumCard.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;flex-wrap:wrap;gap:4px">'+
+      '<div style="font-size:1.05rem;font-weight:700;color:var(--muted)" id="mob-totalwatts">'+(_mTotalW>0?_mTotalW.toFixed(1)+'W':'—W')+'</div>'+
+      (_mCostStr?'<div id="mob-totalcost" style="font-size:.85rem;font-weight:600;color:#f7931a">'+_mCostStr+'</div>':'<div id="mob-totalcost"></div>')+
+      '<div style="font-size:1.05rem;font-weight:700;color:var(--grn)" id="mob-totalhr">'+(totalHR>=1000?(totalHR/1000).toFixed(2)+' TH/s':totalHR.toFixed(1)+' GH/s')+'</div></div>';
     c.appendChild(sumCard);
   }
 
@@ -300,6 +337,9 @@ function renderMiners(){
     nameSpan.textContent=nameVal||ip;
     ipEl.appendChild(nameSpan);
     var hrEl=document.createElement('div'); hrEl.className='card-hr'; hrEl.id='hrbadge-'+key; hrEl.textContent=fmtHR(winHR);
+    var stallBadge=document.createElement('div'); stallBadge.id='stallbadge-'+key;
+    stallBadge.style.cssText='font-size:.72em;color:var(--red);white-space:nowrap;align-self:center;margin:0 4px;font-weight:700;';
+
     var errEl=document.createElement('div');
     errEl.id='errbadge-'+key;
     errEl.style.cssText='font-size:.72em;color:var(--red);white-space:nowrap;align-self:center;margin:0';
@@ -320,7 +360,13 @@ function renderMiners(){
     clbl.appendChild(swatch); clbl.appendChild(cpick);
         var arEl=document.createElement('button');
     arEl.id='mob-ar-'+key;
-    var _localAR=mobGetARState(ip); var arOn=_localAR!==null?_localAR:(((sessionData[ip]||{}).autoRestart)||false);
+    // Use session data from Windows unless user tapped recently (15s debounce)
+    var _tapAge = _mobARTapTime[ip] ? Date.now()-_mobARTapTime[ip] : 99999;
+    var _sdAR = (sessionData[ip]||{}).autoRestart||false;
+    var _localAR = mobGetARState(ip);
+    var arOn = _tapAge < 15000 ? (_localAR!==null?_localAR:_sdAR) : _sdAR;
+    // Keep local state in sync with session data after debounce
+    if(_tapAge >= 15000 && _localAR !== _sdAR){ _mobARState[ip]=_sdAR; }
     arEl.textContent='A';
     arEl.title='Auto-Restart';
     arEl.style.cssText='background:transparent;border:1px solid '+(arOn?'var(--grn)':'var(--muted)')+';border-radius:3px;color:'+(arOn?'var(--grn)':'var(--muted)')+';font-size:.65rem;cursor:pointer;padding:0 2px;margin-left:1px;flex-shrink:0';
@@ -345,7 +391,7 @@ function renderMiners(){
       };
     })(card, thermEl, ip);
     thermEl.className='therm-btn';
-    hdr.appendChild(ipEl); hdr.appendChild(hrEl); hdr.appendChild(errEl); hdr.appendChild(arEl); hdr.appendChild(thermEl); hdr.appendChild(rmEl); hdr.appendChild(clbl);
+    hdr.appendChild(ipEl); hdr.appendChild(hrEl); hdr.appendChild(stallBadge); hdr.appendChild(errEl); hdr.appendChild(arEl); hdr.appendChild(thermEl); hdr.appendChild(rmEl); hdr.appendChild(clbl);
     card.appendChild(hdr);
 
     // Avg/share calculation
@@ -750,7 +796,7 @@ function renderTop10(){
     bar.id='top10-topn-bar';
     bar.style.cssText='display:flex;gap:8px;align-items:center;margin-bottom:12px';
     bar.innerHTML='<span style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Show:</span>';
-    [10,25,50,100].forEach(function(n){
+    [10,25,50,100,250,500].forEach(function(n){
       var btn=document.createElement('button');
       btn.textContent=n;
       btn.dataset.n=n;
@@ -809,7 +855,7 @@ function renderAllTime(){
     bar2.id='alltime-topn-bar';
     bar2.style.cssText='display:flex;gap:8px;align-items:center;margin-bottom:12px';
     bar2.innerHTML='<span style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Show:</span>';
-    [10,25,50,100].forEach(function(n){
+    [10,25,50,100,250,500].forEach(function(n){
       var btn=document.createElement('button');
       btn.textContent=n;btn.dataset.n=n;
       btn.style.cssText='background:'+(mobAllTimeN===n?'var(--orange)':'var(--surf2)')+';border:1px solid '+(mobAllTimeN===n?'var(--orange)':'var(--bdr)')+';color:'+(mobAllTimeN===n?'#000':'#e8f4ff')+';font-family:inherit;font-size:.72rem;padding:4px 12px;border-radius:6px;cursor:pointer';
@@ -953,6 +999,7 @@ async function poolSave(ip){
     if(res.ok){msg.style.color='var(--grn)';msg.textContent='Saved! Restart to apply.';}
     else{msg.style.color='var(--red)';msg.textContent='Failed ('+res.status+')';}
   }catch(e){msg.style.color='var(--red)';msg.textContent='Error: '+e.message;}
+  refreshPaused=false;
 }
 async function poolRestart(ip){
   var key=ip.replace(/[.]/g,'_');
@@ -963,27 +1010,96 @@ async function poolRestart(ip){
     if(res.ok){msg.style.color='var(--grn)';msg.textContent='Restart sent!';}
     else{msg.style.color='var(--red)';msg.textContent='Failed.';}
   }catch(e){msg.style.color='var(--red)';msg.textContent='Error: '+e.message;}
+  refreshPaused=false;
 }
 // ── SETTINGS TAB ──────────────────────────────────────────────────────────────
 function renderSettings(){
   var c=document.getElementById('tab-settings');
   if(!minerIPs.length){c.innerHTML='<div id="mob-notif-wrap"></div><div class="loading">No miners configured</div>';return;}
   c.innerHTML='<div id="mob-notif-wrap"></div>';
-  
-  // Total hashrate summary card
-  var totalHR=0;
-  minerIPs.forEach(function(ip){
-    var sd=sessionData[ip]||{};
-    var d=minerData[ip]||{};
-    var hr=sd.hashrate!=null?sd.hashrate:(d.hashRate_1m||d.hashRate||0);
-    totalHR+=hr;
-  });
+
+  // Total bar at top of settings
   if(minerIPs.length>1){
+    var _sTotalW=0; minerIPs.forEach(function(ip){var p=(sessionData[ip]||{}).power;if(p!=null)_sTotalW+=p;});
+    var _sPwrRate=parseFloat(localStorage.getItem('mob_power_rate')||'0');
+    var _sCostDay=_sTotalW>0&&_sPwrRate>0?(_sTotalW/1000)*24*_sPwrRate:0;
+    var _sCostStr=_sCostDay>0?'$'+_sCostDay.toFixed(2)+'/day':'';
+    var _sTotalHR=0; minerIPs.forEach(function(ip){var sd2=sessionData[ip]||{};_sTotalHR+=sd2.hashrate!=null?sd2.hashrate:0;});
     var sumCard=document.createElement('div'); sumCard.className='card';
     sumCard.style.marginBottom='14px';
-    sumCard.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">'+'<div style="font-size:1.05rem;font-weight:700;color:var(--muted)" id="mob-totalwatts">'+(function(){var w=0;minerIPs.forEach(function(ip){var p=(sessionData[ip]||{}).power;if(p!=null)w+=p;});return w>0?w.toFixed(1)+'W':'\u2014W';})()+'</div>'+'<div style="font-size:1.05rem;font-weight:700;color:var(--grn)" id="mob-totalhr">'+(totalHR>=1000?(totalHR/1000).toFixed(2)+' TH/s':totalHR.toFixed(1)+' GH/s')+'</div></div>';
+    sumCard.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;flex-wrap:wrap;gap:4px">'+
+      '<div style="font-size:1.05rem;font-weight:700;color:var(--muted)">'+(_sTotalW>0?_sTotalW.toFixed(1)+'W':'—W')+'</div>'+
+      (_sCostStr?'<div style="font-size:.85rem;font-weight:600;color:#f7931a">'+_sCostStr+'</div>':'')+
+      '<div style="font-size:1.05rem;font-weight:700;color:var(--grn)">'+(_sTotalHR>=1000?(_sTotalHR/1000).toFixed(2)+' TH/s':_sTotalHR.toFixed(1)+' GH/s')+'</div></div>';
     c.appendChild(sumCard);
   }
+
+  // Scripts button at top
+  if(_mobScView==='list'||_mobScView==='editor'){ renderMobScripts(); return; }
+  var scBtn=document.createElement('button');
+  scBtn.style.cssText='width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);font-size:.85rem;font-weight:600;padding:11px 14px;border-radius:8px;cursor:pointer;text-align:left;margin-bottom:14px;display:flex;align-items:center;gap:8px';
+  scBtn.innerHTML='📜 <span style="flex:1">Scripts</span><span style="color:var(--muted);font-size:.75rem">'+_mobSc.length+' saved ›</span>';
+  scBtn.onclick=function(){_mobScView='list';mobLoadScripts().then(function(){renderSettings();}).catch(function(){renderSettings();});}; 
+  c.appendChild(scBtn);
+
+  var themeBtn=document.createElement('button');
+  themeBtn.style.cssText='width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);font-size:.85rem;font-weight:600;padding:10px 14px;border-radius:8px;cursor:pointer;margin-bottom:14px;';
+  themeBtn.textContent='Theme / BG Color';
+  themeBtn.onclick=function(){showThemePicker();};
+  c.appendChild(themeBtn);
+
+  // Electricity cost input
+  var costCard=document.createElement('div');
+  costCard.style.cssText='background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;margin-bottom:14px;';
+  var costLabel=document.createElement('div');
+  costLabel.style.cssText='font-size:.72rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;';
+  costLabel.textContent='Electricity Cost';
+  costCard.appendChild(costLabel);
+  var costRow=document.createElement('div');
+  costRow.style.cssText='display:flex;align-items:center;gap:8px;';
+  var costPrefix=document.createElement('span');
+  costPrefix.style.cssText='color:var(--txt);font-size:.9rem;';
+  costPrefix.textContent='$';
+  var costInput=document.createElement('input');
+  costInput.type='number'; costInput.step='0.001'; costInput.min='0';
+  costInput.style.cssText='flex:1;background:var(--surf);border:1px solid var(--bdr);color:var(--txt);font-size:.9rem;padding:6px 10px;border-radius:6px;';
+  costInput.value=localStorage.getItem('mob_power_rate')||'';
+  costInput.placeholder='0.10';
+  var costSuffix=document.createElement('span');
+  costSuffix.style.cssText='color:var(--muted);font-size:.85rem;white-space:nowrap;';
+  costSuffix.textContent='/ kWh';
+  var costSaveBtn=document.createElement('button');
+  costSaveBtn.style.cssText='background:var(--grn);border:none;color:#000;font-weight:700;font-size:.8rem;padding:6px 12px;border-radius:6px;cursor:pointer;white-space:nowrap;';
+  costSaveBtn.textContent='Save';
+  costSaveBtn.onclick=function(){
+    var rate=parseFloat(costInput.value)||0;
+    try{localStorage.setItem('mob_power_rate',String(rate));}catch(e){}
+    renderSettings();
+  };
+  costRow.appendChild(costPrefix);
+  costRow.appendChild(costInput);
+  costRow.appendChild(costSuffix);
+  costRow.appendChild(costSaveBtn);
+  costCard.appendChild(costRow);
+  c.appendChild(costCard);
+
+  // Miner Settings collapsible
+  var _msOpen=localStorage.getItem('mob_minersett_open')==='1';
+  var msBtn=document.createElement('button');
+  msBtn.style.cssText='width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);font-size:.85rem;font-weight:600;padding:10px 14px;border-radius:8px;cursor:pointer;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;';
+  var msLbl=document.createElement('span'); msLbl.textContent='Miner Settings';
+  var msArr=document.createElement('span'); msArr.textContent=_msOpen?'▲':'▼'; msArr.style.fontSize='.7rem';
+  msBtn.appendChild(msLbl); msBtn.appendChild(msArr);
+  c.appendChild(msBtn);
+  var msWrap=document.createElement('div');
+  msWrap.style.display=_msOpen?'block':'none';
+  c.appendChild(msWrap);
+  msBtn.onclick=function(){
+    var open=msWrap.style.display==='none';
+    msWrap.style.display=open?'block':'none';
+    msArr.textContent=open?'▲':'▼';
+    try{localStorage.setItem('mob_minersett_open',open?'1':'0');}catch(e){}
+  };
 
   minerIPs.forEach(function(ip){
     var d=minerData[ip]||{};
@@ -1037,7 +1153,7 @@ function renderSettings(){
       '<div class="set-msg" id="m-msg-'+key+'"></div>';
 
     card.appendChild(body);
-    c.appendChild(card);
+    msWrap.appendChild(card);
   });
 }
 
@@ -1047,6 +1163,7 @@ function toggleFan(key, checked){
 }
 
 async function mSave(ip){
+  refreshPaused=true; // pause refresh during save so card doesn't get wiped
   var key=ip.replace(/\./g,'_');
   var msg=document.getElementById('m-msg-'+key);
   var nameEl=document.getElementById('mob-name-'+key);
@@ -1062,7 +1179,7 @@ async function mSave(ip){
   }
   var freq=parseInt(document.getElementById('m-freq-'+key).value);
   var volt=parseInt(document.getElementById('m-volt-'+key).value);
-  if(isNaN(freq)||isNaN(volt)){msg.style.color='var(--red)';msg.textContent='Enter valid numbers.';return;}
+  if(isNaN(freq)||isNaN(volt)){msg.style.color='var(--red)';msg.textContent='Enter valid numbers.';refreshPaused=false;return;}
   var autoFan=document.getElementById('m-autofan-'+key).checked?1:0;
   var body={frequency:freq,coreVoltage:volt,overclockEnabled:1,autofanspeed:autoFan};
   if(autoFan){
@@ -1076,12 +1193,14 @@ async function mSave(ip){
   }
   msg.style.color='var(--muted)'; msg.textContent='Saving…';
   try{
-    var r=await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000),headers:{'X-Body':JSON.stringify(body)}});
+    var r=await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(8000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(body)}});
     if(r.ok){
-      msg.style.color='var(--grn)';msg.textContent='Saved! Restart to apply.';
-      if(nameChanged){ minersBuilt=false; } // rebuild cards to show new name
-    } else{msg.style.color='var(--red)';msg.textContent='Failed ('+r.status+')';}
+      msg.style.color='var(--grn)';msg.textContent='Saved! ✓';
+      settingsDirty=false; refreshPaused=false;
+      if(nameChanged){ minersBuilt=false; }
+    } else{msg.style.color='var(--red)';msg.textContent='Failed ('+r.status+')';refreshPaused=false;}
   }catch(e){msg.style.color='var(--red)';msg.textContent='Error: '+e.message;}
+  refreshPaused=false;
 }
 
 async function mRestart(ip){
@@ -1093,6 +1212,7 @@ async function mRestart(ip){
     if(r.ok){msg.style.color='var(--grn)';msg.textContent='Restart sent!';}
     else{msg.style.color='var(--red)';msg.textContent='Failed.';}
   }catch(e){msg.style.color='var(--red)';msg.textContent='Error: '+e.message;}
+  refreshPaused=false;
 }
 
 // ── REFRESH ───────────────────────────────────────────────────────────────────
@@ -1117,6 +1237,9 @@ function mobAddMiner(){
 }
 
 var _mobARState={};
+var _mobStallTs={};
+var _mobARTapTime={};
+var _mobARTapExpected={}; // expected value after tap, cleared when confirmed
 var _mobTempsOnly={
   _data: (function(){try{return JSON.parse(localStorage.getItem('mob_tempsonly')||'[]');}catch(e){return [];}}()),
   has:function(ip){return this._data.indexOf(ip)>=0;},
@@ -1140,12 +1263,38 @@ function mobSetAutoRestart(ip, val){
 }
 
 var _lastNotifTs=0;
-function showMobNotif(title,msg,type){
+function showMobNotif(title,msg,type,ts){
   var wrap=document.getElementById('mob-notif-wrap');
   if(!wrap){wrap=document.createElement('div');wrap.id='mob-notif-wrap';var tm=document.getElementById('tab-miners');if(tm)tm.insertBefore(wrap,tm.firstChild);}
+  var now2=new Date(ts||Date.now()); var hh2=now2.getHours()%12||12; var mm2=String(now2.getMinutes()).padStart(2,'0'); var ampm2=now2.getHours()>=12?'PM':'AM';
+  var ts2=hh2+':'+mm2+' '+ampm2;
   var n=document.createElement('div');n.className='mob-notif '+(type||'warn');
-  n.innerHTML='<div class="mob-notif-body"><div class="mob-notif-title">'+title+'</div><div class="mob-notif-msg">'+msg+'</div></div><button class="mob-notif-x" onclick="this.parentNode.remove()">✕</button>';
+  n.innerHTML='<div class="mob-notif-body"><div class="mob-notif-title">'+title+' <span style="font-size:.75em;opacity:.55;font-weight:400">'+ts2+'</span></div><div class="mob-notif-msg">'+msg+'</div></div><button class="mob-notif-x" onclick="this.parentNode.remove()">✕</button>';
   wrap.insertBefore(n,wrap.firstChild);
+}
+
+var _mobLastBlockTs=0;
+function checkForBlockFound(arr){
+  arr.forEach(function(n){
+    if(n&&n.title&&n.title.indexOf('BLOCK')>=0&&n.ts>_mobLastBlockTs){
+      _mobLastBlockTs=n.ts;
+      var sub=document.getElementById('mob-block-sub');
+      if(sub) sub.textContent=n.msg||'A block was found!';
+      var banner=document.getElementById('mob-block-banner');
+      if(banner){ banner.classList.add('show'); setTimeout(function(){banner.classList.remove('show');},30000); }
+      try{
+        var ctx=new(window.AudioContext||window.webkitAudioContext)();
+        var osc=ctx.createOscillator(),gain=ctx.createGain();
+        osc.connect(gain);gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(880,ctx.currentTime);
+        osc.frequency.setValueAtTime(1100,ctx.currentTime+0.15);
+        osc.frequency.setValueAtTime(880,ctx.currentTime+0.3);
+        gain.gain.setValueAtTime(0.3,ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.6);
+        osc.start(ctx.currentTime);osc.stop(ctx.currentTime+0.6);
+      }catch(e){}
+    }
+  });
 }
 async function pollNotifications(){
   try{
@@ -1153,7 +1302,7 @@ async function pollNotifications(){
     if(!r.ok)return;
     var arr=await r.json();
     if(!Array.isArray(arr))return;
-    arr.forEach(function(n){if(n&&n.ts>_lastNotifTs){showMobNotif(n.title,n.msg,n.type);_lastNotifTs=n.ts;}});
+    arr.forEach(function(n){if(n&&n.ts>_lastNotifTs){showMobNotif(n.title,n.msg,n.type,n.ts);_lastNotifTs=n.ts;}}); checkForBlockFound(arr);
   }catch(e){}
 }
 setInterval(pollNotifications,5000);
@@ -1204,6 +1353,386 @@ function updateOddsCard(){
       '<span style="color:var(--muted)">Per month</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(blocksPerMonth)+'</span>'+
       '<span style="color:var(--muted)">Per year</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(blocksPerYear)+'</span>'+
     '</div>';
+}
+
+// ── MOBILE SCRIPTS ──────────────────────────────────────────────────────────
+var _mobSc = (function(){ try{ var s=localStorage.getItem('mob_scripts'); return s?JSON.parse(s):[]; }catch(e){ return []; } })();
+(function(){
+  try{ var bg=localStorage.getItem('mob_bg_color'); if(bg) document.documentElement.style.setProperty('--bg',bg); }catch(e){}
+  try{ var sf=localStorage.getItem('mob_surf_color'); if(sf) document.documentElement.style.setProperty('--surf',sf); }catch(e){}
+  try{ var sf2=localStorage.getItem('mob_surf2_color'); if(sf2) document.documentElement.style.setProperty('--surf2',sf2); }catch(e){}
+})();
+var _mobScEdit = null;
+var _mobScView = ''; // '' = miner settings, 'list' = scripts list, 'editor' = script editor
+
+var MOB_SC_FIELDS = ['hashrate','hashrate_1m','hashrate_10m','hashrate_1h','bestDiff','bestSessionDiff',
+  'efficiency','asic1Temp','asic2Temp','asic3Temp','asic4Temp','asic5Temp','asic6Temp','asic7Temp','asic8Temp','vrTemp','fanRpm','fanMode','tempTarget','power','voltage','current',
+  'poolConnected','rejectRate','staleRate','poolTarget','uptime','online','frequency',
+  'hourOfDay','minuteOfDay'];
+var MOB_SC_OPS = ['>','>=','<','<=','==','!=','between','outside','is_true','is_false'];
+var MOB_SC_ACTIONS = ['restart','setFrequency','setCoreVoltage','setFanSpeed','setAutoFan',
+  'setTargetTemp','setOverclock','setPrimaryPool','switchFallbackPool',
+  'setWorkerName','setPassword','notification'];
+
+async function mobLoadScripts(){
+  try{
+    var r=await fetch(SERVER+'/scripts',{signal:AbortSignal.timeout(4000)});
+    if(r.ok){
+      var data=await r.json();
+      if(Array.isArray(data)&&data.length) _mobSc=data;
+    }
+  }catch(e){}
+  // fallback to localStorage
+  if(!_mobSc.length){
+    try{ var ls=localStorage.getItem('mob_scripts'); if(ls) _mobSc=JSON.parse(ls); }catch(e){}
+  }
+}
+
+async function mobSaveScripts(){
+  _mobScPushedAt=Date.now();
+  try{ localStorage.setItem('mob_scripts',JSON.stringify(_mobSc)); }catch(e){}
+  try{
+    await fetch(SERVER+'/setscripts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(_mobSc),signal:AbortSignal.timeout(4000)});
+  }catch(e){}
+}
+
+function renderMobScripts(){
+  var c=document.getElementById('tab-settings');
+  c.innerHTML='';
+  // Header with back button
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:14px';
+  if(_mobScView==='editor'){
+    var bk=document.createElement('button');
+    bk.style.cssText='background:transparent;border:1px solid var(--muted2);color:var(--muted);font-size:.8rem;padding:4px 10px;border-radius:5px;cursor:pointer;flex-shrink:0';
+    bk.textContent='← Back';
+    bk.onclick=function(){_mobScView='list';renderMobScripts();};
+    hdr.appendChild(bk);
+    var ttl=document.createElement('span');
+    ttl.style.cssText='font-weight:700;color:var(--txt);font-size:.95rem;flex:1';
+    ttl.textContent=_mobScEdit.name||'Edit Script';
+    hdr.appendChild(ttl);
+    var sv=document.createElement('button');
+    sv.style.cssText='background:var(--grn);border:none;color:#000;font-weight:700;font-size:.78rem;padding:5px 14px;border-radius:5px;cursor:pointer';
+    sv.textContent='Save';
+    sv.onclick=function(){mobSaveScript();};
+    hdr.appendChild(sv);
+  } else {
+    var bkSet=document.createElement('button');
+    bkSet.style.cssText='background:transparent;border:1px solid var(--muted2);color:var(--muted);font-size:.8rem;padding:4px 10px;border-radius:5px;cursor:pointer;flex-shrink:0';
+    bkSet.textContent='← Settings';
+    bkSet.onclick=function(){_mobScView='';settingsDirty=false;document.getElementById('tab-settings').innerHTML='';renderSettings();};
+    hdr.appendChild(bkSet);
+    var ttl2=document.createElement('span');
+    ttl2.style.cssText='font-weight:700;color:var(--txt);font-size:.95rem;flex:1';
+    ttl2.textContent='Scripts';
+    hdr.appendChild(ttl2);
+    var nb=document.createElement('button');
+    nb.style.cssText='background:var(--grn);border:none;color:#000;font-weight:700;font-size:.78rem;padding:5px 12px;border-radius:5px;cursor:pointer';
+    nb.textContent='+ New';
+    nb.onclick=function(){mobNewScript();};
+    hdr.appendChild(nb);
+  }
+  c.appendChild(hdr);
+
+  if(_mobScView==='list'){
+    mobRenderScList(c);
+  } else {
+    mobBuildEditor(c);
+  }
+}
+
+function mobRenderScList(c){
+  _mobSc.sort(function(a,b){return String(a.id).localeCompare(String(b.id));});
+  if(!_mobSc.length){
+    var em=document.createElement('div');
+    em.style.cssText='color:var(--muted);text-align:center;padding:30px 0;font-size:.85rem';
+    em.textContent='No scripts yet. Tap + New to create one.';
+    c.appendChild(em); return;
+  }
+  _mobSc.forEach(function(sc,i){
+    var card=document.createElement('div'); card.className='mob-sc-card';
+    var info=document.createElement('div'); info.style.flex='1';
+    var nm=document.createElement('div'); nm.className='mob-sc-name'; nm.textContent=sc.name||'Unnamed';
+    var sb=document.createElement('div'); sb.className='mob-sc-sub';
+    sb.textContent=(sc.conditions||[]).length+' cond · '+(sc.actions||[]).length+' action(s)';
+    info.appendChild(nm); info.appendChild(sb);
+    var tog=document.createElement('button'); tog.className='mob-sc-tog '+(sc.enabled?'on':'off'); tog.dataset.scid=sc.id;
+    tog.onclick=(function(s){return function(e){e.stopPropagation();s.enabled=!s.enabled;s.updatedAt=Date.now();this.className='mob-sc-tog '+(s.enabled?'on':'off');mobSaveScripts();};})(sc);
+    var eb=document.createElement('button');
+    eb.style.cssText='background:transparent;border:1px solid var(--muted2);color:var(--muted);font-size:.73rem;padding:3px 9px;border-radius:5px;cursor:pointer;margin-left:5px';
+    eb.textContent='Edit'; eb.onclick=(function(s){return function(){mobOpenEditor(s);};})(sc);
+    var db=document.createElement('button');
+    db.style.cssText='background:transparent;border:1px solid var(--red);color:var(--red);font-size:.73rem;padding:3px 9px;border-radius:5px;cursor:pointer;margin-left:4px';
+    db.textContent='Del'; db.onclick=(function(idx){return function(){if(confirm('Delete?')){_mobSc.splice(idx,1);mobSaveScripts();renderMobScripts();}};})(i);
+    card.appendChild(info); card.appendChild(tog); card.appendChild(eb); card.appendChild(db);
+    c.appendChild(card);
+  });
+}
+
+function mobNewScript(){
+  mobOpenEditor({id:'sc_'+Date.now(),name:'New Script',enabled:true,miners:'all',duration:0,cooldown:300,conditions:[],actions:[],elseActions:[]});
+}
+
+function mobOpenEditor(sc){
+  _mobScEdit=JSON.parse(JSON.stringify(sc));
+  _mobScView='editor';
+  renderMobScripts();
+}
+
+function mobBuildEditor(c){
+  var sc=_mobScEdit;
+  // Basic settings
+  var top=document.createElement('div'); top.className='mob-sc-sec';
+  top.innerHTML='<div class="mob-sc-sec-t">Script Settings</div>';
+  var nf=document.createElement('div'); nf.className='mob-sc-fld';
+  nf.innerHTML='<div class="mob-sc-lbl">Name</div>';
+  var ni=document.createElement('input'); ni.className='mob-sc-inp'; ni.value=sc.name||'';
+  ni.oninput=function(){sc.name=this.value;};
+  nf.appendChild(ni); top.appendChild(nf);
+  // Enabled
+  var er=document.createElement('div'); er.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:9px';
+  var el=document.createElement('span'); el.style.cssText='font-size:.83rem;color:var(--txt)'; el.textContent='Enabled';
+  var et=document.createElement('button'); et.className='mob-sc-tog '+(sc.enabled?'on':'off');
+  et.onclick=function(){sc.enabled=!sc.enabled;this.className='mob-sc-tog '+(sc.enabled?'on':'off');};
+  er.appendChild(el); er.appendChild(et); top.appendChild(er);
+  // Applies to - use IP instead of internal ID
+  var mf=document.createElement('div'); mf.className='mob-sc-fld';
+  mf.innerHTML='<div class="mob-sc-lbl">Applies To</div>';
+  var ms=document.createElement('select'); ms.className='mob-sc-sel';
+  var ao=document.createElement('option'); ao.value='all'; ao.textContent='All Miners'; ms.appendChild(ao);
+  minerIPs.forEach(function(ip){
+    var o=document.createElement('option'); o.value=ip; o.textContent=getMinerName(ip)||ip;
+    ms.appendChild(o);
+  });
+  // sc.miners could be 'all', an IP, or an internal ID - normalize to IP
+  var minersVal=sc.miners||'all';
+  if(minersVal!=='all'&&minerIPs.indexOf(minersVal)<0){
+    // It's an internal ID from Windows - find matching IP via session data
+    var matchedIP=minerIPs.find(function(ip){
+      var sd=sessionData[ip]||{};
+      return false; // session data doesn't have miner ID
+    });
+    // Try matching by index position
+    var idNum=parseInt(minersVal);
+    if(!isNaN(idNum)&&minerIPs[idNum]) minersVal=minerIPs[idNum];
+  }
+  ms.value=minersVal;
+  // Also update sc.miners to use IP going forward
+  if(minersVal!==sc.miners) sc.miners=minersVal;
+  ms.onchange=function(){sc.miners=this.value;};
+  mf.appendChild(ms); top.appendChild(mf);
+  // Duration + Cooldown
+  var dc=document.createElement('div'); dc.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px';
+  [['duration','Duration (sec)'],['cooldown','Cooldown (sec)']].forEach(function(p){
+    var df=document.createElement('div'); df.className='mob-sc-fld';
+    df.innerHTML='<div class="mob-sc-lbl">'+p[1]+'</div>';
+    var di=document.createElement('input'); di.className='mob-sc-inp'; di.type='number'; di.min=0; di.value=sc[p[0]]||0;
+    di.oninput=(function(k){return function(){sc[k]=parseInt(this.value)||0;};})(p[0]);
+    df.appendChild(di); dc.appendChild(df);
+  });
+  top.appendChild(dc); c.appendChild(top);
+  // Conditions
+  var cs=document.createElement('div'); cs.className='mob-sc-sec';
+  cs.innerHTML='<div class="mob-sc-sec-t">Conditions (ALL must be true)</div>';
+  (sc.conditions||[]).forEach(function(cond,ci){cs.appendChild(mobMkCrow(cond,ci));});
+  var ac=document.createElement('button'); ac.className='mob-sc-add'; ac.textContent='+ Add Condition';
+  ac.onclick=function(){sc.conditions.push({field:'hashrate',op:'<',v1:'0',v2:''});renderMobScripts();};
+  cs.appendChild(ac); c.appendChild(cs);
+  c.appendChild(mobMkActionSec('Actions','actions'));
+  c.appendChild(mobMkActionSec('Else Actions (optional)','elseActions'));
+}
+
+function mobMkCrow(cond,ci){
+  var row=document.createElement('div'); row.className='mob-sc-crow';
+  var fs=document.createElement('select'); fs.className='mob-sc-sel'; fs.style.flex='1';
+  MOB_SC_FIELDS.forEach(function(f){var o=document.createElement('option');o.value=f;o.textContent=f;if(f===cond.field)o.selected=true;fs.appendChild(o);});
+  fs.onchange=function(){cond.field=this.value;};
+  var os=document.createElement('select'); os.className='mob-sc-sel'; os.style.width='80px';
+  MOB_SC_OPS.forEach(function(op){var o=document.createElement('option');o.value=op;o.textContent=op;if(op===cond.op)o.selected=true;os.appendChild(o);});
+  os.onchange=function(){cond.op=this.value;renderMobScripts();};
+  if(cond.field==='hourOfDay'||cond.field==='minuteOfDay'){
+    var now2=new Date();
+    var hh3=now2.getHours()%12||12; var mm3=String(now2.getMinutes()).padStart(2,'0'); var ap2=now2.getHours()>=12?'PM':'AM';
+    var hint2=document.createElement('span');
+    hint2.style.cssText='font-size:.68rem;color:var(--muted);white-space:nowrap';
+    hint2.textContent=cond.field==='hourOfDay'?'now='+now2.getHours()+'('+hh3+ap2+')':'now='+(now2.getHours()*60+now2.getMinutes())+'('+hh3+':'+mm3+' '+ap2+')';
+    row.appendChild(hint2);
+  }
+  row.appendChild(fs); row.appendChild(os);
+  if(cond.op!=='is_true'&&cond.op!=='is_false'){
+    var v1=document.createElement('input'); v1.className='mob-sc-inp'; v1.style.width='65px'; v1.value=cond.v1||''; v1.placeholder='val';
+    v1.oninput=function(){cond.v1=this.value;}; row.appendChild(v1);
+  }
+  if(cond.op==='between'||cond.op==='outside'){
+    var v2=document.createElement('input'); v2.className='mob-sc-inp'; v2.style.width='65px'; v2.value=cond.v2||''; v2.placeholder='to';
+    v2.oninput=function(){cond.v2=this.value;}; row.appendChild(v2);
+  }
+  var rm=document.createElement('button'); rm.className='mob-sc-rm'; rm.innerHTML='&#x2715;';
+  rm.onclick=(function(i){return function(){_mobScEdit.conditions.splice(i,1);renderMobScripts();};})(ci);
+  row.appendChild(rm); return row;
+}
+
+function mobMkActionSec(title,key){
+  var sec=document.createElement('div'); sec.className='mob-sc-sec';
+  sec.innerHTML='<div class="mob-sc-sec-t">'+title+'</div>';
+  (_mobScEdit[key]||[]).forEach(function(a,ai){sec.appendChild(mobMkArow(a,ai,key));});
+  var ab=document.createElement('button'); ab.className='mob-sc-add'; ab.textContent='+ Add Action';
+  ab.onclick=function(){if(!_mobScEdit[key])_mobScEdit[key]=[];_mobScEdit[key].push({type:'restart',value:''});renderMobScripts();};
+  sec.appendChild(ab); return sec;
+}
+
+function mobMkArow(a,ai,key){
+  var row=document.createElement('div'); row.className='mob-sc-arow';
+  var ts=document.createElement('select'); ts.className='mob-sc-sel'; ts.style.flex='1';
+  MOB_SC_ACTIONS.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;if(t===a.type)o.selected=true;ts.appendChild(o);});
+  ts.onchange=function(){a.type=this.value;renderMobScripts();};
+  row.appendChild(ts);
+  if(a.type!=='restart'){
+    var vi=document.createElement('input'); vi.className='mob-sc-inp'; vi.style.flex='1'; vi.value=a.value||'';
+    if(a.type==='setPrimaryPool'||a.type==='switchFallbackPool') vi.placeholder='host:port';
+    else if(a.type==='setAutoFan') vi.placeholder='true / false';
+    else if(a.type==='setOverclock') vi.placeholder='freq/voltage';
+    else if(a.type==='notification') vi.placeholder='message';
+    else vi.placeholder='value';
+    vi.oninput=function(){a.value=this.value;}; row.appendChild(vi);
+  }
+  var rm=document.createElement('button'); rm.className='mob-sc-rm'; rm.innerHTML='&#x2715;';
+  rm.onclick=(function(k,i){return function(){_mobScEdit[k].splice(i,1);renderMobScripts();};})(key,ai);
+  row.appendChild(rm); return row;
+}
+
+function mobSaveScript(){
+  var sc=_mobScEdit;
+  if(!sc.name||!sc.name.trim()){ alert('Please enter a script name.'); return; }
+  sc.updatedAt=Date.now(); // stamp with current time
+  var i=_mobSc.findIndex(function(s){return s.id===sc.id;});
+  if(i>=0) _mobSc[i]=sc; else _mobSc.push(sc);
+  mobSaveScripts();
+  _mobScView='list';
+  renderMobScripts();
+}
+
+function getMinerName(ip){
+  try{ var n=JSON.parse(localStorage.getItem('mob_names')||'{}'); return n[ip]||''; }catch(e){ return ''; }
+}
+
+// Poll for script changes from Windows every 5s
+setInterval(function(){
+  fetch(SERVER+'/getscripts',{signal:AbortSignal.timeout(3000)}).then(function(r){return r.json();}).then(function(d){
+    if(!d||!Array.isArray(d)) return;
+    var changed=false;
+    d.forEach(function(ss){
+      var i=_mobSc.findIndex(function(s){return s.id===ss.id;});
+      if(i<0){ _mobSc.push(ss); changed=true; }
+      else if(!ss.updatedAt||!_mobSc[i].updatedAt||ss.updatedAt>_mobSc[i].updatedAt){ _mobSc[i]=ss; changed=true; }
+    });
+    if(changed){
+      try{ localStorage.setItem('mob_scripts',JSON.stringify(_mobSc)); }catch(e){}
+      if(activeTab==='settings'&&_mobScView==='list') renderMobScripts();
+    }
+  }).catch(function(){});
+},5000);
+// Poll /scripts every 3s - Windows pushes every 5s
+setInterval(function(){
+  fetch(SERVER+'/scripts',{signal:AbortSignal.timeout(2000)}).then(function(r){
+    if(!r.ok) return null; return r.json();
+  }).then(function(d){
+    if(!d||!Array.isArray(d)||!d.length) return;
+    if(JSON.stringify(d)===JSON.stringify(_mobSc)) return;
+    _mobSc=d;
+    try{ localStorage.setItem('mob_scripts',JSON.stringify(_mobSc)); }catch(e){}
+    // Update toggle buttons in-place
+    _mobSc.forEach(function(sc){
+      var tog=document.querySelector('[data-scid="'+sc.id+'"]');
+      if(tog){ tog.className='mob-sc-tog '+(sc.enabled?'on':'off'); }
+    });
+    if(activeTab==='settings'&&_mobScView==='list') renderMobScripts();
+  }).catch(function(){});
+},3000);
+
+function showThemePicker(){
+  var root=document.documentElement;
+  function getCss(v){ return (getComputedStyle(root).getPropertyValue(v).trim()||'').replace(/ /g,''); }
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;overflow-y:auto;';
+  var box=document.createElement('div');
+  box.style.cssText='background:var(--surf);border-radius:12px;padding:20px;width:300px;max-width:93vw;margin:20px auto;';
+
+  var title=document.createElement('div');
+  title.style.cssText='font-weight:700;color:var(--txt);margin-bottom:16px;font-size:1rem;';
+  title.textContent='Theme Colors';
+  box.appendChild(title);
+
+  function makeRow(label, cssVar, storageKey, defaultColor){
+    var cur=(getCss(cssVar)||defaultColor);
+    var row=document.createElement('div');
+    row.style.cssText='margin-bottom:16px;';
+    var lbl=document.createElement('div');
+    lbl.style.cssText='font-size:.8rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;';
+    lbl.textContent=label;
+    row.appendChild(lbl);
+    var pk=document.createElement('input');
+    pk.type='color'; pk.value=cur; pk.dataset.cssVar=cssVar; pk.dataset.storageKey=storageKey;
+    pk.style.cssText='width:100%;height:48px;border:none;border-radius:8px;cursor:pointer;padding:0;display:block;';
+    row.appendChild(pk);
+    var sw=document.createElement('div');
+    sw.style.cssText='display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;';
+    var presetColors;
+    if(cssVar==='--bg') presetColors=['#000000','#0a0a0a','#07111f','#0d1117','#111827','#0f0f23','#0a1628','#1a1a2e','#1c1c1e','#0d1b2a','#1a0a0a','#0a1a0a'];
+    else if(cssVar==='--surf') presetColors=['#000000','#0d0d0d','#111111','#1a1a1a','#0b1929','#161b22','#1c1c1e','#0f2035','#1a1a2e','#112240','#1a0000','#001a00'];
+    else presetColors=['#000000','#111111','#1a1a1a','#222222','#2d2d2d','#0f2035','#1a1a2e','#1f2937','#21262d','#162032','#1e0000','#001e00'];
+    presetColors.forEach(function(c){
+      var s=document.createElement('div');
+      s.style.cssText='width:30px;height:30px;border-radius:5px;background:'+c+';border:2px solid var(--bdr);cursor:pointer;flex-shrink:0;';
+      s.onclick=function(){pk.value=c;};
+      sw.appendChild(s);
+    });
+    row.appendChild(sw);
+    return row;
+  }
+
+  box.appendChild(makeRow('Background','--bg','mob_bg_color','#07111f'));
+  box.appendChild(makeRow('Cards','--surf','mob_surf_color','#0b1929'));
+  box.appendChild(makeRow('Secondary / Inputs','--surf2','mob_surf2_color','#0f2035'));
+
+  var btnRow=document.createElement('div');
+  btnRow.style.cssText='display:flex;gap:10px;margin-top:8px;';
+  var cancelBtn=document.createElement('button');
+  cancelBtn.style.cssText='flex:1;background:var(--surf2);border:1px solid var(--bdr);color:var(--muted);padding:10px;border-radius:6px;cursor:pointer;font-size:.85rem;';
+  cancelBtn.textContent='Cancel';
+  cancelBtn.onclick=function(){ov.remove();};
+  var applyBtn=document.createElement('button');
+  applyBtn.style.cssText='flex:1;background:var(--grn);border:none;color:#000;font-weight:700;padding:10px;border-radius:6px;cursor:pointer;font-size:.85rem;';
+  applyBtn.textContent='Apply';
+  applyBtn.onclick=function(){
+    var pickers=box.querySelectorAll('input[type=color]');
+    pickers.forEach(function(pk){
+      root.style.setProperty(pk.dataset.cssVar, pk.value);
+      try{localStorage.setItem(pk.dataset.storageKey, pk.value);}catch(e){}
+    });
+    ov.remove();
+    renderSettings();
+  };
+  var resetBtn=document.createElement('button');
+  resetBtn.style.cssText='width:100%;background:transparent;border:1px solid var(--bdr);color:var(--muted);padding:8px;border-radius:6px;cursor:pointer;font-size:.8rem;margin-top:8px;';
+  resetBtn.textContent='Reset to Default';
+  resetBtn.onclick=function(){
+    var defaults={'--bg':'#07111f','--surf':'#0b1929','--surf2':'#0f2035'};
+    var keys={'--bg':'mob_bg_color','--surf':'mob_surf_color','--surf2':'mob_surf2_color'};
+    Object.keys(defaults).forEach(function(v){
+      root.style.setProperty(v,defaults[v]);
+      try{localStorage.removeItem(keys[v]);}catch(e){}
+    });
+    ov.remove();
+    renderSettings();
+  };
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(applyBtn);
+  box.appendChild(btnRow);
+  box.appendChild(resetBtn);
+  ov.appendChild(box);
+  document.body.appendChild(ov);
 }
 function mobRemoveMiner(ip){
   if(!confirm('Remove '+ip+'?')) return;
@@ -1300,6 +1829,9 @@ function updateMinerData(){
   });
 }
 
+// Load scripts from server on startup
+mobLoadScripts();
+
 async function doRefresh(){
   if(refreshing||refreshPaused) return;
   refreshing=true;
@@ -1308,6 +1840,22 @@ async function doRefresh(){
     await Promise.all([loadAllTime(),loadSession()]);
     await loadMiners();
     await loadAllMinerData();
+    // Update AR buttons in-place from session data (no full rebuild needed)
+    minerIPs.forEach(function(ip){
+      var key=ip.replace(/[.]/g,'_');
+      var arB=document.getElementById('mob-ar-'+key);
+      if(!arB) return;
+      var tapAge=_mobARTapTime[ip]?Date.now()-_mobARTapTime[ip]:99999;
+      if(tapAge<15000) return; // user tapped recently, don't override
+      var sdAR=(sessionData[ip]||{}).autoRestart||false;
+      var curOn=arB.dataset.on==='1';
+      if(curOn!==sdAR){
+        arB.dataset.on=sdAR?'1':'0';
+        arB.style.color=sdAR?'var(--grn)':'var(--muted)';
+        arB.style.borderColor=sdAR?'var(--grn)':'var(--muted)';
+        _mobARState[ip]=sdAR;
+      }
+    });
     var ipStr=minerIPs.slice().sort().join(',');
     if(!minersBuilt||ipStr!==lastIPStr){
       renderMiners();
@@ -1321,7 +1869,7 @@ async function doRefresh(){
     if(activeTab==='top10') renderTop10();
     else if(activeTab==='alltime') renderAllTime();
     else if(activeTab==='pool') renderPool();
-    else if(activeTab==='settings') renderSettings();
+    else if(activeTab==='settings'&&!refreshPaused&&!settingsDirty) renderSettings();
   }catch(e){}
   // Update odds card
   updateOddsCard();
@@ -1331,14 +1879,52 @@ async function doRefresh(){
   var wEl=document.getElementById('mob-totalwatts');
   if(hrEl){
     var thr=0;
-    minerIPs.forEach(function(ip){var sd2=sessionData[ip]||{};var hr2=sd2.hashrate!=null?sd2.hashrate:(minerData[ip]||{}).hashRate_1m||(minerData[ip]||{}).hashRate||0;thr+=hr2;});
+    minerIPs.forEach(function(ip){var sd2=sessionData[ip]||{};var lastFound2=sd2.lastFoundTs||0;var stalled2=sd2.stalled===true;var hr2=stalled2?0:(sd2.hashrate!=null?sd2.hashrate:(minerData[ip]||{}).hashRate_1m||(minerData[ip]||{}).hashRate||0);thr+=hr2;});
     hrEl.textContent=thr>=1000?(thr/1000).toFixed(2)+' TH/s':thr.toFixed(1)+' GH/s';
   }
   if(wEl){
     var tw=0;
     minerIPs.forEach(function(ip){var p=(sessionData[ip]||{}).power;if(p!=null)tw+=p;});
     wEl.textContent=tw>0?tw.toFixed(1)+'W':'—W';
+    var cEl=document.getElementById('mob-totalcost');
+    if(cEl){
+      var cRate=parseFloat(localStorage.getItem('mob_power_rate')||'0');
+      var cDay=tw>0&&cRate>0?(tw/1000)*24*cRate:0;
+      cEl.textContent=cDay>0?'$'+cDay.toFixed(2)+'/day':'';
+    }
   }
+  // Stall detection per miner
+  minerIPs.forEach(function(ip){
+    var key=ip.replace(/[.]/g,'_');
+    var sd2=sessionData[ip]||{};
+    var lastFound=sd2.lastFoundTs||0;
+    var status=sd2.status||'';
+    var isStalled=sd2.stalled===true;
+    // Card border
+    var card=document.getElementById('mob-card-'+key);
+    if(card) card.style.borderColor=isStalled?'var(--red)':'var(--bdr)';
+    // Hashrate badge
+    var hrBadge=document.getElementById('hrbadge-'+key);
+    if(hrBadge){
+      hrBadge.style.color=isStalled?'var(--red)':'';
+      if(isStalled) hrBadge.textContent='0 GH/s';
+    }
+    // Stall badge
+    var stallBadge=document.getElementById('stallbadge-'+key);
+    if(stallBadge) stallBadge.textContent=isStalled?'⚠ Stalled':'';
+
+    // Null out stats when stalled (shares, avg, last, target, status row)
+    ['shares','avg','last','target'].forEach(function(rk){
+      var el=document.getElementById('sv-'+key+'-'+rk);
+      if(el&&isStalled) el.textContent='—';
+    });
+    var shrEl=document.getElementById('sv-'+key+'-shares');
+    var rejEl=document.getElementById('sv-'+key+'-rej');
+    if(isStalled){ if(shrEl) shrEl.textContent='—'; if(rejEl) rejEl.textContent='—'; }
+    var stEl=document.getElementById('sv-'+key+'-status');
+    if(stEl&&isStalled) stEl.textContent='⚠ Stalled';
+  });
+
   document.getElementById('refresh-btn').classList.remove('spinning');
   refreshing=false;
 }
@@ -1348,5 +1934,11 @@ setInterval(doRefresh, 5000);
 doRefresh();
 </script>
 <div id="mob-donate-overlay" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'"><div style="background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:20px;max-width:420px;width:92%;max-height:85vh;overflow-y:auto"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><h2 style="font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;color:#f7931a">💛 Support This Project</h2><button onclick="document.getElementById('mob-donate-overlay').style.display='none'" style="background:transparent;border:1px solid var(--muted2);color:var(--muted);font-family:inherit;font-size:.68rem;padding:4px 12px;border-radius:6px;cursor:pointer">✕</button></div><p style="font-size:.76rem;color:var(--muted);margin-bottom:14px;line-height:1.6">If this app has helped your mining operation, any donation is greatly appreciated. Tap any address to copy it.</p><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#f7931a;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BTC</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('bc1q7cddtk0leg6n7phpe8ershfx5ue6ksd2lgut0s').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">bc1q7cddtk0leg6n7phpe8ershfx5ue6ksd2lgut0s</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#8dc351;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BCH</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('qru9pw3v76wk8m4taac4670dmnlyk5c6kceu763rnm').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">qru9pw3v76wk8m4taac4670dmnlyk5c6kceu763rnm</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#627eea;font-weight:700;letter-spacing:.1em;margin-bottom:6px">ETH</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('0x8d89ad340A131429fE76bBeC547476e6a6Ae16db').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">0x8d89ad340A131429fE76bBeC547476e6a6Ae16db</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#bfbbbb;font-weight:700;letter-spacing:.1em;margin-bottom:6px">LTC</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('ltc1q4jeadmeunm397vqmuycxvpdhasvzatx7te5z2g').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">ltc1q4jeadmeunm397vqmuycxvpdhasvzatx7te5z2g</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#f3ba2f;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BNB</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('0x8d89ad340A131429fE76bBeC547476e6a6Ae16db').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">0x8d89ad340A131429fE76bBeC547476e6a6Ae16db</div></div><div id="mob-donate-copied" style="text-align:center;color:var(--grn);font-size:.8rem;min-height:18px;margin-top:6px"></div></div></div>
+<div id="mob-block-banner">
+  <div class="mob-block-emoji">🎉</div>
+  <div class="mob-block-title">BLOCK FOUND!</div>
+  <div class="mob-block-sub" id="mob-block-sub">A block was found!</div>
+  <button class="mob-block-close" onclick="document.getElementById('mob-block-banner').classList.remove('show')">Dismiss</button>
+</div>
 </body>
 </html>
