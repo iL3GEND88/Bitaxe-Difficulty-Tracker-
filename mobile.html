@@ -147,6 +147,8 @@ input[type=checkbox].toggle{width:20px;height:20px;accent-color:var(--grn);curso
 </head>
 <body>
 
+<canvas id="hash-rain" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;display:none"></canvas>
+
 <div id="hdr">
   <div class="axe">⛏</div>
   <div id="hdr-title">
@@ -159,7 +161,7 @@ input[type=checkbox].toggle{width:20px;height:20px;accent-color:var(--grn);curso
 
 <div id="nav">
   <div class="nav-tab on" onclick="showTab('miners')">⛏ Miners</div>
-  <div class="nav-tab" onclick="showTab('addminer')">➕ Add</div>
+  <div class="nav-tab" onclick="showTab('addminer')">⚙ Miner</div>
   <div class="nav-tab" onclick="showTab('top10')">📋 Session</div>
   <div class="nav-tab" onclick="showTab('alltime')">⭐ All-Time</div>
   <div class="nav-tab" onclick="showTab('pool')">⛁ Pool</div>
@@ -411,6 +413,7 @@ function renderMiners(){
     var winStatus=sd.status!=null?sd.status:(isLive?'Live':'Offline');
     var winIsLive=winStatus==='Live';
     var winLast=sd.lastDiff!=null?fmtD(sd.lastDiff):'—';
+    var winEff=sd.efficiency!=null?sd.efficiency.toFixed(1)+' W/TH':'—';
     var winTarget=sd.lastTarget!=null?fmtD(sd.lastTarget):'—';
     var winRejPct=winShares>0?((winRej/winShares)*100).toFixed(2):'0.00';
     var winRejStr=winShares>0?winRej+' ('+winRejPct+'%)':String(winRej);
@@ -424,9 +427,9 @@ function renderMiners(){
       ['Voltage',        d.coreVoltage?d.coreVoltage+' mV':'—', ''],
       ['Target',         winTarget, ''],
       ['Fan Speed',      d.fanspeed!=null?Math.round(d.fanspeed)+'%':(d.autofanspeed?'Auto':'—'), ''],
-      ['Last',           winLast, ''],
+      ['Efficiency',     winEff, ''],
     ];
-    var rowKeys=['atbest','sessbest','status','shares','freq','avg','volt','target','fan','last'];
+    var rowKeys=['atbest','sessbest','status','shares','freq','avg','volt','target','fan','eff'];
     // Render stats in 2-column grid (pairs of rows)
     var statsGrid=document.createElement('div');
     statsGrid.className='mob-stats-grid';
@@ -488,6 +491,12 @@ function renderMiners(){
   oddsCard.className='card';
   oddsCard.style.marginTop='14px';
   c.appendChild(oddsCard);
+
+  // Daily fact card
+  var factCard=document.createElement('div');
+  factCard.id='mob-fact-card'; factCard.className='card';
+  factCard.style.cssText='margin-bottom:14px;display:none;';
+  c.appendChild(factCard);
   updateOddsCard();
 
   // ── All charts below all stats ────────────────────────────────────────────
@@ -769,11 +778,12 @@ function renderAddMiner(){
   }
   c.appendChild(listCard);
 
-  // Add miner form
+  // Add miner form - collapsible
   var addCard=document.createElement('div'); addCard.className='card';
+  var _addOpen=localStorage.getItem('mob_addminer_open')==='1';
   var addHdr=document.createElement('div');
-  addHdr.style.cssText='padding:12px 16px;border-bottom:1px solid var(--bdr);font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em';
-  addHdr.textContent='Add Miner';
+  addHdr.style.cssText='padding:12px 16px;border-bottom:1px solid var(--bdr);font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;cursor:pointer;display:flex;justify-content:space-between;align-items:center';
+  addHdr.innerHTML='Add Miner <span style="font-size:.7rem">'+(_addOpen?'&#9650;':'&#9660;')+'</span>';
   addCard.appendChild(addHdr);
   var addBody=document.createElement('div'); addBody.style.cssText='padding:14px 16px';
   addBody.innerHTML=
@@ -783,8 +793,92 @@ function renderAddMiner(){
     '<input id="mob-add-name" class="field-input" type="text" placeholder="e.g. Living Room Miner"></div>'+
     '<button onclick="mobAddMiner()" style="width:100%;background:var(--orange);border:none;color:#000;font-weight:700;padding:11px;border-radius:8px;font-size:.82rem;cursor:pointer;font-family:inherit">+ Add Miner</button>'+
     '<div id="mob-add-msg" style="font-size:.7rem;color:var(--muted);min-height:16px;margin-top:8px;text-align:center"></div>';
-  addCard.appendChild(addBody);
+  var addBodyWrap=document.createElement('div');
+  addBodyWrap.style.display=_addOpen?'block':'none';
+  addBodyWrap.appendChild(addBody);
+  addCard.appendChild(addBodyWrap);
+  addHdr.onclick=function(){
+    var open=addBodyWrap.style.display==='none';
+    addBodyWrap.style.display=open?'block':'none';
+    addHdr.querySelector('span').innerHTML=open?'&#9650;':'&#9660;';
+    try{localStorage.setItem('mob_addminer_open',open?'1':'0');}catch(e){}
+  };
   c.appendChild(addCard);
+
+  // Miner Settings
+  var msHdr=document.createElement('div');
+  msHdr.style.cssText='font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:4px 2px 10px 2px;margin-top:8px';
+  msHdr.textContent='Miner Settings';
+  c.appendChild(msHdr);
+  var msWrap=c;
+    minerIPs.forEach(function(ip){
+    var d=minerData[ip]||{};
+    var color=getMinerColor(ip);
+    var key=ip.replace(/\./g,'_');
+    var autoFan=d.autofanspeed!=null?d.autofanspeed:1;
+
+    var card=document.createElement('div'); card.className='card';
+    var _cOpen=localStorage.getItem('mob_mscard_open_'+key)==='1';
+    var cardHdrDiv=document.createElement('div');
+    cardHdrDiv.className='set-hdr';
+    cardHdrDiv.style.cssText='color:'+color+';cursor:pointer;display:flex;justify-content:space-between;align-items:center';
+    var _cName=getMinerName(ip)||ip;
+    cardHdrDiv.innerHTML='<span>'+_cName+'</span><span style="font-size:.65rem;color:var(--muted)">'+(_cOpen?'&#9650;':'&#9660;')+'</span>';
+    card.appendChild(cardHdrDiv);
+
+    var body=document.createElement('div'); body.className='set-body';
+    body.style.display=_cOpen?'block':'none';
+    cardHdrDiv.onclick=function(){
+      var open=body.style.display==='none';
+      body.style.display=open?'block':'none';
+      cardHdrDiv.querySelector('span:last-child').innerHTML=open?'&#9650;':'&#9660;';
+      try{localStorage.setItem('mob_mscard_open_'+key,open?'1':'0');}catch(e){}
+      if(open) settingsDirty=false;
+    };
+
+    // Info row
+    var info=document.createElement('div');
+    info.style.cssText='font-size:.75rem;color:var(--muted);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--bdr)';
+    info.innerHTML='Hashrate: <span style="color:var(--txt);font-weight:600">'+fmtHR(d.hashRate_1m||d.hashRate||0)+'</span>'+
+      ' &nbsp; Uptime: <span style="color:var(--txt);font-weight:600">'+fmtUp(d.uptimeSeconds)+'</span>';
+    body.appendChild(info);
+
+    // Performance section
+    var ps=document.createElement('div'); ps.className='set-sec'; ps.textContent='Performance'; body.appendChild(ps);
+
+    body.innerHTML+=
+      '<div class="field-group"><label class="field-lbl">Frequency (MHz)</label>'+
+      '<input class="field-input" type="number" id="m-freq-'+key+'" value="'+(d.frequency||'')+'" placeholder="e.g. 500" oninput=\'settingsDirty=true\'></div>'+
+      '<div class="field-group"><label class="field-lbl">Core Voltage (mV)</label>'+
+      '<input class="field-input" type="number" id="m-volt-'+key+'" value="'+(d.coreVoltage||'')+'" placeholder="e.g. 1200" oninput=\'settingsDirty=true\'></div>';
+
+    // Fan section
+    var fs=document.createElement('div'); fs.className='set-sec'; fs.textContent='Fan Control';
+    body.appendChild(fs);
+
+    body.innerHTML+=
+      '<div class="toggle-row"><span class="toggle-lbl">Auto Fan Speed</span>'+
+      '<input type="checkbox" class="toggle" id="m-autofan-'+key+'" '+(autoFan?'checked':'')+
+      ' onchange="toggleFan(\''+key+'\',this.checked)"></div>'+
+      '<div id="m-fanauto-'+key+'" style="display:'+(autoFan?'block':'none')+'">'+
+        '<div class="field-group"><label class="field-lbl">Target Temp (35–66°C)</label>'+
+        '<input class="field-input" type="number" id="m-temptgt-'+key+'" value="'+(d.temptarget||60)+'" min="35" max="66"></div>'+
+        '<div class="field-group"><label class="field-lbl">Min Fan Speed (0–99%)</label>'+
+        '<input class="field-input" type="number" id="m-minfan-'+key+'" oninput="settingsDirty=true" value="'+(d.minFanSpeed||35)+'" min="0" max="99"></div>'+
+      '</div>'+
+      '<div id="m-fanmanual-'+key+'" style="display:'+(autoFan?'none':'block')+'">'+
+        '<div class="field-group"><label class="field-lbl">Manual Fan Speed (0–100%)</label>'+
+        '<input class="field-input" type="number" id="m-fanspd-'+key+'" value="'+(d.manualFanSpeed||d.fanspeed||100)+'" min="0" max="100" oninput=\'settingsDirty=true\'></div>'+
+      '</div>'+
+      '<div class="btn-row">'+
+        '<button class="btn-save" onclick="mSave(\''+ip+'\')">✓ Save</button>'+
+        '<button class="btn-restart" onclick="mRestart(\''+ip+'\')">↻ Restart</button>'+
+      '</div>'+
+      '<div class="set-msg" id="m-msg-'+key+'"></div>';
+
+    card.appendChild(body);
+    msWrap.appendChild(card);
+  });
 }
 // ── SESSION TOP 10 TAB (best shares from current session via alltime) ─────────
 function renderTop10(){
@@ -1042,6 +1136,77 @@ function renderSettings(){
   scBtn.onclick=function(){_mobScView='list';mobLoadScripts().then(function(){renderSettings();}).catch(function(){renderSettings();});}; 
   c.appendChild(scBtn);
 
+  // Hash Rain toggle
+  var hrCard=document.createElement('div');
+  hrCard.style.cssText='background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;margin-bottom:14px;';
+  var hrRow=document.createElement('div');
+  hrRow.style.cssText='display:flex;align-items:center;justify-content:space-between;';
+  var hrLbl=document.createElement('div');
+  hrLbl.innerHTML='<span style="font-size:.85rem;font-weight:600">Hash Rain</span><span style="font-size:.7rem;color:var(--muted);display:block">Animated hashes behind miners tab</span>';
+  var hrToggle=document.createElement('input');
+  hrToggle.type='checkbox';
+  hrToggle.style.cssText='width:20px;height:20px;cursor:pointer;';
+  hrToggle.checked=localStorage.getItem('mob_hashrain')==='1';
+  hrToggle.onchange=function(){
+    var on=hrToggle.checked;
+    try{localStorage.setItem('mob_hashrain',on?'1':'0');}catch(e){}
+    if(on) _hrStart(); else _hrStop();
+  };
+  hrRow.appendChild(hrLbl); hrRow.appendChild(hrToggle);
+  hrCard.appendChild(hrRow);
+  // Color picker for hash color
+  var hrColorRow=document.createElement('div');
+  hrColorRow.style.cssText='display:flex;align-items:center;gap:10px;margin-top:10px;';
+  var hrColorLbl=document.createElement('span');
+  hrColorLbl.style.cssText='font-size:.75rem;color:var(--muted);';
+  hrColorLbl.textContent='Hash Color';
+  var hrColorPick=document.createElement('input');
+  hrColorPick.type='color';
+  hrColorPick.value=localStorage.getItem('mob_hashrain_color')||'#22d37a';
+  hrColorPick.style.cssText='width:36px;height:28px;border:none;background:none;cursor:pointer;border-radius:4px;';
+  hrColorPick.oninput=function(){
+    _hrColor=hrColorPick.value;
+    try{localStorage.setItem('mob_hashrain_color',_hrColor);}catch(e){}
+  };
+  hrColorRow.appendChild(hrColorLbl); hrColorRow.appendChild(hrColorPick);
+  hrCard.appendChild(hrColorRow);
+
+  // Background brightness slider
+  var hrBgRow=document.createElement('div');
+  hrBgRow.style.cssText='display:flex;align-items:center;gap:10px;margin-top:10px;';
+  var hrBgLbl=document.createElement('span');
+  hrBgLbl.style.cssText='font-size:.75rem;color:var(--muted);white-space:nowrap;';
+  hrBgLbl.textContent='Background';
+  var hrBgSlider=document.createElement('input');
+  hrBgSlider.type='range'; hrBgSlider.min='0.02'; hrBgSlider.max='1'; hrBgSlider.step='0.02';
+  hrBgSlider.value=localStorage.getItem('mob_hashrain_bgalpha')||'0.18';
+  hrBgSlider.style.cssText='flex:1;cursor:pointer;';
+  hrBgSlider.oninput=function(){
+    _hrBgAlpha=parseFloat(hrBgSlider.value);
+    try{localStorage.setItem('mob_hashrain_bgalpha',String(_hrBgAlpha));}catch(e){}
+  };
+  hrBgRow.appendChild(hrBgLbl); hrBgRow.appendChild(hrBgSlider);
+  hrCard.appendChild(hrBgRow);
+
+  // Share brightness slider
+  var hrShRow=document.createElement('div');
+  hrShRow.style.cssText='display:flex;align-items:center;gap:10px;margin-top:10px;';
+  var hrShLbl=document.createElement('span');
+  hrShLbl.style.cssText='font-size:.75rem;color:var(--muted);white-space:nowrap;';
+  hrShLbl.textContent='Share Flash';
+  var hrShSlider=document.createElement('input');
+  hrShSlider.type='range'; hrShSlider.min='0.1'; hrShSlider.max='1'; hrShSlider.step='0.05';
+  hrShSlider.value=localStorage.getItem('mob_hashrain_sharealpha')||'1.0';
+  hrShSlider.style.cssText='flex:1;cursor:pointer;';
+  hrShSlider.oninput=function(){
+    _hrShareAlpha=parseFloat(hrShSlider.value);
+    try{localStorage.setItem('mob_hashrain_sharealpha',String(_hrShareAlpha));}catch(e){}
+  };
+  hrShRow.appendChild(hrShLbl); hrShRow.appendChild(hrShSlider);
+  hrCard.appendChild(hrShRow);
+
+  c.appendChild(hrCard);
+
   var themeBtn=document.createElement('button');
   themeBtn.style.cssText='width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);font-size:.85rem;font-weight:600;padding:10px 14px;border-radius:8px;cursor:pointer;margin-bottom:14px;';
   themeBtn.textContent='Theme / BG Color';
@@ -1083,78 +1248,6 @@ function renderSettings(){
   costCard.appendChild(costRow);
   c.appendChild(costCard);
 
-  // Miner Settings collapsible
-  var _msOpen=localStorage.getItem('mob_minersett_open')==='1';
-  var msBtn=document.createElement('button');
-  msBtn.style.cssText='width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);font-size:.85rem;font-weight:600;padding:10px 14px;border-radius:8px;cursor:pointer;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;';
-  var msLbl=document.createElement('span'); msLbl.textContent='Miner Settings';
-  var msArr=document.createElement('span'); msArr.textContent=_msOpen?'▲':'▼'; msArr.style.fontSize='.7rem';
-  msBtn.appendChild(msLbl); msBtn.appendChild(msArr);
-  c.appendChild(msBtn);
-  var msWrap=document.createElement('div');
-  msWrap.style.display=_msOpen?'block':'none';
-  c.appendChild(msWrap);
-  msBtn.onclick=function(){
-    var open=msWrap.style.display==='none';
-    msWrap.style.display=open?'block':'none';
-    msArr.textContent=open?'▲':'▼';
-    try{localStorage.setItem('mob_minersett_open',open?'1':'0');}catch(e){}
-  };
-
-  minerIPs.forEach(function(ip){
-    var d=minerData[ip]||{};
-    var color=getMinerColor(ip);
-    var key=ip.replace(/\./g,'_');
-    var autoFan=d.autofanspeed!=null?d.autofanspeed:1;
-
-    var card=document.createElement('div'); card.className='card';
-    card.innerHTML='<div class="set-hdr" style="color:'+color+'">▸ '+ip+'</div>';
-
-    var body=document.createElement('div'); body.className='set-body';
-
-    // Info row
-    var info=document.createElement('div');
-    info.style.cssText='font-size:.75rem;color:var(--muted);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--bdr)';
-    info.innerHTML='Hashrate: <span style="color:var(--txt);font-weight:600">'+fmtHR(d.hashRate_1m||d.hashRate||0)+'</span>'+
-      ' &nbsp; Uptime: <span style="color:var(--txt);font-weight:600">'+fmtUp(d.uptimeSeconds)+'</span>';
-    body.appendChild(info);
-
-    // Performance section
-    var ps=document.createElement('div'); ps.className='set-sec'; ps.textContent='Performance'; body.appendChild(ps);
-
-    body.innerHTML+=
-      '<div class="field-group"><label class="field-lbl">Frequency (MHz)</label>'+
-      '<input class="field-input" type="number" id="m-freq-'+key+'" value="'+(d.frequency||'')+'" placeholder="e.g. 500"></div>'+
-      '<div class="field-group"><label class="field-lbl">Core Voltage (mV)</label>'+
-      '<input class="field-input" type="number" id="m-volt-'+key+'" value="'+(d.coreVoltage||'')+'" placeholder="e.g. 1200"></div>';
-
-    // Fan section
-    var fs=document.createElement('div'); fs.className='set-sec'; fs.textContent='Fan Control';
-    body.appendChild(fs);
-
-    body.innerHTML+=
-      '<div class="toggle-row"><span class="toggle-lbl">Auto Fan Speed</span>'+
-      '<input type="checkbox" class="toggle" id="m-autofan-'+key+'" '+(autoFan?'checked':'')+
-      ' onchange="toggleFan(\''+key+'\',this.checked)"></div>'+
-      '<div id="m-fanauto-'+key+'" style="display:'+(autoFan?'block':'none')+'">'+
-        '<div class="field-group"><label class="field-lbl">Target Temp (35–66°C)</label>'+
-        '<input class="field-input" type="number" id="m-temptgt-'+key+'" value="'+(d.temptarget||60)+'" min="35" max="66"></div>'+
-        '<div class="field-group"><label class="field-lbl">Min Fan Speed (0–99%)</label>'+
-        '<input class="field-input" type="number" id="m-minfan-'+key+'" value="'+(d.minFanSpeed||35)+'" min="0" max="99"></div>'+
-      '</div>'+
-      '<div id="m-fanmanual-'+key+'" style="display:'+(autoFan?'none':'block')+'">'+
-        '<div class="field-group"><label class="field-lbl">Manual Fan Speed (0–100%)</label>'+
-        '<input class="field-input" type="number" id="m-fanspd-'+key+'" value="'+(d.manualFanSpeed||d.fanspeed||100)+'" min="0" max="100"></div>'+
-      '</div>'+
-      '<div class="btn-row">'+
-        '<button class="btn-save" onclick="mSave(\''+ip+'\')">✓ Save</button>'+
-        '<button class="btn-restart" onclick="mRestart(\''+ip+'\')">↻ Restart</button>'+
-      '</div>'+
-      '<div class="set-msg" id="m-msg-'+key+'"></div>';
-
-    card.appendChild(body);
-    msWrap.appendChild(card);
-  });
 }
 
 function toggleFan(key, checked){
@@ -1307,8 +1400,36 @@ async function pollNotifications(){
 }
 setInterval(pollNotifications,5000);
 
-// Network hashrate in TH/s (~970 EH/s)
-var NETWORK_HASHRATE_THS = 970e6; // 970 EH/s in TH/s, updated periodically
+// Network hashrates per coin (in TH/s), fetched live
+var NET_HASHRATES = { btc: 970e6, bch: 3e6, dgb: 60e3, xec: 70e3, fb: 700e6 }; // DGB ~60PH/s, XEC ~70PH/s, FB ~700EH/s
+var BLOCK_TIMES   = { btc: 600,   bch: 600,  dgb: 15,   xec: 600, fb: 30 };
+var SELECTED_COIN = localStorage.getItem('mob_odds_coin')||'btc';
+var _lastNetHashFetch = 0;
+
+function fetchNetHash(){
+  if(Date.now()-_lastNetHashFetch < 300000) return; // fetch every 5 min
+  _lastNetHashFetch = Date.now();
+  ['btc','bch','dgb','xec'].forEach(function(coin){ // fb has no simple public API
+    fetch(SERVER+'/nethash?coin='+coin, {signal:AbortSignal.timeout(10000)})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d && d.hashrate){
+          var raw = parseFloat(d.hashrate);
+          if(!isNaN(raw) && raw > 0){
+            // blockchain.info returns GH/s, chainz nethashps returns H/s
+            // All three APIs return GH/s
+            var converted = raw / 1000; // GH/s to TH/s
+            // Sanity check - DGB/XEC should be > 1000 TH/s
+            if((coin==='dgb'||coin==='xec') && converted < 1000) return;
+            NET_HASHRATES[coin] = converted;
+            updateOddsCard();
+          }
+        }
+      }).catch(function(){});
+  });
+}
+fetchNetHash();
+setInterval(fetchNetHash, 300000);
 
 function updateOddsCard(){
   var card=document.getElementById('mob-odds-card');
@@ -1319,40 +1440,60 @@ function updateOddsCard(){
   minerIPs.forEach(function(ip){
     var sd=sessionData[ip]||{};
     var hr=sd.hashrate!=null?sd.hashrate:(minerData[ip]||{}).hashRate_1m||(minerData[ip]||{}).hashRate||0;
-    totalTHs+=hr; // already in GH/s from AxeOS
+    totalTHs+=hr;
   });
-  // Convert GH/s to TH/s
-  totalTHs=totalTHs/1000;
+  totalTHs=totalTHs/1000; // GH/s to TH/s
+
+  var netHash=NET_HASHRATES[SELECTED_COIN]||NET_HASHRATES.btc;
+  var blockTime=BLOCK_TIMES[SELECTED_COIN]||600;
+  var blocksPerDay=86400/blockTime;
 
   if(totalTHs<=0){
     card.innerHTML='<div style="padding:14px 16px;color:var(--muted);font-size:.8rem;text-align:center">Mining odds — waiting for hashrate data</div>';
     return;
   }
 
-  // Blocks per period = (your TH/s / network TH/s) * (period seconds / 600)
-  var share=totalTHs/NETWORK_HASHRATE_THS;
-  var blocksPerHour=share*6;
-  var blocksPerDay=share*144;
-  var blocksPerMonth=share*144*30;
-  var blocksPerYear=share*144*365;
+  var share=totalTHs/netHash;
+  var bph=share*(3600/blockTime);
+  var bpd=share*blocksPerDay;
+  var bpm=share*blocksPerDay*30;
+  var bpy=share*blocksPerDay*365;
 
   function oddsStr(bpp){
     if(bpp<=0) return '—';
+    var pct=(bpp*100);
+    var pctStr=pct>=1?pct.toFixed(2)+'%':pct.toFixed(7)+'%';
+    if(bpp>=1) return '<span style="color:var(--grn)">'+pctStr+'</span>';
     var oneIn=Math.round(1/bpp);
-    var pct=(bpp*100).toFixed(7);
-    return '1 in '+oneIn.toLocaleString()+' <span style="color:var(--muted);font-size:.72rem">('+pct+'%)</span>';
+    return '1 in '+oneIn.toLocaleString()+' <span style="color:var(--muted);font-size:.72rem">('+pctStr+')</span>';
   }
 
+  var coinNames={btc:'Bitcoin',bch:'Bitcoin Cash',dgb:'DigiByte',xec:'eCash',fb:'Fractal BTC'};
+  var coinLabel=coinNames[SELECTED_COIN]||'Bitcoin';
+
+  // Build coin selector buttons
+  var btnHtml='';
+  ['btc','bch','dgb','xec','fb'].forEach(function(c){
+    var active=c===SELECTED_COIN;
+    btnHtml+='<button onclick="SELECTED_COIN=\''+c+'\';localStorage.setItem(\'mob_odds_coin\',\''+c+'\');updateOddsCard();" '+
+      'style="padding:4px 10px;border-radius:6px;border:1px solid '+(active?'var(--grn)':'var(--bdr)')+
+      ';background:'+(active?'var(--grn)':'transparent')+';color:'+(active?'#000':'var(--muted)')+
+      ';font-size:.75rem;font-weight:'+(active?'700':'400')+';cursor:pointer">'+c.toUpperCase()+'</button>';
+  });
+
   card.innerHTML=
-    '<div style="padding:12px 16px 6px 16px;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--bdr);margin-bottom:10px">⛏ Block Finding Odds · '+
-      (totalTHs>=1000?(totalTHs/1000).toFixed(2)+' PH/s':totalTHs.toFixed(3)+' TH/s')+
+    '<div style="padding:10px 16px 8px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr);margin-bottom:10px">'+
+      '<span style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Block Odds · '+(totalTHs>=1000?(totalTHs/1000).toFixed(2)+' PH/s':totalTHs.toFixed(3)+' TH/s')+'</span>'+
+      '<div style="display:flex;gap:6px">'+btnHtml+'</div>'+
     '</div>'+
     '<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;padding:0 16px 14px 16px;font-size:.82rem;align-items:baseline">'+
-      '<span style="color:var(--muted)">Per hour</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(blocksPerHour)+'</span>'+
-      '<span style="color:var(--muted)">Per day</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(blocksPerDay)+'</span>'+
-      '<span style="color:var(--muted)">Per month</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(blocksPerMonth)+'</span>'+
-      '<span style="color:var(--muted)">Per year</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(blocksPerYear)+'</span>'+
+      '<span style="color:var(--muted)">Per hour</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(bph)+'</span>'+
+      '<span style="color:var(--muted)">Per day</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(bpd)+'</span>'+
+      '<span style="color:var(--muted)">Per month</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(bpm)+'</span>'+
+      '<span style="color:var(--muted)">Per year</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(bpy)+'</span>'+
     '</div>';
+  updateFactCard();
+
 }
 
 // ── MOBILE SCRIPTS ──────────────────────────────────────────────────────────
@@ -1734,6 +1875,117 @@ function showThemePicker(){
   ov.appendChild(box);
   document.body.appendChild(ov);
 }
+
+// Daily mining fact card
+var MINING_FACTS = [
+  {label:'picking a perfect March Madness bracket', odds:1/9200000000000000000},
+  {label:'winning back-to-back major lottery jackpots', odds:1/90000000000000000},
+  {label:'getting hit by satellite debris falling from orbit', odds:1/21000000000},
+  {label:'being struck by lightning twice in one year', odds:1/9000000000},
+  {label:'flipping heads 30 times in a row', odds:1/1073741824},
+  {label:'contracting rabies in the US this year', odds:1/1000000000},
+  {label:'being elected Pope as a Catholic layperson', odds:1/1000000000},
+  {label:'winning a Mega Millions jackpot', odds:1/302000000},
+  {label:'winning a Powerball jackpot', odds:1/292000000},
+  {label:'having a meteorite land on your property in a year', odds:1/182000000},
+  {label:'flipping heads 27 times in a row', odds:1/134217728},
+  {label:'being killed by a vending machine tipping over', odds:1/100000000},
+  {label:'dying in a sinkhole collapse this year', odds:1/100000000},
+  {label:'dying from a stingray injury', odds:1/100000000},
+  {label:'dying from a volcanic eruption in the US this year', odds:1/80000000},
+  {label:'rolling the same number on a die 10 times in a row', odds:1/60466176},
+  {label:'dying from a falling coconut in your lifetime', odds:1/50000000},
+  {label:'dying from a jellyfish sting', odds:1/40000000},
+  {label:'dying from a snakebite in the US this year', odds:1/37500000},
+  {label:'correctly guessing a coin flip 25 times in a row', odds:1/33554432},
+  {label:'dying from a mountain lion attack in the US', odds:1/32000000},
+  {label:'becoming an astronaut', odds:1/13200000},
+  {label:'dying in a commercial plane crash', odds:1/11000000},
+  {label:'becoming US President', odds:1/10000000},
+  {label:'finding a gold nugget while hiking', odds:1/10000000},
+  {label:'dying in a hot air balloon accident this year', odds:1/10000000},
+  {label:'dying from airplane debris falling from the sky', odds:1/10000000},
+  {label:'dying from a lightning strike while indoors', odds:1/10000000},
+  {label:'dying in an earthquake in the US this year', odds:1/10000000},
+  {label:'dying from a wasp sting on a single encounter', odds:1/6250000},
+  {label:'dying from a rare parasitic infection in the US', odds:1/5000000},
+  {label:'being attacked by a shark', odds:1/3748067},
+  {label:'dying in a skydiving accident this year', odds:1/3000000},
+  {label:'dying from a grizzly bear attack in the US', odds:1/2100000},
+  {label:'rolling a 6 on a die 8 times in a row', odds:1/1679616},
+  {label:'being struck by lightning this year', odds:1/1200000},
+  {label:'winning a Nobel Prize in your lifetime', odds:1/1100000},
+  {label:'flipping heads 20 times in a row', odds:1/1048576},
+  {label:'dying from a spider bite', odds:1/1000000},
+  {label:'correctly guessing a 6-digit PIN on first try', odds:1/1000000},
+  {label:'dying in a boating accident this year', odds:1/1000000},
+  {label:'winning the Fields Medal in mathematics', odds:1/1000000},
+  {label:'dying from a rare prion disease like CJD this year', odds:1/1000000},
+  {label:'dying from a fireworks accident as a bystander', odds:1/1000000},
+  {label:'winning a major poker tournament as an amateur', odds:1/1000000},
+  {label:'getting a perfect SAT score', odds:1/785000},
+  {label:'being hit by a falling meteorite in your lifetime', odds:1/700000},
+  {label:'dying in a flood this year', odds:1/693116},
+  {label:'winning an Olympic medal as an average person', odds:1/662000},
+  {label:'getting a royal flush on your first hand of poker', odds:1/649740},
+  {label:'becoming a billionaire', odds:1/578508},
+  {label:'having identical triplets', odds:1/500000},
+  {label:'dying from a train accident as a passenger this year', odds:1/500000},
+  {label:'dying from a bee swarm attack', odds:1/500000},
+  {label:'dying from a rare autoimmune disease this year', odds:1/250000},
+  {label:'dying on a single skydive', odds:1/200000},
+  {label:'drawing a perfect blackjack hand on first deal', odds:1/184756},
+  {label:'becoming a chess grandmaster', odds:1/168000},
+  {label:'dying from a dog bite this year', odds:1/112400},
+  {label:'getting a straight flush in poker', odds:1/64974},
+  {label:'dying from a hornet or wasp sting this year', odds:1/63225},
+  {label:'dying in a tornado this year', odds:1/60000},
+  {label:'dying from a bee sting this year', odds:1/46948},
+  {label:'rolling snake eyes three times in a row', odds:1/46656}
+];
+
+function updateFactCard(){
+  var card=document.getElementById('mob-fact-card');
+  if(!card) return;
+  // Pick fact based on day of year (changes daily)
+  var now=new Date();
+  var dayOfYear=Math.floor((now-(new Date(now.getFullYear(),0,0)))/86400000);
+  var fact=MINING_FACTS[dayOfYear%MINING_FACTS.length];
+  // Get current 1-year block odds for selected coin
+  var totalTHs=0;
+  minerIPs.forEach(function(ip){
+    var sd=sessionData[ip]||{};
+    var hr=sd.hashrate!=null?sd.hashrate:(minerData[ip]||{}).hashRate_1m||(minerData[ip]||{}).hashRate||0;
+    totalTHs+=hr;
+  });
+  totalTHs=totalTHs/1000;
+  if(totalTHs<=0){ card.style.display='none'; return; }
+  var netHash=NET_HASHRATES[SELECTED_COIN]||NET_HASHRATES.btc;
+  var blockTime=BLOCK_TIMES[SELECTED_COIN]||600;
+  var blocksPerYear=(86400/blockTime)*365;
+  var miningOdds=(totalTHs/netHash)*blocksPerYear;
+  if(miningOdds<=0){ card.style.display='none'; return; }
+  var ratio=miningOdds/fact.odds;
+  var ratioStr, comparison;
+  function fmtRatio(n){
+    var rounded=n>=1000?Math.round(n/100)*100:Math.round(n);
+    return rounded.toLocaleString()+'x';
+  }
+  if(ratio>=2){
+    ratioStr=fmtRatio(ratio);
+    comparison='You are <b>'+ratioStr+' more likely</b> to mine a '+SELECTED_COIN.toUpperCase()+' block this year than '+fact.label+'.';
+  } else if(ratio<=0.5){
+    ratioStr=fmtRatio(1/ratio);
+    comparison='You are <b>'+ratioStr+' less likely</b> to mine a '+SELECTED_COIN.toUpperCase()+' block this year than '+fact.label+'.';
+  } else {
+    comparison='You have <b>about the same odds</b> of mining a '+SELECTED_COIN.toUpperCase()+' block this year as '+fact.label+'.';
+  }
+  card.style.display='block';
+  card.innerHTML='<div style="padding:10px 16px;font-size:.78rem;color:var(--txt);line-height:1.5">'+
+    '<span style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">Daily Mining Fact</span>'+
+    comparison+
+  '</div>';
+}
 function mobRemoveMiner(ip){
   if(!confirm('Remove '+ip+'?')) return;
   var i=minerIPs.indexOf(ip);
@@ -1780,6 +2032,7 @@ function updateMinerData(){
     var winStatus=sd.status!=null?sd.status:(isLive?'Live':'Offline');
     var winIsLive=winStatus==='Live';
     var winLast=sd.lastDiff!=null?fmtD(sd.lastDiff):'—';
+    var winEff=sd.efficiency!=null?sd.efficiency.toFixed(1)+' W/TH':'—';
     var winTarget=sd.lastTarget!=null?fmtD(sd.lastTarget):'—';
     var winRejPct=winShares>0?((winRej/winShares)*100).toFixed(2):'0.00';
     var winRejStr=winShares>0?winRej+' ('+winRejPct+'%)':String(winRej);
@@ -1829,6 +2082,132 @@ function updateMinerData(){
   });
 }
 
+
+// ── Hash Rain ─────────────────────────────────────────────────────────────────
+var _hrCanvas=null, _hrCtx=null, _hrAnim=null, _hrEnabled=false;
+var _hrHashes=[], _hrFlashes={};
+var _hrFontSize=11, _hrSpeed=0.5, _hrOffset=0;
+var _hrColor='#22d37a';
+var _hrBgAlpha=0.18;    // background hash brightness
+var _hrShareAlpha=1.0;  // share flash brightness
+var _prevShares={};
+
+function _hrRandHex64(){
+  var h='0123456789abcdef',s='';
+  for(var i=0;i<64;i++) s+=h[Math.floor(Math.random()*16)];
+  return s;
+}
+
+function _hrInit(){
+  _hrCanvas=document.getElementById('hash-rain');
+  if(!_hrCanvas) return;
+  _hrCtx=_hrCanvas.getContext('2d');
+  _hrResize();
+  window.addEventListener('resize',_hrResize);
+}
+
+function _hrResize(){
+  if(!_hrCanvas) return;
+  _hrCanvas.width=window.innerWidth;
+  _hrCanvas.height=window.innerHeight;
+  // Fill screen with rows + buffer rows above for seamless loop
+  var rowH=_hrFontSize+2;
+  var numRows=Math.ceil(window.innerHeight/rowH)+4;
+  var numVisible=Math.ceil(window.innerHeight/(_hrFontSize+2))+2;
+  _hrHashes=[];
+  for(var i=0;i<numVisible;i++) _hrHashes.push(_hrRandHex64());
+  _hrOffset=0;
+  _hrFlashes={};
+}
+
+function _hrDraw(){
+  if(!_hrCtx||!_hrEnabled) return;
+  _hrCtx.clearRect(0,0,_hrCanvas.width,_hrCanvas.height);
+  _hrCtx.font=_hrFontSize+'px monospace';
+  _hrCtx.textAlign='left';
+
+  var rowH=_hrFontSize+2;
+  _hrOffset+=_hrSpeed;
+  if(_hrOffset>=rowH){
+    _hrOffset-=rowH;
+    // Remove last hash (scrolled off bottom), add new one at top
+    _hrHashes.pop();
+    _hrHashes.unshift(_hrRandHex64());
+  }
+
+  for(var i=0;i<_hrHashes.length;i++){
+    var y=i*rowH+_hrOffset;
+    if(y<0||y>_hrCanvas.height+rowH) continue;
+    var hash=_hrHashes[i];
+    var flash=_hrFlashes[hash];
+    if(flash){
+      _hrCtx.fillStyle=flash.color;
+      _hrCtx.globalAlpha=_hrShareAlpha;
+      // Remove flash when it scrolls off bottom
+      if(y>_hrCanvas.height) delete _hrFlashes[hash];
+    } else {
+      _hrCtx.fillStyle=_hrColor;
+      _hrCtx.globalAlpha=_hrBgAlpha;
+    }
+    _hrCtx.fillText(hash,4,y);
+  }
+
+  _hrCtx.globalAlpha=1;
+  _hrAnim=requestAnimationFrame(_hrDraw);
+}
+
+function _hrStart(){
+  if(!_hrCanvas) _hrInit();
+  _hrEnabled=true;
+  _hrCanvas.style.display='block';
+  if(!_hrAnim) _hrDraw();
+}
+
+function _hrStop(){
+  _hrEnabled=false;
+  if(_hrCanvas) _hrCanvas.style.display='none';
+  if(_hrAnim){ cancelAnimationFrame(_hrAnim); _hrAnim=null; }
+}
+
+function _hrFlashShare(diff){
+  if(!_hrCanvas||!_hrHashes.length) return;
+  var color='#22d37a';
+  if(diff>=100000000) color='#f45060';
+  else if(diff>=1000000) color='#f7931a';
+  // Insert a new unique hash at the top and tag it by value
+  var newHash=_hrRandHex64();
+  _hrHashes[0]=newHash;
+  _hrFlashes[newHash]={color:color};
+}
+
+function _hrCheckShares(){
+  if(!_hrEnabled) return;
+  minerIPs.forEach(function(ip){
+    var sd=sessionData[ip]||{};
+    var shares=sd.shares!=null?sd.shares:0;
+    var prev=_prevShares[ip]!=null?_prevShares[ip]:shares;
+    var diff=shares-prev;
+    if(diff>0 && prev>0){
+      var lastDiff=sd.lastDiff||0;
+      for(var i=0;i<Math.min(diff,5);i++){
+        (function(delay){
+          setTimeout(function(){ _hrFlashShare(lastDiff); }, delay);
+        })(i*250);
+      }
+    }
+    _prevShares[ip]=shares;
+  });
+}
+
+// Load hash rain setting
+(function(){
+  var enabled=localStorage.getItem('mob_hashrain')==='1';
+  var color=localStorage.getItem('mob_hashrain_color')||'#22d37a';
+  _hrColor=color;
+  _hrBgAlpha=parseFloat(localStorage.getItem('mob_hashrain_bgalpha')||'0.18');
+  _hrShareAlpha=parseFloat(localStorage.getItem('mob_hashrain_sharealpha')||'1.0');
+  if(enabled){ setTimeout(_hrStart,500); }
+})();
 // Load scripts from server on startup
 mobLoadScripts();
 
@@ -1865,11 +2244,12 @@ async function doRefresh(){
       updateMinerData();
     }
     // Always re-render active tab to keep data fresh
-    if(activeTab==='addminer') renderAddMiner();
+    if(activeTab==='addminer'&&!settingsDirty) renderAddMiner();
     if(activeTab==='top10') renderTop10();
     else if(activeTab==='alltime') renderAllTime();
     else if(activeTab==='pool') renderPool();
     else if(activeTab==='settings'&&!refreshPaused&&!settingsDirty) renderSettings();
+    if(activeTab==='addminer'&&!refreshPaused&&!settingsDirty) renderAddMiner();
   }catch(e){}
   // Update odds card
   updateOddsCard();
@@ -1894,6 +2274,7 @@ async function doRefresh(){
     }
   }
   // Stall detection per miner
+  _hrCheckShares();
   minerIPs.forEach(function(ip){
     var key=ip.replace(/[.]/g,'_');
     var sd2=sessionData[ip]||{};
@@ -1914,7 +2295,7 @@ async function doRefresh(){
     if(stallBadge) stallBadge.textContent=isStalled?'⚠ Stalled':'';
 
     // Null out stats when stalled (shares, avg, last, target, status row)
-    ['shares','avg','last','target'].forEach(function(rk){
+    ['shares','avg','eff','target'].forEach(function(rk){
       var el=document.getElementById('sv-'+key+'-'+rk);
       if(el&&isStalled) el.textContent='—';
     });
@@ -1923,6 +2304,14 @@ async function doRefresh(){
     if(isStalled){ if(shrEl) shrEl.textContent='—'; if(rejEl) rejEl.textContent='—'; }
     var stEl=document.getElementById('sv-'+key+'-status');
     if(stEl&&isStalled) stEl.textContent='⚠ Stalled';
+    // Update efficiency live
+    if(!isStalled){
+      var effEl2=document.getElementById('sv-'+key+'-eff');
+      if(effEl2){
+        var eff2=sd2.efficiency!=null?sd2.efficiency:(sd2.power&&sd2.hashrate&&sd2.hashrate>0?sd2.power/sd2.hashrate*1000:null);
+        effEl2.textContent=eff2!=null?eff2.toFixed(1)+' W/TH':'—';
+      }
+    }
   });
 
   document.getElementById('refresh-btn').classList.remove('spinning');

@@ -2085,6 +2085,7 @@ function pushSessionData(){
         series:recentSeries,
         hashSeries:hashPts,
         hashrate:m.axeOSHashrate,
+        efficiency:(m.axeOSPower&&m.axeOSHashrate&&m.axeOSHashrate>0)?parseFloat((m.axeOSPower/m.axeOSHashrate*1000).toFixed(1)):null,
         temps:m.temps||[],
         uptime:m.axeOSUptime,
         shares:m.axeOSShares,

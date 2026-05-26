@@ -16,9 +16,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Try to register URL for network access (allows iPhone access without Admin each time)
-:: This only needs to work once - if it fails we fall back to localhost only
+:: Register URL for network access
 netsh http add urlacl url=http://+:19248/ user=Everyone >nul 2>&1
+
+:: Add firewall rule so iPhone/Android can connect on local network
+netsh advfirewall firewall delete rule name="Bitaxe Difficulty Tracker" >nul 2>&1
+netsh advfirewall firewall add rule name="Bitaxe Difficulty Tracker" dir=in action=allow protocol=TCP localport=19248 >nul 2>&1
 
 :: Open in default browser
 start http://localhost:19248

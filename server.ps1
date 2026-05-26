@@ -536,6 +536,43 @@ $script:pendingScripts = $null
         }
 
         # Simple test page to confirm iPhone can reach server
+        if ($path -eq "/nethash") {
+            $coin = $req.QueryString["coin"]
+            if (-not $coin) { $coin = "btc" }
+            # Return cached value immediately (non-blocking)
+            $nhCached = $script:netHashCache[$coin]
+            if (-not $nhCached -or $nhCached -eq "{}") { $nhCached = "{`"hashrate`":`"0`",`"coin`":`"$coin`"}" }
+            $nhBytes = [System.Text.Encoding]::UTF8.GetBytes($nhCached)
+            $resp.ContentType = "application/json"
+            $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64 = $nhBytes.Length
+            $resp.OutputStream.Write($nhBytes, 0, $nhBytes.Length)
+            $resp.Close()
+            # Fetch fresh data in background if stale (>5 min)
+            $nhNow = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+            if (($nhNow - $script:netHashLastFetch[$coin]) -gt 300) {
+                $script:netHashLastFetch[$coin] = $nhNow
+                $nhCoin = $coin
+                $null = [System.Threading.Tasks.Task]::Run({
+                    try {
+                        $nhUrl = if ($nhCoin -eq "btc") { "https://blockchain.info/q/hashrate" }
+                                 elseif ($nhCoin -eq "bch") { "https://blockchain.info/bch/q/hashrate" }
+                                 elseif ($nhCoin -eq "xec") { "https://chainz.cryptoid.info/xec/api.dws?q=hashrate" }
+                                 elseif ($nhCoin -eq "fb") { $null }
+                                 else { "https://chainz.cryptoid.info/dgb/api.dws?q=hashrate" }
+                                 if (-not $nhUrl) { return }
+                        $nhReq2 = [System.Net.HttpWebRequest]::Create($nhUrl)
+                        $nhReq2.Timeout = 10000; $nhReq2.ReadWriteTimeout = 10000
+                        $nhResp2 = $nhReq2.GetResponse()
+                        $nhReader2 = New-Object System.IO.StreamReader($nhResp2.GetResponseStream())
+                        $nhVal2 = $nhReader2.ReadToEnd().Trim()
+                        $nhReader2.Close(); $nhResp2.Close()
+                        $script:netHashCache[$nhCoin] = "{`"hashrate`":`"$nhVal2`",`"coin`":`"$nhCoin`"}"
+                    } catch {}
+                })
+            }
+            continue       }
+
         if ($path -eq "/test") {
             $b = [System.Text.Encoding]::UTF8.GetBytes("<html><body style='background:#000;color:#0f0;font-family:monospace;font-size:24px;padding:40px'><h1>✅ Server is reachable!</h1><p>Your iPhone can talk to the server.</p><p>Now try: <a style='color:#38bdf8' href='/'>http://$($req.Url.Host)/</a></p></body></html>")
             $resp.ContentType = "text/html; charset=utf-8"
