@@ -161,11 +161,11 @@ input[type=checkbox].toggle{width:20px;height:20px;accent-color:var(--grn);curso
 
 <div id="nav">
   <div class="nav-tab on" onclick="showTab('miners')">⛏ Miners</div>
-  <div class="nav-tab" onclick="showTab('addminer')">⚙ Miner</div>
+  <div class="nav-tab" onclick="showTab('addminer')"><div style="font-size:.85rem">⚙</div>Miner</div>
   <div class="nav-tab" onclick="showTab('top10')">📋 Session</div>
   <div class="nav-tab" onclick="showTab('alltime')">⭐ All-Time</div>
-  <div class="nav-tab" onclick="showTab('pool')">⛁ Pool</div>
-  <div class="nav-tab" onclick="showTab('settings')">⚙ Settings</div>
+  <div class="nav-tab" onclick="showTab('pool')"><div style="font-size:.85rem">⛁</div>Pool</div>
+  <div class="nav-tab" onclick="showTab('settings')"><div style="font-size:.85rem">⚙</div>App</div>
 </div>
 
 <div id="main">
@@ -859,7 +859,7 @@ function renderAddMiner(){
     body.innerHTML+=
       '<div class="toggle-row"><span class="toggle-lbl">Auto Fan Speed</span>'+
       '<input type="checkbox" class="toggle" id="m-autofan-'+key+'" '+(autoFan?'checked':'')+
-      ' onchange="toggleFan(\''+key+'\',this.checked)"></div>'+
+      ' onchange="settingsDirty=true;toggleFan(\''+key+'\',this.checked)"></div>'+
       '<div id="m-fanauto-'+key+'" style="display:'+(autoFan?'block':'none')+'">'+
         '<div class="field-group"><label class="field-lbl">Target Temp (35–66°C)</label>'+
         '<input class="field-input" type="number" id="m-temptgt-'+key+'" value="'+(d.temptarget||60)+'" min="35" max="66"></div>'+
@@ -868,7 +868,7 @@ function renderAddMiner(){
       '</div>'+
       '<div id="m-fanmanual-'+key+'" style="display:'+(autoFan?'none':'block')+'">'+
         '<div class="field-group"><label class="field-lbl">Manual Fan Speed (0–100%)</label>'+
-        '<input class="field-input" type="number" id="m-fanspd-'+key+'" value="'+(d.manualFanSpeed||d.fanspeed||100)+'" min="0" max="100" oninput=\'settingsDirty=true\'></div>'+
+        '<input class="field-input" type="number" id="m-fanspd-'+key+'" value="'+(d.fanspeed!=null?Math.round(d.fanspeed):100)+'" min="0" max="100" oninput=\'settingsDirty=true\'></div>'+
       '</div>'+
       '<div class="btn-row">'+
         '<button class="btn-save" onclick="mSave(\''+ip+'\')">✓ Save</button>'+
@@ -1136,6 +1136,16 @@ function renderSettings(){
   scBtn.onclick=function(){_mobScView='list';mobLoadScripts().then(function(){renderSettings();}).catch(function(){renderSettings();});}; 
   c.appendChild(scBtn);
 
+  // Crash/Restart Reports button
+  var rpBtn=document.createElement('button');
+  rpBtn.style.cssText='width:100%;background:var(--surf);border:1px solid var(--bdr);color:var(--txt);padding:14px 16px;border-radius:10px;text-align:left;display:flex;align-items:center;cursor:pointer;font-size:.85rem;margin-bottom:0';
+  var rpCount=Object.keys(_mobReports).reduce(function(t,ip){return t+(_mobReports[ip]||[]).length;},0);
+  rpBtn.innerHTML='📋 <span style="flex:1;margin-left:8px">Crash/Restart Reports</span><span style="color:var(--muted);font-size:.75rem">'+rpCount+' saved ›</span>';
+  rpBtn.onclick=function(){
+    mobLoadReports().then(function(){ renderMobReports(); }).catch(function(){ renderMobReports(); });
+  };
+  c.appendChild(rpBtn);
+
   // Hash Rain toggle
   var hrCard=document.createElement('div');
   hrCard.style.cssText='background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;margin-bottom:14px;';
@@ -1248,6 +1258,35 @@ function renderSettings(){
   costCard.appendChild(costRow);
   c.appendChild(costCard);
 
+  // Mobile Battery Saver card
+  var bsCard=document.createElement('div');
+  bsCard.style.cssText='background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;margin-bottom:14px;';
+  var bsLabel=document.createElement('div');
+  bsLabel.style.cssText='font-size:.72rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;';
+  bsLabel.textContent='Mobile Battery Saver';
+  bsCard.appendChild(bsLabel);
+  var bsDesc=document.createElement('div');
+  bsDesc.style.cssText='font-size:.75rem;color:var(--muted);margin-bottom:10px;';
+  bsDesc.textContent='Refresh interval — faster uses more battery';
+  bsCard.appendChild(bsDesc);
+  var bsRow=document.createElement('div');
+  bsRow.style.cssText='display:flex;gap:8px;flex-wrap:wrap;';
+  [['2s',2000],['5s',5000],['10s',10000],['20s',20000]].forEach(function(opt){
+    var btn=document.createElement('button');
+    var active=_mobRefreshMs===opt[1];
+    btn.style.cssText='padding:6px 14px;border-radius:6px;border:1px solid '+(active?'var(--grn)':'var(--bdr)')+
+      ';background:'+(active?'var(--grn)':'transparent')+';color:'+(active?'#000':'var(--txt)')+
+      ';font-size:.82rem;font-weight:'+(active?'700':'400')+';cursor:pointer;';
+    btn.textContent=opt[0];
+    btn.onclick=function(){
+      setMobRefresh(opt[1]);
+      renderSettings();
+    };
+    bsRow.appendChild(btn);
+  });
+  bsCard.appendChild(bsRow);
+  c.appendChild(bsCard);
+
 }
 
 function toggleFan(key, checked){
@@ -1274,19 +1313,31 @@ async function mSave(ip){
   var volt=parseInt(document.getElementById('m-volt-'+key).value);
   if(isNaN(freq)||isNaN(volt)){msg.style.color='var(--red)';msg.textContent='Enter valid numbers.';refreshPaused=false;return;}
   var autoFan=document.getElementById('m-autofan-'+key).checked?1:0;
-  var body={frequency:freq,coreVoltage:volt,overclockEnabled:1,autofanspeed:autoFan};
-  if(autoFan){
-    var tt=document.getElementById('m-temptgt-'+key);
-    var mf=document.getElementById('m-minfan-'+key);
-    if(tt) body.temptarget=parseInt(tt.value);
-    if(mf) body.minfanspeed=parseInt(mf.value);
-  } else {
-    var fs=document.getElementById('m-fanspd-'+key);
-    if(fs) body.fanspeed=parseInt(fs.value);
-  }
+  var ttEl=document.getElementById('m-temptgt-'+key);
+  var mfEl=document.getElementById('m-minfan-'+key);
+  var fsEl=document.getElementById('m-fanspd-'+key);
+  var body={
+    frequency:freq,
+    coreVoltage:volt,
+    overclockEnabled:1,
+    autofanspeed:autoFan,
+    fanspeed:fsEl?parseInt(fsEl.value)||100:100,
+    temptarget:ttEl?parseInt(ttEl.value)||60:60,
+    minfanspeed:mfEl?parseInt(mfEl.value)||35:35
+  };
   msg.style.color='var(--muted)'; msg.textContent='Saving…';
   try{
-    var r=await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(8000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(body)}});
+    // PATCH 1: performance settings
+    var perfBody={frequency:body.frequency,coreVoltage:body.coreVoltage,overclockEnabled:1};
+    await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(8000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(perfBody)}});
+    // PATCH 2: fan settings
+    var fanBody;
+    if(autoFan){
+      fanBody={autofanspeed:1,temptarget:body.temptarget,minfanspeed:body.minfanspeed};
+    } else {
+      fanBody={manualFanSpeed:body.fanspeed,autofanspeed:0};
+    }
+    var r=await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(8000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(fanBody)}});
     if(r.ok){
       msg.style.color='var(--grn)';msg.textContent='Saved! ✓';
       settingsDirty=false; refreshPaused=false;
@@ -1504,6 +1555,8 @@ var _mobSc = (function(){ try{ var s=localStorage.getItem('mob_scripts'); return
   try{ var sf2=localStorage.getItem('mob_surf2_color'); if(sf2) document.documentElement.style.setProperty('--surf2',sf2); }catch(e){}
 })();
 var _mobScEdit = null;
+var _mobReportsView = false;
+var _mobReports = {};
 var _mobScView = ''; // '' = miner settings, 'list' = scripts list, 'editor' = script editor
 
 var MOB_SC_FIELDS = ['hashrate','hashrate_1m','hashrate_10m','hashrate_1h','bestDiff','bestSessionDiff',
@@ -1514,6 +1567,151 @@ var MOB_SC_OPS = ['>','>=','<','<=','==','!=','between','outside','is_true','is_
 var MOB_SC_ACTIONS = ['restart','setFrequency','setCoreVoltage','setFanSpeed','setAutoFan',
   'setTargetTemp','setOverclock','setPrimaryPool','switchFallbackPool',
   'setWorkerName','setPassword','notification'];
+
+function mobDeleteReport(ip, ts){
+  if(!confirm('Delete this report?')) return;
+  // Remove locally
+  if(_mobReports[ip]){ _mobReports[ip]=_mobReports[ip].filter(function(r){return r.ts!==ts;}); }
+  // Push updated reports to server pending channel so Windows picks it up
+  fetch(SERVER+'/setreports',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(_mobReports)}).catch(function(){});
+  renderMobReports();
+}
+
+async function mobLoadReports(){
+  try{
+    var r=await fetch(SERVER+'/reports',{signal:AbortSignal.timeout(4000)});
+    if(r.ok){ var d=await r.json(); if(d&&typeof d==='object') _mobReports=d; }
+  }catch(e){}
+}
+
+function fmtDMob(v){
+  if(!v) return '0';
+  if(v>=1e12) return (v/1e12).toFixed(2)+'T';
+  if(v>=1e9)  return (v/1e9).toFixed(2)+'G';
+  if(v>=1e6)  return (v/1e6).toFixed(2)+'M';
+  if(v>=1e3)  return (v/1e3).toFixed(2)+'K';
+  return v.toFixed ? v.toFixed(2) : v;
+}
+
+function renderMobReports(){
+  _mobReportsView=true;
+  var tab=document.getElementById('tab-settings');
+  tab.innerHTML='';
+  // Header
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--bdr);gap:10px;position:sticky;top:0;background:var(--bg);z-index:10';
+  var back=document.createElement('button');
+  back.style.cssText='background:transparent;border:1px solid var(--bdr);color:var(--txt);padding:6px 14px;border-radius:8px;font-size:.85rem;cursor:pointer';
+  back.textContent='‹ Back';
+  back.onclick=function(){ _mobReportsView=false; mobLoadReports().then(function(){renderSettings();}).catch(function(){renderSettings();}); };
+  var title=document.createElement('div');
+  title.style.cssText='font-size:.95rem;font-weight:700;color:var(--txt)';
+  title.textContent='📋 Crash/Restart Reports';
+  hdr.appendChild(back); hdr.appendChild(title);
+  tab.appendChild(hdr);
+
+  var content=document.createElement('div');
+  content.style.cssText='padding:14px;display:flex;flex-direction:column;gap:12px';
+
+  var ips=Object.keys(_mobReports);
+  if(!ips.length){
+    var empty=document.createElement('div');
+    empty.style.cssText='color:var(--muted);text-align:center;padding:40px;font-size:.85rem';
+    empty.textContent='No reports yet. Reports save automatically when a miner restarts.';
+    content.appendChild(empty);
+    tab.appendChild(content);
+    return;
+  }
+
+  ips.forEach(function(ip){
+    var reports=_mobReports[ip]||[];
+    if(!reports.length) return;
+    var r0=reports[0];
+    var minerName=r0.name&&r0.name.trim()?r0.name.trim():ip;
+    var color=r0.color||'#f7931a';
+
+    // Miner section header
+    var mhdr=document.createElement('div');
+    mhdr.style.cssText='font-size:.85rem;font-weight:700;color:'+color+';padding:4px 0;border-bottom:1px solid var(--bdr)';
+    mhdr.textContent='▸ '+minerName;
+    content.appendChild(mhdr);
+
+    reports.forEach(function(r,ri){
+      var card=document.createElement('div');
+      card.style.cssText='background:var(--surf);border:1px solid var(--bdr);border-radius:10px;overflow:hidden';
+
+      var date=new Date(r.ts);
+      var dateStr=date.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+      var dur=r.duration?(r.duration>=3600?Math.floor(r.duration/3600)+'h '+Math.floor((r.duration%3600)/60)+'m':r.duration>=60?Math.floor(r.duration/60)+'m '+r.duration%60+'s':r.duration+'s'):'—';
+      var hrStr=r.lastHashrate?(r.lastHashrate>=1000?(r.lastHashrate/1000).toFixed(2)+' TH/s':r.lastHashrate.toFixed(2)+' GH/s'):'—';
+      var effStr=r.lastEfficiency?r.lastEfficiency+' W/TH':'—';
+      var rejPct=r.sharesFound>0?' ('+(r.sharesRejected/r.sharesFound*100).toFixed(1)+'%)':'';
+
+      // Collapsible header
+      var cardHdr=document.createElement('div');
+      cardHdr.style.cssText='display:flex;align-items:center;padding:12px 14px;cursor:pointer;gap:8px';
+      var sessionNum=document.createElement('span');
+      sessionNum.style.cssText='font-size:.8rem;font-weight:700;color:var(--txt)';
+      sessionNum.textContent='Session #'+(reports.length-ri);
+      var dateEl=document.createElement('span');
+      dateEl.style.cssText='font-size:.72rem;color:var(--muted);margin-left:auto';
+      dateEl.textContent=dateStr;
+      var chevron=document.createElement('span');
+      chevron.style.cssText='color:var(--muted);font-size:.8rem;margin-left:6px';
+      chevron.textContent='›';
+      var mobDelBtn=document.createElement('button');
+      mobDelBtn.style.cssText='background:transparent;border:none;color:var(--red);font-size:.8rem;padding:0 4px;cursor:pointer;opacity:.7';
+      mobDelBtn.textContent='✕';
+      mobDelBtn.onclick=(function(rip,rts){ return function(e){ e.stopPropagation(); mobDeleteReport(rip,rts); }; })(r.ip,r.ts);
+      cardHdr.appendChild(sessionNum); cardHdr.appendChild(dateEl); cardHdr.appendChild(mobDelBtn); cardHdr.appendChild(chevron);
+
+      // Collapsible body
+      var cardBody=document.createElement('div');
+      cardBody.style.cssText='display:none;padding:0 14px 14px;border-top:1px solid var(--bdr)';
+
+      var tempStr=(r.lastTemps&&r.lastTemps.length)?r.lastTemps.map(function(t){
+        var tc=t.label==='VR'?(t.val>80?'var(--red)':t.val>70?'#f7931a':'var(--grn)'):(t.val>=70?'var(--red)':t.val>=65?'#f7931a':'var(--grn)');
+        return '<span style="color:'+tc+'">'+t.label+': '+t.val.toFixed(1)+'°</span>';
+      }).join('  '):'—';
+
+      var top10Html=(r.top10&&r.top10.length)?r.top10.map(function(p,i){
+        return '<div style="display:flex;gap:8px;font-size:.75rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)">'+
+          '<span style="color:var(--muted);min-width:18px">'+(i+1)+'.</span>'+
+          '<span style="color:var(--orange);font-weight:600">'+fmtDMob(p.found)+'</span>'+
+          '<span style="color:var(--muted)">of '+fmtDMob(p.target)+'</span>'+
+          (p.accepted?'<span style="color:var(--grn);margin-left:auto">✓</span>':'<span style="color:var(--red);margin-left:auto">✗</span>')+
+          '</div>';
+      }).join(''):'<div style="color:var(--muted);font-size:.75rem">No shares</div>';
+
+      cardBody.innerHTML=
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 0;font-size:.78rem">'+
+          '<div><div style="color:var(--muted)">Duration</div><div style="font-weight:600">'+dur+'</div></div>'+
+          '<div><div style="color:var(--muted)">Hashrate</div><div style="font-weight:600">'+hrStr+'</div></div>'+
+          '<div><div style="color:var(--muted)">Efficiency</div><div style="font-weight:600">'+effStr+'</div></div>'+
+          '<div><div style="color:var(--muted)">Best Diff</div><div style="font-weight:600;color:var(--orange)">'+fmtDMob(r.bestDiff)+'</div></div>'+
+          '<div><div style="color:var(--muted)">Shares</div><div style="font-weight:600">'+r.sharesAccepted+' / '+r.sharesFound+'</div></div>'+
+          '<div><div style="color:var(--muted)">Rejected</div><div style="font-weight:600;color:'+(r.sharesRejected>0?'var(--red)':'var(--grn)')+'">'+r.sharesRejected+rejPct+'</div></div>'+
+          '<div><div style="color:var(--muted)">Avg Share</div><div style="font-weight:600">'+(r.avgShare?r.avgShare.toFixed(1)+'s':'—')+'</div></div>'+
+          '<div><div style="color:var(--muted)">Temps</div><div style="font-weight:600;font-size:.72rem">'+tempStr+'</div></div>'+
+        '</div>'+
+        '<div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Top 10 Difficulties</div>'+
+        '<div>'+top10Html+'</div>';
+
+      var open=false;
+      cardHdr.onclick=function(){
+        open=!open;
+        cardBody.style.display=open?'block':'none';
+        chevron.textContent=open?'˅':'›';
+      };
+
+      card.appendChild(cardHdr); card.appendChild(cardBody);
+      content.appendChild(card);
+    });
+  });
+
+  tab.appendChild(content);
+}
 
 async function mobLoadScripts(){
   try{
@@ -1531,10 +1729,11 @@ async function mobLoadScripts(){
 
 async function mobSaveScripts(){
   _mobScPushedAt=Date.now();
+  // Stamp updatedAt on all scripts so Windows accepts order change
+  var now=Date.now();
+  _mobSc.forEach(function(s){ s.updatedAt=now; });
   try{ localStorage.setItem('mob_scripts',JSON.stringify(_mobSc)); }catch(e){}
-  try{
-    await fetch(SERVER+'/setscripts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(_mobSc),signal:AbortSignal.timeout(4000)});
-  }catch(e){}
+  fetch(SERVER+'/setscripts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(_mobSc)}).catch(function(){});
 }
 
 function renderMobScripts(){
@@ -1584,30 +1783,153 @@ function renderMobScripts(){
 }
 
 function mobRenderScList(c){
-  _mobSc.sort(function(a,b){return String(a.id).localeCompare(String(b.id));});
   if(!_mobSc.length){
     var em=document.createElement('div');
     em.style.cssText='color:var(--muted);text-align:center;padding:30px 0;font-size:.85rem';
     em.textContent='No scripts yet. Tap + New to create one.';
     c.appendChild(em); return;
   }
-  _mobSc.forEach(function(sc,i){
+
+  function mobScMinerLabel(val){
+    if(!val||val==='all') return '__all__';
+    // Try direct IP match first
+    if(minerIPs.indexOf(val)>=0) return val;
+    // Try match by session data id or name
+    var byId=minerIPs.find(function(ip){
+      var sd=sessionData&&sessionData[ip];
+      return sd&&(String(sd.id)===String(val)||(sd.name&&sd.name===val));
+    });
+    if(byId) return byId;
+    // Try match by stored names
+    var names={}; try{names=JSON.parse(localStorage.getItem('mob_names')||'{}');}catch(e){}
+    var byName=minerIPs.find(function(ip){ var k=ip.replace(/[.]/g,'_'); return names[k]===val; });
+    if(byName) return byName;
+    return '__misc__';
+  }
+  function mobScMinerDisplay(key){
+    if(key==='__all__') return 'All Miners / Global';
+    if(key==='__misc__') return 'Miscellaneous';
+    // Use session data name if available
+    var sd=sessionData&&sessionData[key];
+    if(sd&&sd.name&&sd.name.trim()) return sd.name.trim();
+    // Use stored names
+    var names={}; try{names=JSON.parse(localStorage.getItem('mob_names')||'{}');}catch(e){}
+    var k=key.replace(/[.]/g,'_');
+    if(names[k]) return names[k];
+    return key;
+  }
+
+  var groups={}, groupOrder=[];
+  _mobSc.forEach(function(sc){
+    var key=mobScMinerLabel(sc.miners);
+    if(!groups[key]){groups[key]=[];groupOrder.push(key);}
+    groups[key].push(sc);
+  });
+  if(!groups['__all__']){groups['__all__']=[];groupOrder.unshift('__all__');}
+  groupOrder.sort(function(a,b){
+    if(a==='__all__') return -1; if(b==='__all__') return 1;
+    if(a==='__misc__') return 1; if(b==='__misc__') return -1;
+    return 0;
+  });
+
+  // Touch drag state
+  var touchSrc=null, touchClone=null, touchTarget=null;
+
+  function makeMobCard(sc){
     var card=document.createElement('div'); card.className='mob-sc-card';
+    card.dataset.scid=sc.id;
+    card.style.cssText=card.style.cssText+'position:relative;';
+
+    // Drag handle (touch)
+    var dh=document.createElement('div');
+    dh.innerHTML='&#9776;';
+    dh.style.cssText='padding:0 8px;color:var(--muted);font-size:1rem;cursor:grab;flex-shrink:0;touch-action:none;';
+
+    dh.addEventListener('touchstart',function(e){
+      e.preventDefault();
+      touchSrc=card;
+      var rect=card.getBoundingClientRect();
+      touchClone=card.cloneNode(true);
+      touchClone.style.cssText='position:fixed;z-index:999;left:'+rect.left+'px;top:'+rect.top+'px;width:'+rect.width+'px;opacity:0.8;pointer-events:none;background:var(--surf2);border-radius:8px;';
+      document.body.appendChild(touchClone);
+      card.style.opacity='0.3';
+    },{passive:false});
+
+    dh.addEventListener('touchmove',function(e){
+      e.preventDefault();
+      if(!touchClone) return;
+      var t=e.touches[0];
+      touchClone.style.left=(t.clientX-80)+'px';
+      touchClone.style.top=(t.clientY-20)+'px';
+      // Find card under finger
+      touchClone.style.display='none';
+      var el2=document.elementFromPoint(t.clientX,t.clientY);
+      touchClone.style.display='';
+      var over=el2?el2.closest('.mob-sc-card'):null;
+      if(over&&over!==touchSrc) touchTarget=over; else touchTarget=null;
+      c.querySelectorAll('.mob-sc-card').forEach(function(x){x.style.outline='';});
+      if(touchTarget) touchTarget.style.outline='2px dashed var(--orange)';
+    },{passive:false});
+
+    dh.addEventListener('touchend',function(e){
+      e.preventDefault();
+      if(touchClone){touchClone.remove();touchClone=null;}
+      if(touchSrc) touchSrc.style.opacity='1';
+      c.querySelectorAll('.mob-sc-card').forEach(function(x){x.style.outline='';});
+      if(touchSrc&&touchTarget&&touchSrc!==touchTarget){
+        var fromId=touchSrc.dataset.scid, toId=touchTarget.dataset.scid;
+        var fromIdx=_mobSc.findIndex(function(s){return String(s.id)===String(fromId);});
+        var toIdx=_mobSc.findIndex(function(s){return String(s.id)===String(toId);});
+        if(fromIdx>=0&&toIdx>=0){
+          // Also update miner group if dragged to different group
+          var toGrpEl=touchTarget.closest('[data-mobgrpkey]');
+          if(toGrpEl){
+            var newKey=toGrpEl.dataset.mobgrpkey;
+            _mobSc[fromIdx].miners=newKey==='__all__'?'all':newKey;
+          }
+          var moved=_mobSc.splice(fromIdx,1)[0];
+          _mobSc.splice(toIdx,0,moved);
+          mobSaveScripts(); renderMobScripts();
+        }
+      }
+      touchSrc=null; touchTarget=null;
+    },{passive:false});
+
     var info=document.createElement('div'); info.style.flex='1';
     var nm=document.createElement('div'); nm.className='mob-sc-name'; nm.textContent=sc.name||'Unnamed';
     var sb=document.createElement('div'); sb.className='mob-sc-sub';
     sb.textContent=(sc.conditions||[]).length+' cond · '+(sc.actions||[]).length+' action(s)';
     info.appendChild(nm); info.appendChild(sb);
+
     var tog=document.createElement('button'); tog.className='mob-sc-tog '+(sc.enabled?'on':'off'); tog.dataset.scid=sc.id;
     tog.onclick=(function(s){return function(e){e.stopPropagation();s.enabled=!s.enabled;s.updatedAt=Date.now();this.className='mob-sc-tog '+(s.enabled?'on':'off');mobSaveScripts();};})(sc);
+
     var eb=document.createElement('button');
     eb.style.cssText='background:transparent;border:1px solid var(--muted2);color:var(--muted);font-size:.73rem;padding:3px 9px;border-radius:5px;cursor:pointer;margin-left:5px';
     eb.textContent='Edit'; eb.onclick=(function(s){return function(){mobOpenEditor(s);};})(sc);
+
     var db=document.createElement('button');
     db.style.cssText='background:transparent;border:1px solid var(--red);color:var(--red);font-size:.73rem;padding:3px 9px;border-radius:5px;cursor:pointer;margin-left:4px';
-    db.textContent='Del'; db.onclick=(function(idx){return function(){if(confirm('Delete?')){_mobSc.splice(idx,1);mobSaveScripts();renderMobScripts();}};})(i);
-    card.appendChild(info); card.appendChild(tog); card.appendChild(eb); card.appendChild(db);
-    c.appendChild(card);
+    db.textContent='Del'; db.onclick=(function(s){return function(){if(confirm('Delete?')){var i=_mobSc.findIndex(function(x){return x.id===s.id;});if(i>=0){_mobSc.splice(i,1);mobSaveScripts();renderMobScripts();}}};})(sc);
+
+    card.appendChild(dh); card.appendChild(info); card.appendChild(tog); card.appendChild(eb); card.appendChild(db);
+    return card;
+  }
+
+  groupOrder.forEach(function(key){
+    var grpWrap=document.createElement('div');
+    grpWrap.dataset.mobgrpkey=key;
+    grpWrap.style.cssText='margin-bottom:10px;';
+
+    var grpHdr=document.createElement('div');
+    grpHdr.style.cssText='font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:6px 2px 4px 2px;';
+    grpHdr.textContent=mobScMinerDisplay(key);
+    grpWrap.appendChild(grpHdr);
+
+    groups[key].forEach(function(sc){
+      grpWrap.appendChild(makeMobCard(sc));
+    });
+    c.appendChild(grpWrap);
   });
 }
 
@@ -1757,6 +2079,9 @@ function mobSaveScript(){
 function getMinerName(ip){
   try{ var n=JSON.parse(localStorage.getItem('mob_names')||'{}'); return n[ip]||''; }catch(e){ return ''; }
 }
+
+// Sync reports every 30s
+setInterval(function(){ mobLoadReports().catch(function(){}); }, 5000);
 
 // Poll for script changes from Windows every 5s
 setInterval(function(){
@@ -2216,7 +2541,7 @@ async function doRefresh(){
   refreshing=true;
   document.getElementById('refresh-btn').classList.add('spinning');
   try{
-    await Promise.all([loadAllTime(),loadSession()]);
+    await Promise.all([loadAllTime(),loadSession(),mobLoadReports()]);
     await loadMiners();
     await loadAllMinerData();
     // Update AR buttons in-place from session data (no full rebuild needed)
@@ -2248,7 +2573,7 @@ async function doRefresh(){
     if(activeTab==='top10') renderTop10();
     else if(activeTab==='alltime') renderAllTime();
     else if(activeTab==='pool') renderPool();
-    else if(activeTab==='settings'&&!refreshPaused&&!settingsDirty) renderSettings();
+    else if(activeTab==='settings'&&!refreshPaused&&!settingsDirty&&!_mobReportsView) renderSettings();
     if(activeTab==='addminer'&&!refreshPaused&&!settingsDirty) renderAddMiner();
   }catch(e){}
   // Update odds card
@@ -2319,7 +2644,14 @@ async function doRefresh(){
 }
 function manualRefresh(){ minersBuilt=false; doRefresh(); }
 
-setInterval(doRefresh, 5000);
+var _mobRefreshMs=parseInt(localStorage.getItem('mob_refresh_ms')||'5000');
+var _mobRefreshTimer=setInterval(doRefresh, _mobRefreshMs);
+function setMobRefresh(ms){
+  _mobRefreshMs=ms;
+  try{localStorage.setItem('mob_refresh_ms',String(ms));}catch(e){}
+  clearInterval(_mobRefreshTimer);
+  _mobRefreshTimer=setInterval(doRefresh, ms);
+}
 doRefresh();
 </script>
 <div id="mob-donate-overlay" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'"><div style="background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:20px;max-width:420px;width:92%;max-height:85vh;overflow-y:auto"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><h2 style="font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;color:#f7931a">💛 Support This Project</h2><button onclick="document.getElementById('mob-donate-overlay').style.display='none'" style="background:transparent;border:1px solid var(--muted2);color:var(--muted);font-family:inherit;font-size:.68rem;padding:4px 12px;border-radius:6px;cursor:pointer">✕</button></div><p style="font-size:.76rem;color:var(--muted);margin-bottom:14px;line-height:1.6">If this app has helped your mining operation, any donation is greatly appreciated. Tap any address to copy it.</p><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#f7931a;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BTC</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('bc1q7cddtk0leg6n7phpe8ershfx5ue6ksd2lgut0s').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">bc1q7cddtk0leg6n7phpe8ershfx5ue6ksd2lgut0s</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#8dc351;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BCH</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('qru9pw3v76wk8m4taac4670dmnlyk5c6kceu763rnm').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">qru9pw3v76wk8m4taac4670dmnlyk5c6kceu763rnm</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#627eea;font-weight:700;letter-spacing:.1em;margin-bottom:6px">ETH</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('0x8d89ad340A131429fE76bBeC547476e6a6Ae16db').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">0x8d89ad340A131429fE76bBeC547476e6a6Ae16db</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#bfbbbb;font-weight:700;letter-spacing:.1em;margin-bottom:6px">LTC</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('ltc1q4jeadmeunm397vqmuycxvpdhasvzatx7te5z2g').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">ltc1q4jeadmeunm397vqmuycxvpdhasvzatx7te5z2g</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#f3ba2f;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BNB</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('0x8d89ad340A131429fE76bBeC547476e6a6Ae16db').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">0x8d89ad340A131429fE76bBeC547476e6a6Ae16db</div></div><div id="mob-donate-copied" style="text-align:center;color:var(--grn);font-size:.8rem;min-height:18px;margin-top:6px"></div></div></div>

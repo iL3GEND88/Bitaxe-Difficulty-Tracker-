@@ -130,6 +130,27 @@ $sseScript = {
     }
 }
 
+# ── Shared state initialization ──────────────────────────────────────────────
+if (-not $script:netHashCache)   { $script:netHashCache   = @{btc='{}';bch='{}';dgb='{}';xec='{}';fb='{}'} }
+if (-not $script:netHashLastFetch){ $script:netHashLastFetch = @{btc=0;bch=0;dgb=0;xec=0;fb=0} }
+if (-not $script:sessionCache)   { $script:sessionCache   = $null }
+if (-not $script:allTimeCache)   { $script:allTimeCache   = $null }
+if (-not $script:pendingNotifs)  { $script:pendingNotifs  = $null }
+if (-not $script:scriptsCache)   { $script:scriptsCache   = $null }
+if (-not $script:pendingScripts) { $script:pendingScripts = $null }
+if (-not $script:arStateCache)   { $script:arStateCache   = $null }
+if (-not $script:minersCache)    { $script:minersCache    = $null }
+if (-not $script:pendingReports)  { $script:pendingReports  = $null }
+if (-not $script:reportsCache) {
+    try {
+        $rpath = "$PSScriptRoot\reports-data.json"
+        if (Test-Path $rpath) { $script:reportsCache = [System.IO.File]::ReadAllText($rpath, [System.Text.Encoding]::UTF8) }
+        else { $script:reportsCache = $null }
+    } catch { $script:reportsCache = $null }
+}
+if (-not $script:minerIPs)       { $script:minerIPs       = @() }
+if (-not $script:setAutoRestart) { $script:setAutoRestart = $null }
+
 $running = $true
 while ($running -and $listener.IsListening) {
     try {
@@ -185,8 +206,8 @@ while ($running -and $listener.IsListening) {
                             if ($script:pendingNotifs) {
                                 $existing = ConvertFrom-Json $script:pendingNotifs
                                 $combined = @($existing) + @($newNotifs)
-                                if ($combined.Count -gt 50) { $combined = $combined[-50..-1] }
-                                $script:pendingNotifs = ConvertTo-Json $combined -Compress
+                                if ($combined -and $combined.Count -gt 50) { $combined = $combined[-50..-1] }
+                                if ($combined) { $script:pendingNotifs = ConvertTo-Json $combined -Compress }
                             } else {
                                 $script:pendingNotifs = $nj
                             }
@@ -206,6 +227,25 @@ while ($running -and $listener.IsListening) {
                     $resp.OutputStream.Write($nb2, 0, $nb2.Length)
                 }
             } catch { Write-Host "  [Notif] Error: $_" -ForegroundColor Yellow }
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/setreports") {
+            try {
+                $srr = New-Object System.IO.StreamReader($req.InputStream)
+                $srj = $srr.ReadToEnd(); $srr.Dispose()
+                if ($srj -and $srj.Length -gt 2) { $script:pendingReports = $srj }
+            } catch {}
+            $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $b=[System.Text.Encoding]::UTF8.GetBytes("ok"); $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/getreports") {
+            $sout5 = if ($script:pendingReports) { $script:pendingReports } else { 'null' }
+            $sb5=[System.Text.Encoding]::UTF8.GetBytes($sout5)
+            $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64=$sb5.Length; $resp.OutputStream.Write($sb5,0,$sb5.Length)
             $resp.Close(); continue
         }
 
@@ -230,6 +270,29 @@ while ($running -and $listener.IsListening) {
             $sb4=[System.Text.Encoding]::UTF8.GetBytes($sout4)
             $resp.ContentType="application/json"; $resp.ContentLength64=$sb4.Length
             $resp.OutputStream.Write($sb4,0,$sb4.Length)
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/reports") {
+            try {
+                if ($req.HttpMethod -eq "POST") {
+                    try {
+                        $rr = New-Object System.IO.StreamReader($req.InputStream)
+                        $rj = $rr.ReadToEnd(); $rr.Dispose()
+                        if ($rj -and $rj.Length -gt 2) {
+                            $script:reportsCache = $rj
+                            try { [System.IO.File]::WriteAllText("$PSScriptRoot\reports-data.json", $rj, [System.Text.Encoding]::UTF8) } catch {}
+                        }
+                    } catch {}
+                    $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+                    $b=[System.Text.Encoding]::UTF8.GetBytes("ok"); $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+                } else {
+                    $data = if ($script:reportsCache) { $script:reportsCache } else { '{}' }
+                    $resp.StatusCode = 200; $resp.ContentType = "application/json"
+                    $resp.Headers.Add("Access-Control-Allow-Origin","*")
+                    $b=[System.Text.Encoding]::UTF8.GetBytes($data); $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+                }
+            } catch { $resp.StatusCode=500 }
             $resp.Close(); continue
         }
 
@@ -258,7 +321,12 @@ while ($running -and $listener.IsListening) {
             try {
                 $wc2 = New-Object System.Net.WebClient
                 $wc2.Headers.Add("Accept","application/json")
-                $sb = $wc2.DownloadData("http://$ip/api/system/scoreboard")
+                $sbReq = [System.Net.HttpWebRequest]::Create("http://$ip/api/system/scoreboard")
+                $sbReq.Method = "GET"; $sbReq.Timeout = 4000; $sbReq.ReadWriteTimeout = 4000
+                $sbResp2 = $sbReq.GetResponse()
+                $sbReader = New-Object System.IO.StreamReader($sbResp2.GetResponseStream())
+                $sb = [System.Text.Encoding]::UTF8.GetBytes($sbReader.ReadToEnd())
+                $sbReader.Close(); $sbResp2.Close()
                 $resp.ContentType="application/json"
                 $resp.Headers.Add("Access-Control-Allow-Origin","*")
                 $resp.ContentLength64=$sb.Length
@@ -274,108 +342,39 @@ while ($running -and $listener.IsListening) {
 
         if ($path -eq "/api" -and $ip) {
             try {
-                $wc = New-Object System.Net.WebClient
-                $wc.Headers.Add("Accept","application/json")
-                $data = $wc.DownloadData("http://$ip/api/system/info")
-                $resp.ContentType="application/json"; $resp.ContentLength64=$data.Length
-                $resp.OutputStream.Write($data,0,$data.Length)
+                $apiReq = [System.Net.HttpWebRequest]::Create("http://$ip/api/system/info")
+                $apiReq.Method = "GET"; $apiReq.Accept = "application/json"
+                $apiReq.Timeout = 4000; $apiReq.ReadWriteTimeout = 4000
+                $apiResp = $apiReq.GetResponse()
+                $apiReader = New-Object System.IO.StreamReader($apiResp.GetResponseStream())
+                $apiData = [System.Text.Encoding]::UTF8.GetBytes($apiReader.ReadToEnd())
+                $apiReader.Close(); $apiResp.Close()
+                $resp.ContentType = "application/json"
+                $resp.Headers.Add("Access-Control-Allow-Origin","*")
+                $resp.ContentLength64 = $apiData.Length
+                $resp.OutputStream.Write($apiData,0,$apiData.Length)
                 Write-Host "  [API] $ip OK" -ForegroundColor Green
             } catch {
-                $msg=[System.Text.Encoding]::UTF8.GetBytes("{`"error`":`"$_`"}")
-                $resp.StatusCode=502; $resp.ContentType="application/json"
-                $resp.ContentLength64=$msg.Length; $resp.OutputStream.Write($msg,0,$msg.Length)
-                Write-Host "  [API] $ip FAILED: $_" -ForegroundColor Red
+                $msg = [System.Text.Encoding]::UTF8.GetBytes("{`"error`":`"$_`"}")
+                $resp.StatusCode = 502; $resp.ContentType = "application/json"
+                $resp.Headers.Add("Access-Control-Allow-Origin","*")
+                $resp.ContentLength64 = $msg.Length
+                $resp.OutputStream.Write($msg,0,$msg.Length)
+                Write-Host "  [API] $ip FAILED" -ForegroundColor Red
             }
             $resp.Close(); continue
 
-
-        # /scoreboard - proxy to miner scoreboard API
-        if ($path -eq "/notifications") {
-            try {
-                if ($req.HttpMethod -eq "POST") {
-                    try {
-                        $sr2 = New-Object System.IO.StreamReader($req.InputStream)
-                        $nj = $sr2.ReadToEnd(); $sr2.Dispose()
-                        if ($nj -and $nj.Length -gt 2) {
-                        try {
-                            $newNotifs = ConvertFrom-Json $nj
-                            if ($script:pendingNotifs) {
-                                $existing = ConvertFrom-Json $script:pendingNotifs
-                                $combined = @($existing) + @($newNotifs)
-                                if ($combined.Count -gt 50) { $combined = $combined[-50..-1] }
-                                $script:pendingNotifs = ConvertTo-Json $combined -Compress
-                            } else {
-                                $script:pendingNotifs = $nj
-                            }
-                        } catch { $script:pendingNotifs = $nj }
-                    }
-                    } catch {}
-                    $nb = [System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
-                    $resp.ContentType = "application/json"
-                    $resp.ContentLength64 = $nb.Length
-                    $resp.OutputStream.Write($nb, 0, $nb.Length)
-                } else {
-                    $nout = if ($script:pendingNotifs) { $script:pendingNotifs } else { '[]' }
-                    $script:pendingNotifs = $null
-                    $nb2 = [System.Text.Encoding]::UTF8.GetBytes($nout)
-                    $resp.ContentType = "application/json"
-                    $resp.ContentLength64 = $nb2.Length
-                    $resp.OutputStream.Write($nb2, 0, $nb2.Length)
-                }
-            } catch { Write-Host "  [Notif] Error: $_" -ForegroundColor Yellow }
-            $resp.Close(); continue
-        }
-
-        if ($path -eq "/setscripts") {
-            try {
-                $sr4 = New-Object System.IO.StreamReader($req.InputStream)
-                $sj4 = $sr4.ReadToEnd(); $sr4.Dispose()
-                if ($sj4 -and $sj4.Length -gt 2) {
-                    $script:scriptsCache = $sj4
-                    $script:pendingScripts = $sj4
-                }
-            } catch {}
-            $rb4=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
-            $resp.ContentType="application/json"; $resp.ContentLength64=$rb4.Length
-            $resp.OutputStream.Write($rb4,0,$rb4.Length)
-            $resp.Close(); continue
-        }
-
-        if ($path -eq "/getscripts") {
-            # Return full scripts cache so Safari always has latest
-            $sout4 = if ($script:scriptsCache) { $script:scriptsCache } else { 'null' }
-            $sb4=[System.Text.Encoding]::UTF8.GetBytes($sout4)
-            $resp.ContentType="application/json"; $resp.ContentLength64=$sb4.Length
-            $resp.OutputStream.Write($sb4,0,$sb4.Length)
-            $resp.Close(); continue
-        }
-
-        if ($path -eq "/scripts") {
-            try {
-                if ($req.HttpMethod -eq "POST") {
-                    try {
-                        $sr3 = New-Object System.IO.StreamReader($req.InputStream)
-                        $sj = $sr3.ReadToEnd(); $sr3.Dispose()
-                        if ($sj -and $sj.Length -gt 2) { $script:scriptsCache = $sj }
-                    } catch {}
-                    $rb=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
-                    $resp.ContentType="application/json"; $resp.ContentLength64=$rb.Length
-                    $resp.OutputStream.Write($rb,0,$rb.Length)
-                } else {
-                    $sout = if ($script:scriptsCache) { $script:scriptsCache } else { '[]' }
-                    $sb=[System.Text.Encoding]::UTF8.GetBytes($sout)
-                    $resp.ContentType="application/json"; $resp.ContentLength64=$sb.Length
-                    $resp.OutputStream.Write($sb,0,$sb.Length)
-                }
-            } catch {}
-            $resp.Close(); continue
-        }
 
         if ($path -eq "/scoreboard" -and $ip) {
             try {
                 $wc2 = New-Object System.Net.WebClient
                 $wc2.Headers.Add("Accept","application/json")
-                $sb = $wc2.DownloadData("http://$ip/api/system/scoreboard")
+                $sbReq = [System.Net.HttpWebRequest]::Create("http://$ip/api/system/scoreboard")
+                $sbReq.Method = "GET"; $sbReq.Timeout = 4000; $sbReq.ReadWriteTimeout = 4000
+                $sbResp2 = $sbReq.GetResponse()
+                $sbReader = New-Object System.IO.StreamReader($sbResp2.GetResponseStream())
+                $sb = [System.Text.Encoding]::UTF8.GetBytes($sbReader.ReadToEnd())
+                $sbReader.Close(); $sbResp2.Close()
                 $resp.ContentType="application/json"
                 $resp.Headers.Add("Access-Control-Allow-Origin","*")
                 $resp.ContentLength64=$sb.Length
@@ -540,7 +539,7 @@ $script:pendingScripts = $null
             $coin = $req.QueryString["coin"]
             if (-not $coin) { $coin = "btc" }
             # Return cached value immediately (non-blocking)
-            $nhCached = $script:netHashCache[$coin]
+            $nhCached = if ($script:netHashCache -and $script:netHashCache.ContainsKey($coin)) { $script:netHashCache[$coin] } else { $null }
             if (-not $nhCached -or $nhCached -eq "{}") { $nhCached = "{`"hashrate`":`"0`",`"coin`":`"$coin`"}" }
             $nhBytes = [System.Text.Encoding]::UTF8.GetBytes($nhCached)
             $resp.ContentType = "application/json"
@@ -550,26 +549,33 @@ $script:pendingScripts = $null
             $resp.Close()
             # Fetch fresh data in background if stale (>5 min)
             $nhNow = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-            if (($nhNow - $script:netHashLastFetch[$coin]) -gt 300) {
+            if ($script:netHashLastFetch -and $script:netHashLastFetch.ContainsKey($coin) -and ($nhNow - $script:netHashLastFetch[$coin]) -gt 300) {
                 $script:netHashLastFetch[$coin] = $nhNow
                 $nhCoin = $coin
-                $null = [System.Threading.Tasks.Task]::Run({
+                $rsNH = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+                $rsNH.Open()
+                $psNH = [System.Management.Automation.PowerShell]::Create()
+                $psNH.Runspace = $rsNH
+                [void]$psNH.AddScript({
+                    param($nhCoinArg, $cacheRef)
                     try {
-                        $nhUrl = if ($nhCoin -eq "btc") { "https://blockchain.info/q/hashrate" }
-                                 elseif ($nhCoin -eq "bch") { "https://blockchain.info/bch/q/hashrate" }
-                                 elseif ($nhCoin -eq "xec") { "https://chainz.cryptoid.info/xec/api.dws?q=hashrate" }
-                                 elseif ($nhCoin -eq "fb") { $null }
+                        $nhUrl = if ($nhCoinArg -eq "btc") { "https://blockchain.info/q/hashrate" }
+                                 elseif ($nhCoinArg -eq "bch") { "https://blockchain.info/bch/q/hashrate" }
+                                 elseif ($nhCoinArg -eq "xec") { "https://chainz.cryptoid.info/xec/api.dws?q=hashrate" }
+                                 elseif ($nhCoinArg -eq "fb") { $null }
                                  else { "https://chainz.cryptoid.info/dgb/api.dws?q=hashrate" }
-                                 if (-not $nhUrl) { return }
+                        if (-not $nhUrl) { return }
                         $nhReq2 = [System.Net.HttpWebRequest]::Create($nhUrl)
                         $nhReq2.Timeout = 10000; $nhReq2.ReadWriteTimeout = 10000
                         $nhResp2 = $nhReq2.GetResponse()
                         $nhReader2 = New-Object System.IO.StreamReader($nhResp2.GetResponseStream())
                         $nhVal2 = $nhReader2.ReadToEnd().Trim()
                         $nhReader2.Close(); $nhResp2.Close()
-                        $script:netHashCache[$nhCoin] = "{`"hashrate`":`"$nhVal2`",`"coin`":`"$nhCoin`"}"
+                        $script:netHashCache[$nhCoinArg] = "{`"hashrate`":`"$nhVal2`",`"coin`":`"$nhCoinArg`"}"
                     } catch {}
-                })
+                    finally { try { $rsNH.Close() } catch {} }
+                }).AddArgument($nhCoin).AddArgument($script:netHashCache)
+                [void]$psNH.BeginInvoke()
             }
             continue       }
 
@@ -582,63 +588,80 @@ $script:pendingScripts = $null
         }
 
         if ($path -eq "/patch" -and $ip) {
-            try {
-                $bodyJson = $req.Headers["X-Body"]
-                if (-not $bodyJson) {
-                    $freq=$req.Headers["X-Freq"]; $voltage=$req.Headers["X-Voltage"]
-                    $bodyJson='{"frequency":'+$freq+',"coreVoltage":'+$voltage+',"overclockEnabled":1}'
-                }
-                $patchReq=[System.Net.HttpWebRequest]::Create("http://$ip/api/system")
-                $patchReq.Method="PATCH"; $patchReq.ContentType="application/json"
-                $patchReq.Timeout=5000; $patchReq.ReadWriteTimeout=5000
-                $patchReq.ServicePoint.ConnectionLeaseTimeout=5000
-                $patchReq.ServicePoint.MaxIdleTime=5000
-                $patchBytes=[System.Text.Encoding]::UTF8.GetBytes($bodyJson)
-                $patchReq.ContentLength=$patchBytes.Length
-                try {
-                    $patchStream=$patchReq.GetRequestStream()
-                    $patchStream.Write($patchBytes,0,$patchBytes.Length)
-                    $patchStream.Close()
-                    $patchResp=$patchReq.GetResponse()
-                    $patchResp.Close()
-                } catch { }
-                $resp.StatusCode=200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
-                $b=[System.Text.Encoding]::UTF8.GetBytes("ok"); $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
-                Write-Host "  [PATCH] $ip OK" -ForegroundColor Cyan
-            } catch {
-                $b2=[System.Text.Encoding]::UTF8.GetBytes("error: $_"); $resp.StatusCode=502
-                $resp.ContentLength64=$b2.Length; $resp.OutputStream.Write($b2,0,$b2.Length)
-                Write-Host "  [PATCH] Failed: $_" -ForegroundColor Red
+            $bodyJson = $req.Headers["X-Body"]
+            if (-not $bodyJson) {
+                $freq=$req.Headers["X-Freq"]; $voltage=$req.Headers["X-Voltage"]
+                $bodyJson='{"frequency":'+$freq+',"coreVoltage":'+$voltage+',"overclockEnabled":1}'
             }
-            $resp.Close(); continue
+            $ipCopyP = $ip; $bodyJsonCopy = $bodyJson; $respCopyP = $resp
+            $rsPatch = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+            $rsPatch.Open()
+            $psPatch = [System.Management.Automation.PowerShell]::Create()
+            $psPatch.Runspace = $rsPatch
+            [void]$psPatch.AddScript({
+                param($respP, $ipP, $bodyP)
+                try {
+                    $pReq=[System.Net.HttpWebRequest]::Create("http://$ipP/api/system")
+                    $pReq.Method="PATCH"; $pReq.ContentType="application/json"
+                    $pReq.Timeout=5000; $pReq.ReadWriteTimeout=5000
+                    $pBytes=[System.Text.Encoding]::UTF8.GetBytes($bodyP)
+                    $pReq.ContentLength=$pBytes.Length
+                    $pStream=$pReq.GetRequestStream()
+                    $pStream.Write($pBytes,0,$pBytes.Length); $pStream.Close()
+                    $pResp=$pReq.GetResponse(); $pResp.Close()
+                    $b=[System.Text.Encoding]::UTF8.GetBytes("ok")
+                    $respP.StatusCode=200
+                    $respP.Headers.Add("Access-Control-Allow-Origin","*")
+                    $respP.ContentLength64=$b.Length
+                    $respP.OutputStream.Write($b,0,$b.Length)
+                    Write-Host "  [PATCH] $ipP OK" -ForegroundColor Cyan
+                } catch {
+                    try {
+                        $b2=[System.Text.Encoding]::UTF8.GetBytes("error: $_")
+                        $respP.StatusCode=502
+                        $respP.Headers.Add("Access-Control-Allow-Origin","*")
+                        $respP.ContentLength64=$b2.Length
+                        $respP.OutputStream.Write($b2,0,$b2.Length)
+                    } catch {}
+                    Write-Host "  [PATCH] $ipP FAILED: $_" -ForegroundColor Red
+                } finally {
+                    try { $respP.Close() } catch {}
+                    try { $rsPatch.Close() } catch {}
+                }
+            }).AddArgument($respCopyP).AddArgument($ipCopyP).AddArgument($bodyJsonCopy)
+            [void]$psPatch.BeginInvoke()
+            continue
         }
 
         # /restart?ip=... - proxy POST to AxeOS restart endpoint
         if ($path -eq "/restart" -and $ip) {
-            try {
-                $restartReq = [System.Net.HttpWebRequest]::Create("http://$ip/api/system/restart")
-                $restartReq.Method = "POST"
-                $restartReq.ContentType = "application/json"
-                $restartReq.ContentLength = 0
-                $restartReq.Timeout = 5000
-                $restartReq.ReadWriteTimeout = 5000
+            # Fire restart in background runspace so main loop doesn't block
+            $ipCopy = $ip
+            $rsRestart = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+            $rsRestart.Open()
+            $psRestart = [System.Management.Automation.PowerShell]::Create()
+            $psRestart.Runspace = $rsRestart
+            [void]$psRestart.AddScript({
+                param($minerIp)
                 try {
-                    $restartResp=$restartReq.GetResponse()
-                    $restartResp.Close()
-                } catch { }
-                Write-Host "  [RESTART] Sent restart to $ip" -ForegroundColor Yellow
-                $resp.StatusCode = 200
-                $resp.Headers.Add("Access-Control-Allow-Origin","*")
-                $b = [System.Text.Encoding]::UTF8.GetBytes("ok")
-                $resp.ContentLength64 = $b.Length
-                $resp.OutputStream.Write($b, 0, $b.Length)
-            } catch {
-                $b2 = [System.Text.Encoding]::UTF8.GetBytes("error: $_")
-                $resp.StatusCode = 502
-                $resp.ContentLength64 = $b2.Length
-                $resp.OutputStream.Write($b2, 0, $b2.Length)
-                Write-Host "  [RESTART] Failed for ${ip}: $_" -ForegroundColor Red
-            }
+                    $req = [System.Net.HttpWebRequest]::Create("http://$minerIp/api/system/restart")
+                    $req.Method = "POST"; $req.ContentType = "application/json"
+                    $req.ContentLength = 0; $req.Timeout = 5000
+                    try { $r=$req.GetResponse(); $r.Close() } catch { }
+                    Write-Host "  [RESTART] Sent restart to $minerIp" -ForegroundColor Yellow
+                } catch {
+                    Write-Host "  [RESTART] Failed for ${minerIp}: $_" -ForegroundColor Red
+                } finally {
+                    try { $rsRestart.Close() } catch {}
+                }
+            }).AddArgument($ipCopy)
+            [void]$psRestart.BeginInvoke()
+            # Respond immediately
+            $resp.StatusCode = 200
+            $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $b = [System.Text.Encoding]::UTF8.GetBytes("ok")
+            $resp.ContentLength64 = $b.Length
+            $resp.OutputStream.Write($b, 0, $b.Length)
             $resp.Close(); continue
         }
 
