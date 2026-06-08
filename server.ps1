@@ -133,7 +133,13 @@ $sseScript = {
 # ── Shared state initialization ──────────────────────────────────────────────
 if (-not $script:netHashCache)   { $script:netHashCache   = @{btc='{}';bch='{}';dgb='{}';xec='{}';fb='{}'} }
 if (-not $script:netHashLastFetch){ $script:netHashLastFetch = @{btc=0;bch=0;dgb=0;xec=0;fb=0} }
-if (-not $script:sessionCache)   { $script:sessionCache   = $null }
+if (-not $script:sessionCache) {
+    try {
+        $sp = Join-Path $PSScriptRoot "session-data.json"
+        if (Test-Path $sp) { $script:sessionCache = [System.IO.File]::ReadAllText($sp, [System.Text.Encoding]::UTF8) }
+        else { $script:sessionCache = $null }
+    } catch { $script:sessionCache = $null }
+}
 if (-not $script:allTimeCache)   { $script:allTimeCache   = $null }
 if (-not $script:pendingNotifs)  { $script:pendingNotifs  = $null }
 if (-not $script:scriptsCache)   { $script:scriptsCache   = $null }
@@ -437,6 +443,19 @@ while ($running -and $listener.IsListening) {
         if ($path -eq "/session" -and $req.HttpMethod -eq "POST") {
             $reader = New-Object System.IO.StreamReader($req.InputStream)
             $script:sessionCache = $reader.ReadToEnd(); $reader.Close()
+            # Persist to disk - but only if snapshot has data or is intentionally cleared
+            try {
+                $sobj = ConvertFrom-Json $script:sessionCache
+                $hasData = $false
+                $isCleared = $false
+                foreach ($key in $sobj.PSObject.Properties.Name) {
+                    if ($sobj.$key.topSeriesSnapshot -and $sobj.$key.topSeriesSnapshot.Count -gt 0) { $hasData = $true }
+                    if ($sobj.$key.sessionCleared) { $isCleared = $true }
+                }
+                if ($hasData -or $isCleared) {
+                    [System.IO.File]::WriteAllText("$PSScriptRoot\session-data.json", $script:sessionCache, [System.Text.Encoding]::UTF8)
+                }
+            } catch {}
             $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
             $b = [System.Text.Encoding]::UTF8.GetBytes("ok")
             $resp.ContentLength64 = $b.Length; $resp.OutputStream.Write($b,0,$b.Length)
@@ -482,6 +501,30 @@ while ($running -and $listener.IsListening) {
         }
 
         # /alltime GET - return cached all-time data
+        # /setclearsession POST - mobile requests session clear
+        if ($path -eq "/setclearsession" -and $req.HttpMethod -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($req.InputStream)
+            $script:pendingClearSession = $reader.ReadToEnd(); $reader.Close()
+            $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64 = 0; $resp.OutputStream.Close(); continue
+        }
+
+        # /getclearsession GET - Windows polls for pending clear
+        if ($path -eq "/getclearsession") {
+            if ($script:pendingClearSession) {
+                $json = $script:pendingClearSession
+                $script:pendingClearSession = $null
+                $resp.StatusCode = 200; $resp.ContentType = "application/json"
+                $buf = [System.Text.Encoding]::UTF8.GetBytes($json)
+                $resp.ContentLength64 = $buf.Length; $resp.OutputStream.Write($buf,0,$buf.Length)
+                $resp.OutputStream.Close(); continue
+            }
+            $resp.StatusCode = 200; $resp.ContentType = "application/json"
+            $buf = [System.Text.Encoding]::UTF8.GetBytes("{}")
+            $resp.ContentLength64 = $buf.Length; $resp.OutputStream.Write($buf,0,$buf.Length)
+            $resp.OutputStream.Close(); continue
+        }
+
         if ($path -eq "/getautorestart") {
             if ($script:pendingAutoRestart) {
                 $json = $script:pendingAutoRestart | ConvertTo-Json -Compress
@@ -506,6 +549,23 @@ $script:pendingScripts = $null
             $b = [System.Text.Encoding]::UTF8.GetBytes($data)
             $resp.ContentLength64 = $b.Length; $resp.OutputStream.Write($b, 0, $b.Length)
             $resp.Close(); continue
+        }
+
+        # /hralltime GET
+        if ($path -eq "/hralltime" -and $req.HttpMethod -eq "GET") {
+            $data = if ($script:hrAllTimeCache) { $script:hrAllTimeCache } else { '{}' }
+            $resp.StatusCode = 200; $resp.ContentType = "application/json"
+            $buf = [System.Text.Encoding]::UTF8.GetBytes($data)
+            $resp.ContentLength64 = $buf.Length; $resp.OutputStream.Write($buf,0,$buf.Length)
+            $resp.OutputStream.Close(); continue
+        }
+
+        # /hralltime POST
+        if ($path -eq "/hralltime" -and $req.HttpMethod -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($req.InputStream)
+            $script:hrAllTimeCache = $reader.ReadToEnd(); $reader.Close()
+            $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64 = 0; $resp.OutputStream.Close(); continue
         }
 
         # /alltime POST - desktop posts localStorage data for mobile to read

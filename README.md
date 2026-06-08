@@ -1,6 +1,6 @@
-# AxeOS Difficulty Tracker
+# Bitaxe Difficulty Tracker
 
-A real-time share difficulty monitor and full dashboard for home Bitcoin miners running AxeOS firmware — Bitaxe, NerdQaxe++, Titan, and compatible devices.
+A real-time share difficulty monitor and full dashboard for home Bitcoin miners running AxeOS firmware — Bitaxe, NerdQaxe++, NerdOCTAXE Gamma, Titan, and compatible devices.
 
 No cloud. No accounts. No installs beyond the files in this zip. Runs entirely on your local network. Full companion mobile app for iPhone/Android via Safari or Chrome over WiFi or Tailscale.
 
@@ -80,77 +80,73 @@ To access your app from anywhere (not just home WiFi):
 - Resizable — font scales with width, saves between sessions
 - All-Time Best, Session Best, Status/Uptime
 - Shares, Rejected (with %), Avg/share, HR, Error Rate, Last diff, Pool Target
-- **Efficiency (W/TH)** displayed below Last diff
+- Efficiency (W/TH) displayed below Last diff
 - ASIC and VR temperatures with color coding:
   - ASIC: green <65°C, orange 65–69°C, red ≥70°C
   - VR: green ≤70°C, orange 71–80°C, red >80°C
-- Top N best difficulties this session (10/25/50/100)
 
 ### 📊 Stats Visibility Dropdown
-Show or hide individual elements per miner card:
-Best Difficulty, Status/Uptime, Shares, Rejected, Hashrate, Error Rate, Avg/Share, Target, Last, Efficiency, Temperatures, Top Diffs List, Live Log
+Show or hide individual elements per miner card — including **🪩 Disco Mode** which hides miner cards and expands the live log to full height for a colorful full-log view.
 
-### 📋 Session Best (Fullscreen)
-- Full-screen overlay of top session shares across all miners
-- Selectable top 10/25/50/100
+### 📊 Difficulty Scores (Fullscreen)
+- Session Best and All-Time Best side by side
+- Collapsible per miner — state preserved when changing Top N
+- Live updates every 2 seconds while open
+- Per-miner trash icon to clear session diffs individually
+- Selectable Top 10 / 25 / 50 / 100 / 250 / 500
+
+### ⚡ HR High Scores (Fullscreen)
+- Session and all-time hashrate peak records with error rate
+- Collapsible per miner with live updates
+- Per-miner trash icon to clear session HR scores individually
+- Shows hashrate in GH/s or TH/s with timestamp and error rate (color-coded)
+- Selectable Top 10 / 25 / 50 / 100
 
 ### ⭐ All-Time Hall of Fame
 - Stores up to 500 best shares per miner — persists forever
 - Integrates with AxeOS Scoreboard — imports entries automatically on connect and every 30 seconds
 - Synced to server so iPhone reads the same list
-- Selectable top 10/25/50/100 view
 
 ### 📋 Crash/Restart Reports
 - Automatically saves a session snapshot whenever a miner's hashrate drops to zero
-- Triggered by actual hashrate loss — catches crashes, power cycles, manual restarts, and auto-restarts
-- Up to 10 reports per miner stored in localStorage
-- Each report shows: session number, date/time, uptime/duration, hashrate, efficiency, best diff, shares accepted/found, rejected count, avg share time, temperatures, and top 10 difficulties
+- Captures pre-crash hashrate and temps (60-second lookback for accurate data)
+- Detects: crashes, power faults, overheat, pool switches, manual restarts, auto-restarts
 - Collapsible cards — compact by default, expand to see full stats
 - Reports synced to server so iPhone can read them
 - Delete individual reports from Windows or mobile — deletions sync bidirectionally
 
 ### 📜 Scripts Engine
 - Create automation scripts that fire every 10 seconds based on miner conditions
-- Conditions: hashrate, temperature, uptime, efficiency, shares, and more
+- Conditions: hashrate, temperature, uptime, efficiency, frequency, time of day, **autoRestarts** (restarts in last hour), and more
 - Actions: set frequency, voltage, fan speed, restart
 - Scripts grouped by miner with drag-and-drop reordering
 - Bidirectional sync with mobile — changes on either side propagate within seconds
 
+### Clear Sessions
+- **✕ Clear Data** dropdown — clears chart and session data per miner or all at once
+- **🗑 Clear Sessions** button — clears session best lists for all miners
+
 ### ⚙ Settings Panel
-Full-screen overlay per miner:
-- Frequency (MHz), Core Voltage (mV)
-- Auto Fan: Target Temp (35–66°C), Min Fan Speed (0–99%)
-- Manual Fan: Fan Speed (0–100%)
-- Save and Restart buttons
+Full-screen overlay per miner — frequency, voltage, fan control with save and restart.
 
 ### ⛁ Pool Settings Panel
-Full-screen overlay per miner:
-- Primary Pool: Stratum Host, Port, User, Password
-- Primary Advanced: Suggested Difficulty, Extranonce Subscribe, Decode Coinbase Tx, Connection Security
-- Fallback Pool: same fields
-- Save and Restart buttons
-
-### Miner Names
-- Name each miner — shows instead of IP everywhere in the app
-- Names pushed to server so mobile loads them automatically on first open
+Full-screen overlay per miner — primary and fallback stratum with advanced options.
 
 ### Auto-Restart
 - Per-miner toggle — saves between sessions, controllable from mobile
 - Fires after **5 minutes with no shares AND hashrate near zero**
 - Max 3 restarts per hour — shows ⚠ warning when limit reached
-
-### Live Log
-- Real-time stream of miner log output
-- Show/hide via Stats dropdown — pauses writes when hidden to prevent freeze on re-show
+- Uses `autoRestarts` script condition to trigger frequency/voltage reduction after repeated crashes
 
 ### Other
-- Block Found full-screen alert with audio beep
+- Block Found full-screen alert — fires immediately via API polling (not on dismiss)
+- NerdQaxe++ and NerdOCTAXE Gamma compatibility
 - Total Hashrate chip in header (combined all miners)
 - Unlimited miners, custom colors, nameable, add/remove with ✕
 - 💛 Donate button for BTC/BCH/ETH/LTC/BNB
 - ⏻ Close App shuts down server cleanly
-- **Launcher kills any existing server on port 19248 before starting** — prevents "server stopped" after reboots
-- **Opens in dedicated app window** (no browser tabs, no throttling) on Edge, Chrome, Brave, Opera
+- Opens in dedicated app window (no browser tabs, no throttling)
+- Launcher kills any existing server on port 19248 before starting
 
 ---
 
@@ -159,30 +155,27 @@ Full-screen overlay per miner:
 Opening the server address in iPhone Safari or Android Chrome automatically loads the mobile app.
 
 ### ⛏ Miners Tab
-- Card per miner with live stats pushed from Windows every 2 seconds:
-  All-Time Best, Session Best, Status/Uptime, Shares/Rej, Avg/share, Target, Last, Efficiency, Frequency, Voltage, Fan Speed
+- Card per miner with live stats pushed from Windows every 2 seconds
 - Hashrate and error rate displayed in the card header
-- 🌡 Temps-only toggle per miner — tap to collapse everything except temperature bars
-- **A** button per miner — toggles auto-restart on/off, syncs to Windows
+- 🌡 Temps-only toggle per miner
+- Auto-restart toggle per miner, syncs to Windows
 - Temperature bars with color coding, collapsible per miner
-- Color picker per miner (tap the colored circle)
-- Remove miner with ✕, rename by tapping the miner name
-- Total bar — watts on the left, total hashrate on the right (excludes stalled miners)
-- Difficulty chart (last 60 shares) and Hashrate/Temp chart per miner
-- **Stall detection** — stalled miners show red border and ⚠ Stalled badge
-- Block finding odds card at the bottom
-- In-app notifications for miner restarts, auto-restart warnings, block found
-
-### ➕ Add Tab
-- Add miners by IP and name
-- Lists current miners with rename and remove options
+- Color picker per miner, rename by tapping the miner name
+- Total bar — watts on the left, total hashrate on the right
+- Difficulty and Hashrate/Temp charts per miner
+- Stall detection — stalled miners show red border and ⚠ badge
+- Block finding odds card
+- In-app notifications for restarts, warnings, block found
 
 ### 📋 Session Tab
-- Top 10/25/50/100 best shares this session
-- Pulled live from Windows — exact match
+- Top N best difficulty shares this session per miner, collapsible
+- ⚡ HR Scores per miner, collapsible
+- Per-list trash icon to clear diffs or HR scores for each miner individually
+- Selectable Top 10 / 25 / 50 / 100 / 250 / 500
 
 ### ⭐ All-Time Tab
-- Top 10/25/50/100 all-time best per miner
+- Top N all-time best difficulties per miner, collapsible
+- ⚡ All-time HR scores per miner, collapsible
 - Same data as Windows hall of fame
 
 ### ⛁ Pool Tab
@@ -190,15 +183,14 @@ Opening the server address in iPhone Safari or Android Chrome automatically load
 - Save and Restart per miner
 
 ### ⚙ App Settings Tab
-- Frequency, Voltage, Fan control per miner (collapsible per miner)
+- Frequency, Voltage, Fan control per miner
 - **Battery Saver** — choose refresh rate: 2s / 5s / 10s / 20s
 - **📜 Scripts** — view, create, edit, reorder automation scripts
-- **📋 Crash/Restart Reports** — view session snapshots saved on miner restarts, with collapsible cards per miner, delete support, bidirectional sync with Windows
+- **📋 Crash/Restart Reports** — collapsible per miner, delete support, bidirectional sync
 - Hash Rain visual effect with brightness controls
 
 ### General
 - Auto-refreshes (default 5 seconds, configurable)
-- Pauses when any input is focused
 - Manual Refresh button in header
 - Miners and names sync from Windows on first load
 
@@ -209,8 +201,9 @@ Opening the server address in iPhone Safari or Android Chrome automatically load
 | Device | Notes |
 |---|---|
 | Bitaxe (all models) | Full support |
-| Bitaxe Duo 650 | Single ASIC temp sensor |
-| NerdQaxe++ | ANSI stripping + slash log format |
+| Bitaxe Duo 650 | Dual BM1370 chips |
+| NerdQaxe++ | Full support — uses lastResetReason field |
+| NerdOCTAXE Gamma | Full support — same firmware base as NerdQaxe |
 | Titan | AxeOS compatible |
 | NerdMiner v2 | No API — shows ⚠ warning |
 
@@ -223,7 +216,7 @@ The `.bat` launches a PowerShell HTTP server on port 19248 that:
 - Redirects iPhone/iPad/Android to the mobile app automatically
 - Proxies WebSocket connections and REST API calls to your miners
 - Fetches the AxeOS Scoreboard and merges entries into your all-time list
-- Stores shared state in memory: miner list, all-time data, live session data, scripts, notifications, crash reports
+- Stores shared state in memory: miner list, all-time data, live session data, HR scores, scripts, notifications, crash reports
 - All traffic stays on your local network — nothing leaves your home
 
 ---

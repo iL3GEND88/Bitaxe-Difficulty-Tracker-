@@ -184,30 +184,7 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
 .mcard-resize{color:var(--muted2);font-size:10px;line-height:1}
 .mcard-resize:hover{color:var(--bg)}
 
-/* Fullscreen best list overlay */
-#bestlist-overlay{position:fixed;inset:0;z-index:8000;background:var(--bg);
-  display:none;flex-direction:column;overflow:hidden}
-#bestlist-overlay.open{display:flex}
-#blo-hdr{display:flex;align-items:center;gap:12px;padding:12px 20px;
-  border-bottom:1px solid var(--bdr);background:var(--surf);flex-shrink:0}
-#blo-hdr h2{font-size:1rem;letter-spacing:.12em;text-transform:uppercase;color:var(--txt)}
-#blo-close{margin-left:auto;background:transparent;border:1px solid var(--red);
-  color:var(--red);font-family:inherit;font-size:.72rem;padding:4px 14px;
-  border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase}
-#blo-close:hover{background:rgba(244,80,96,.1)}
-#blo-body{flex:1;overflow-y:auto;padding:16px 20px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
-.blo-miner-col{flex:1;min-width:240px;background:var(--surf);border:1px solid var(--bdr);border-radius:8px;overflow:hidden}
-.blo-miner-hdr{padding:10px 14px;border-bottom:1px solid var(--bdr);font-size:.8rem;font-weight:bold;letter-spacing:.08em}
-.blo-best-banner{display:flex;gap:8px;padding:8px 14px;border-bottom:1px solid var(--bdr);background:var(--surf2);font-size:.72rem}
-.blo-best-banner .lbl{color:var(--muted)}
-.blo-best-banner .val{font-weight:bold}
-.blo-list{padding:6px 0}
-.blo-row{display:flex;align-items:center;gap:10px;padding:6px 14px;border-bottom:1px solid var(--muted2);font-size:.85rem}
-.blo-row:last-child{border-bottom:none}
-.blo-rank{width:24px;text-align:center;flex-shrink:0;font-size:.75rem;color:var(--muted)}
-.blo-diff{flex:1;font-weight:bold}
-.blo-meta{font-size:.62rem;color:var(--muted);text-align:right;line-height:1.5}
-.blo-acc{color:var(--grn)}
+
 
 /* Charts-hidden mode */
 #panels.hidden{display:none}
@@ -268,6 +245,8 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
 .sc-add:hover{border-color:var(--grn);color:var(--grn)}
 .sc-rm{background:transparent;border:none;color:var(--muted);font-size:.9rem;cursor:pointer;padding:2px 5px;flex-shrink:0}
 .sc-rm:hover{color:var(--red)}
+#clear-menu div:hover{background:var(--bdr);}
+#clear-menu div:hover{background:var(--bdr);}
 </style>
 </head>
 <body>
@@ -290,7 +269,11 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
   <div id="miner-list"></div>
   <button class="abtn" id="btn-add">＋ Miner</button>
   <button class="cbtn" id="btn-con">⟳ Connect</button>
-  <button class="xbtn" id="btn-clr">✕ Clear Data</button>
+  <div style="position:relative;display:inline-block">
+  <button class="xbtn" id="btn-clr" onclick="showClearMenu(event)">✕ Clear Data ▾</button>
+  <button class="xbtn" id="btn-clr-session" onclick="clearAllSessions()" title="Clear session best lists for all miners">🗑 Clear Sessions</button>
+  <div id="clear-menu" style="display:none;position:absolute;top:100%;left:0;background:var(--surf);border:1px solid var(--bdr);border-radius:6px;min-width:160px;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,.4);margin-top:2px"></div>
+</div>
   <button class="xbtn" id="btn-reset-miners" title="Forget all saved miners and start fresh">⟳ Reset Miners</button>
 </div>
 
@@ -338,13 +321,13 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
     <option value="500">500</option>
   </select>
   <div class="sep"></div>
-  <button class="tbtn" id="btn-fulllist">📋 Session Best</button>
-  <button class="tbtn" id="btn-alltime">⭐ All-Time List</button>
+  <button class="tbtn" id="btn-alltime">📊 Difficulty Scores</button>
+  <button class="tbtn" id="btn-hr-scores">⚡ HR High Scores</button>
   <button class="tbtn" id="btn-settings">⚙ Settings</button>
   <button class="tbtn" id="btn-pool">⛁ Pool</button>
   <button class="tbtn" onclick="openScriptsPanel()">📜 Scripts</button>
   <button class="tbtn" onclick="openReportsPanel()">📋 Reports</button>
-  <div id="stats-dropdown-wrap"><button class="tbtn on" id="btn-toggletemps">📊 Stats ▾</button><div id="stats-dropdown-menu"><div class="sdrop-item"><input type="checkbox" id="sdrop-best" checked><label for="sdrop-best">Best Difficulty</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-status" checked><label for="sdrop-status">Status / Uptime</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-stats" checked><label for="sdrop-stats">Shares / Rejected / Last</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-temps" checked><label for="sdrop-temps">Temperatures</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-top10" checked><label for="sdrop-top10">Top Diffs List</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-log" checked onchange="statsVis.log=this.checked;saveStatsVis();var s=document.getElementById('slog');if(s)s.style.display=this.checked?'block':'none';" ><label for="sdrop-log">Live Log</label></div></div></div>
+  <div id="stats-dropdown-wrap"><button class="tbtn on" id="btn-toggletemps">📊 Stats ▾</button><div id="stats-dropdown-menu"><div class="sdrop-item"><input type="checkbox" id="sdrop-best" checked><label for="sdrop-best">Best Difficulty</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-status" checked><label for="sdrop-status">Status / Uptime</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-stats" checked><label for="sdrop-stats">Shares / Rejected / Last</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-temps" checked><label for="sdrop-temps">Temperatures</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-top10" checked><label for="sdrop-top10">Top Diffs List</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-log" checked onchange="statsVis.log=this.checked;saveStatsVis();var s=document.getElementById('slog');if(s)s.style.display=this.checked?'block':'none';" ><label for="sdrop-log">Live Log</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-disco" onchange="toggleDiscoMode(this.checked)"><label for="sdrop-disco">🪩 Disco Mode</label></div></div></div>
 </div>
 
 <div id="body">
@@ -359,51 +342,69 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
   <div id="panels"></div>
 </div>
 
+<!-- HR High Scores Overlay -->
+<div id="hr-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:300;flex-direction:column">
+  <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--bdr)">
+    <span style="font-size:1.1rem;font-weight:700;color:var(--orange)">⚡ Hashrate High Scores</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+      <select id="hr-top-sel" style="background:var(--surf);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:4px 8px;font-size:.8rem">
+        <option value="10" selected>Top 10</option>
+        <option value="25">Top 25</option>
+        <option value="50">Top 50</option>
+        <option value="100">Top 100</option>
+      </select>
+      <button onclick="document.getElementById('hr-overlay').style.display='none'" style="background:transparent;border:1px solid var(--bdr);color:var(--txt);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:.85rem">✕ Close</button>
+    </div>
+  </div>
+  <div style="display:flex;flex:1;min-height:0">
+    <div style="flex:1;overflow-y:auto;padding:20px;border-right:1px solid var(--bdr)">
+      <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Session Best</div>
+      <div id="hr-session-content"></div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:20px">
+      <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">All-Time Best</div>
+      <div id="hr-alltime-content"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Reports Overlay -->
 <div id="reports-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:300;display:none;flex-direction:column">
   <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--bdr);gap:12px">
     <h2 style="margin:0;font-size:1.1rem;color:var(--txt)">📋 Crash/Restart Reports</h2>
     <button onclick="closeReportsPanel()" style="margin-left:auto;background:transparent;border:1px solid var(--muted2);color:var(--muted);padding:4px 14px;border-radius:6px;cursor:pointer">✕ Close</button>
   </div>
-  <div id="reports-content" style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px"></div>
+  <div id="reports-content" style="flex:1;overflow-y:auto;padding:20px;min-height:0;display:block"></div>
 </div>
 
 <div id="tooltip"></div>
 
 
-<div id="bestlist-overlay">
-  <div id="blo-hdr">
-    <h2>🏆 Best Difficulties</h2>
-    <select class="topn-sel" id="blo-topn-sel" style="font-size:.8rem;padding:5px 10px">
-      <option value="10">Top 10</option>
-      <option value="25">Top 25</option>
-      <option value="50">Top 50</option>
-      <option value="100">Top 100</option>
-      <option value="250">Top 250</option>
-      <option value="500">Top 500</option>
-    </select>
-    <button id="blo-close">✕ Close</button>
-  </div>
-  <div id="blo-body"></div>
-</div>
+
+
 <div id="alltime-overlay" style="position:fixed;inset:0;z-index:8500;background:var(--bg);display:none;flex-direction:column;overflow:hidden">
-  <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--bdr);background:var(--surf);flex-shrink:0">
-    <h2 style="font-size:1rem;letter-spacing:.12em;text-transform:uppercase;color:var(--txt)">⭐ All-Time Best Difficulties</h2>
-    <select class="topn-sel" id="at-topn" style="font-size:.8rem;padding:5px 10px">
-      <option value="10">Top 10</option>
-      <option value="25">Top 25</option>
-      <option value="50">Top 50</option>
-      <option value="100">Top 100</option>
-      <option value="250">Top 250</option>
-      <option value="500">Top 500</option>
-    </select>
-    <span style="font-size:.68rem;color:var(--muted);margin-left:8px" id="at-count"></span>
-    <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
-      <button id="at-reset" style="background:transparent;border:1px solid var(--red);color:var(--red);font-family:inherit;font-size:.68rem;padding:4px 12px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase">🗑 Reset List</button>
-      <button id="at-close" style="background:transparent;border:1px solid var(--muted2);color:var(--muted);font-family:inherit;font-size:.68rem;padding:4px 14px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase">✕ Close</button>
+  <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--bdr)">
+    <span style="font-size:1.1rem;font-weight:700;color:var(--txt)">📊 Difficulty Scores</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+      <select id="diff-top-sel" style="background:var(--surf);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:4px 8px;font-size:.8rem">
+        <option value="10" selected>Top 10</option><option value="25">Top 25</option>
+        <option value="50">Top 50</option><option value="100">Top 100</option>
+        <option value="250">Top 250</option><option value="500">Top 500</option>
+      </select>
+      <button id="at-reset" style="background:transparent;border:1px solid var(--bdr);color:var(--muted);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:.75rem">&#128465; Reset All-Time</button>
+      <button id="at-close" style="background:transparent;border:1px solid var(--bdr);color:var(--txt);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:.85rem">&#10005; Close</button>
     </div>
   </div>
-  <div id="at-body" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start"></div>
+  <div style="display:flex;flex:1;min-height:0">
+    <div style="flex:1;overflow-y:auto;padding:20px;border-right:1px solid var(--bdr)">
+      <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Session Best</div>
+      <div id="diff-session-content"></div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:20px">
+      <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">All-Time Best</div>
+      <div id="diff-alltime-content"></div>
+    </div>
+  </div>
 </div>
 
 <div id="block-banner" style="position:fixed;inset:0;z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.9);cursor:pointer"><h1 style="color:#f7931a;font-size:clamp(2rem,8vw,5rem);text-align:center;padding:20px">&#127881; BLOCK FOUND! &#127881;</h1><p style="color:#fff;font-size:clamp(1rem,3vw,1.8rem);letter-spacing:.1em">Congratulations!</p><p id="block-miner-label" style="color:#f7931a;margin-top:8px"></p><p style="color:rgba(255,255,255,.4);margin-top:30px;font-size:.85rem">Click anywhere to dismiss</p></div>
@@ -469,6 +470,7 @@ function parseDiffLine(line){
 function stripAnsi(s){ return s.replace(/\x1B\[[0-9;]*[mGKHF]/g,'').replace(/\x1B\([0-9A-Z]/g,'').replace(/[\x00-\x08\x0E-\x1F\x7F]/g,''); }
 const COLORS  = ['#f7931a','#38bdf8','#a78bfa','#34d399','#fb7185','#fbbf24','#60a5fa','#f472b6'];
 const MAX_PTS = 30000;
+const MAX_HASH_PTS = 86400; // 48 hours at 2s polling
 
 const miners = {};
 let nextId   = 0;
@@ -526,7 +528,9 @@ function globalTsRange(){
   const hashAll=chartMode==='hash'?Object.values(miners).flatMap(m=>m.hashSeries||[]):[];
   const combined=[...all,...hashAll];
   if(!combined.length) return {min:Date.now()-60000,max:Date.now()};
-  return {min:Math.min(...combined.map(p=>p.ts)),max:Math.max(...combined.map(p=>p.ts))};
+  var minTs=Infinity,maxTs=-Infinity;
+  for(var i=0;i<combined.length;i++){var t=combined[i].ts;if(t<minTs)minTs=t;if(t>maxTs)maxTs=t;}
+  return {min:minTs,max:maxTs};
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -854,7 +858,7 @@ function connectMiner(m){
     const line=stripAnsi((ev.data||'').trim()); if(!line) return;
     if(line==='CONNECTED'){ m.status='Live'; m.connectedAt=m.connectedAt||Date.now(); setDot(m.id,'live'); updateCardStats(m); addLog('ok','Connected to '+m.ip,m.color); pollAxeOSBests(m); markDirty(); return; }
     if(line.startsWith('ERROR:')){ m.status='Error'; setDot(m.id,'err'); updateCardStats(m); addLog('er',m.ip+' — '+line); markDirty(); return; }
-    if(BLOCK_RE.test(line)){showBlockBanner(m.ip); showToast('🎉 BLOCK FOUND','Miner '+m.ip+' found a block!','ok');}
+    if(BLOCK_RE.test(line) && !m._blockFoundShown){ m._blockFoundShown=true; showBlockBanner(m.ip); showToast('🎉 BLOCK FOUND','Miner '+(m.name||m.ip)+' found a block!','ok'); }
     // Detect pool-set difficulty changes
     const pdm=POOLDIFF_RE.exec(line);
     if(pdm){
@@ -878,8 +882,12 @@ function connectMiner(m){
     const nowTs=Date.now();
     m.lastFoundTs=nowTs;
     m.series.push({ts:nowTs,found,target,accepted});
-    // topSeries - unlimited session best list, never trimmed by MAX_PTS
+    // topSeries - keep top 500 by difficulty (matches max display cap)
     m.topSeries.push({ts:nowTs,found,target,accepted});
+    if(m.topSeries.length > 600){
+      m.topSeries.sort(function(a,b){return b.found-a.found;});
+      m.topSeries = m.topSeries.slice(0,500);
+    }
     atRecord(m, found, target, accepted); // persist to all-time list
     if(m.series.length>MAX_PTS) m.series.shift();
     updateCardStats(m); updateHeader();
@@ -911,7 +919,7 @@ function addMiner(ip='', savedColor=null, savedAutoRestart=false, savedName=''){
   const id=nextId++;
   miners[id]={ id,ip,name:savedName,color:savedColor||COLORS[id%COLORS.length],ws:null,retry:null,series:[],topSeries:[],
     sharesFound:0,sharesAccepted:0,bestDiff:0,sessionBest:0,lastDiff:0,lastTarget:0,status:'—',
-    axeOSBestDiff:null,axeOSSessionBest:null,poolDifficulty:null,axeOSRejected:0,axeOSShares:null,axeOSUptime:null,axeOSHashrate:null,noAxeOS:false,autoRestart:savedAutoRestart,restartLog:[],restartWarning:false,lastFoundTs:null,hashSeries:[],temps:[] };
+    axeOSBestDiff:null,axeOSSessionBest:null,poolDifficulty:null,axeOSRejected:0,axeOSShares:null,axeOSUptime:null,axeOSHashrate:null,noAxeOS:false,autoRestart:savedAutoRestart,restartLog:[],restartWarning:false,lastFoundTs:null,hashSeries:[],temps:[],topHrSeries:[],_lastBlockFound:null,_blockFoundShown:false };
   renderMinerList(); renderCards(); buildPanels(); saveMiners();
   setTimeout(()=>{ const el=document.getElementById('ip-'+id); if(el&&!ip) el.focus(); },50);
 }
@@ -1218,8 +1226,7 @@ function drawPanel(panel){
   }
 
   // X range
-  const tsMin=Math.min(...allPanelPts.map(p=>p.ts));
-  const tsMax=Math.max(...allPanelPts.map(p=>p.ts));
+  var tsMin=Infinity,tsMax=-Infinity;allPanelPts.forEach(function(p){if(p.ts<tsMin)tsMin=p.ts;if(p.ts>tsMax)tsMax=p.ts;});
   const tsR=tsMax-tsMin||1;
 
   const xOf=ts=>PL+((ts-tsMin)/tsR)*CW;
@@ -1456,7 +1463,7 @@ function drawHashPanel(panel){
   if(hrMin===hrMax){hrMin*=0.95;hrMax*=1.05;}
   const tempVals=allPts.flatMap(p=>p.temps.map(t=>t.val)).filter(v=>v>0);
   let tMin=tempVals.length?Math.min(...tempVals)-3:40, tMax=tempVals.length?Math.max(...tempVals)+3:100;
-  const tsAll=allPts.map(p=>p.ts), tsMin=Math.min(...tsAll), tsMax=Math.max(...tsAll), tsR=tsMax-tsMin||1;
+  var tsMin2=Infinity,tsMax2=-Infinity;allPts.forEach(function(p){if(p.ts<tsMin2)tsMin2=p.ts;if(p.ts>tsMax2)tsMax2=p.ts;});var tsMin=tsMin2===Infinity?Date.now()-60000:tsMin2,tsMax=tsMax2===-Infinity?Date.now():tsMax2,tsR=tsMax-tsMin||1;
   const xOf=ts=>PL+((ts-tsMin)/tsR)*CW;
   const yOfHr=v=>PT+CH-((v-hrMin)/(hrMax-hrMin))*CH;
   const yOfT=v=>PT+CH-((v-tMin)/(tMax-tMin))*CH;
@@ -1605,14 +1612,51 @@ document.getElementById('btn-lin').onclick=()=>{
 
 document.getElementById('btn-add').onclick=()=>addMiner();
 document.getElementById('btn-con').onclick=connectAll;
-document.getElementById('btn-clr').onclick=()=>{
-  Object.values(miners).forEach(m=>{
-    m.series=[];m.sharesFound=0;m.sharesAccepted=0;m.bestDiff=0;m.sessionBest=0;m.lastDiff=0;m.lastTarget=0;
+function clearSession(m){
+  markSessionCleared(m);
+  m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
+  m.bestDiff=0; m.sessionBest=0; m.lastDiff=0;
+  updateCardStats(m);
+}
+function clearAllSessions(){
+  Object.values(miners).forEach(function(m){ clearSession(m); });
+  markDirty();
+  addLog('ok','Session best lists cleared for all miners.','#aaa');
+}
+
+function showClearMenu(e){
+  e.stopPropagation();
+  var menu=document.getElementById('clear-menu');
+  if(menu.style.display==='block'){ menu.style.display='none'; return; }
+  var items=[{ip:'all',name:'All Miners',color:'var(--txt)'}];
+  Object.values(miners).forEach(function(m){ if(m.ip) items.push({ip:m.ip,name:m.name||m.ip,color:m.color||'var(--txt)'}); });
+  menu.innerHTML='';
+  items.forEach(function(item,i){
+    var d=document.createElement('div');
+    d.style.cssText='padding:8px 14px;cursor:pointer;font-size:.8rem;color:'+item.color+(i<items.length-1?';border-bottom:1px solid var(--bdr)':'');
+    d.textContent=item.name;
+    d.addEventListener('mousedown',function(ev){
+      ev.preventDefault(); ev.stopPropagation();
+      clearMiner(item.ip);
+    });
+    menu.appendChild(d);
+  });
+  menu.style.display='block';
+  document.addEventListener('click',function cl(){ menu.style.display='none'; document.removeEventListener('click',cl); });
+}
+function clearMiner(ip){
+  document.getElementById('clear-menu').style.display='none';
+  var list=ip==='all'?Object.values(miners):Object.values(miners).filter(function(m){ return m.ip===ip; });
+  list.forEach(function(m){
+    markSessionCleared(m);
+    m._sessionRestoreAttempted=true;
+    m.series=[];m.topSeries=[];m.sharesFound=0;m.sharesAccepted=0;
+    m.bestDiff=0;m.sessionBest=0;m.lastDiff=0;m.lastTarget=0;
     updateCardStats(m);
   });
-  document.getElementById('rlog').innerHTML=''; updateHeader(); markDirty();
-};
-
+  if(ip==='all') document.getElementById('rlog').innerHTML='';
+  markDirty();
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOP 10 LEADERBOARD
@@ -1688,8 +1732,9 @@ async function pollAxeOSBests(m){
       const currSess = parseDiff(d.bestSessionDiff);
       if(prevSess > 0 && currSess < prevSess){
         // Session best dropped — miner was restarted
-        m.topSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
-        m.bestDiff=0; m.sessionBest=0; m.lastDiff=0; m.lastFoundTs=null;
+        markSessionCleared(m);
+        m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
+        m.bestDiff=0; m.sessionBest=0; m.lastDiff=0;
         showToast('🔄 Miner Restarted',
           m.ip + ' — Session best reset (' + fmtD(prevSess) + ' → ' + fmtD(currSess) + '). Share list cleared.', 'warn');
         addLog('er', m.ip + ' — Session best dropped. Miner restarted. Share list cleared.', m.color);
@@ -1705,6 +1750,69 @@ async function pollAxeOSBests(m){
     if(d.hashRate_1m    != null) m.axeOSHashrate    = d.hashRate_1m;
     else if(d.hashRate != null) m.axeOSHashrate    = d.hashRate;
     atRecordAxeOSBest(m); // ensure AxeOS all-time best is captured
+
+    // Detect block found via API field (fires immediately, not on dismiss)
+    if(d.blockFound != null){
+      if(m._lastBlockFound === 0 && d.blockFound === 1 && !m._blockFoundShown){
+        m._blockFoundShown = true;
+        showBlockBanner(m.ip);
+        showToast('🎉 BLOCK FOUND','Miner '+(m.name||m.ip)+' found a block!','ok');
+      }
+      if(d.blockFound === 0){
+        m._blockFoundShown = false; // reset when AxeOS clears it
+      }
+      m._lastBlockFound = d.blockFound;
+    }
+
+    // ── Restore topSeries from server on first poll if session is still valid ──
+    if(!m._sessionRestoreAttempted && d.uptimeSeconds != null){
+      m._sessionRestoreAttempted = true;
+      fetch(SERVER+'/session',{signal:AbortSignal.timeout(3000)})
+        .then(function(r){ return r.json(); })
+        .then(function(sd){
+          if(!sd || !sd[m.ip]) return;
+          var snap = sd[m.ip];
+          if(!snap.topSeriesSnapshot || !snap.topSeriesSnapshot.length) return;
+          if(!snap.snapshotTs || !snap.uptimeSnapshot) return;
+          if(snap.sessionCleared) return; // intentionally cleared — don't restore
+          // Calculate expected uptime: stored uptime + time elapsed since snapshot
+          var elapsedSec = (Date.now() - snap.snapshotTs) / 1000;
+          var expectedUptime = snap.uptimeSnapshot + elapsedSec;
+          var tolerance = Math.max(120, elapsedSec * 0.1); // 10% or 2 min min
+          var currentUptime = d.uptimeSeconds;
+          if(currentUptime >= expectedUptime - tolerance){
+            // Session is continuous - merge restored entries with any new ones already captured
+            var existing = m.topSeries || [];
+            var restored = snap.topSeriesSnapshot;
+            // Merge by timestamp - deduplicate
+            var tsSet = {};
+            existing.forEach(function(p){ tsSet[p.ts] = true; });
+            var merged = existing.slice();
+            restored.forEach(function(p){ if(!tsSet[p.ts]){ merged.push(p); tsSet[p.ts]=true; } });
+            merged.sort(function(a,b){return b.found-a.found;});
+            m.topSeries = merged.slice(0,500);
+            addLog('ok', m.ip+' — Session best list restored ('+m.topSeries.length+' entries + '+existing.length+' new)', m.color);
+            markDirty();
+          } else {
+            addLog('ok', m.ip+' — Session reset detected (uptime '+Math.round(currentUptime)+'s vs expected '+Math.round(expectedUptime)+'s)', m.color);
+          }
+        }).catch(function(){});
+    }
+    // Capture resetReason from API (available in AxeOS v2.12+)
+    // Detect reboot by uptime resetting (works even when resetReason stays the same)
+    if(d.uptimeSeconds != null){
+      if(m._awaitingResetReason && m._lastUptime != null && d.uptimeSeconds < m._lastUptime && d.uptimeSeconds < 60){
+        // Uptime reset — miner actually rebooted
+        m._awaitingResetReason = false;
+        m._faultState = null;
+        clearTimeout(m._resetReasonTimeout);
+        var restartReason = ((d.resetReason || d.lastResetReason) && (d.resetReason || d.lastResetReason).trim()) ? (d.resetReason || d.lastResetReason).trim() : 'Restarted';
+        updateReportReason(m.ip, restartReason);
+        addLog('ok', m.ip+' — Restart detected: '+restartReason, m.color);
+      }
+      m._lastUptime = d.uptimeSeconds;
+    if(d.stratumURL) m._lastStratumURL = d.stratumURL;
+    }
     // Collect all temperature fields dynamically (temp, temp2, temp3... vrTemp)
     const temps = [];
     // ASIC temps: temp, temp2, temp3, temp4... support unlimited future chips
@@ -1733,26 +1841,10 @@ async function pollTemps(m){
     if(!res.ok){
       if(res.status===404||res.status===400) m.noAxeOS=true;
       // API failed - if we had good data before, save a report
-      if(!m._reportedThisStall && m.axeOSHashrate && m.axeOSHashrate > 0 && m.sharesFound > 0){
-        m._reportedThisStall = true;
-        m.topSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
-        m.bestDiff=0; m.sessionBest=0; m.lastDiff=0; m.lastFoundTs=null;
-        m.axeOSHashrate=null; m.axeOSPower=null; m.temps=[];
-        markDirty(); updateCardStats(m);
-      }
       return;
     }
     const d=await res.json();
-    if(d.error){
-      if(!m._reportedThisStall && m.axeOSHashrate && m.axeOSHashrate > 0 && m.sharesFound > 0){
-        m._reportedThisStall = true;
-        m.topSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
-        m.bestDiff=0; m.sessionBest=0; m.lastDiff=0; m.lastFoundTs=null;
-        m.axeOSHashrate=null; m.axeOSPower=null; m.temps=[];
-        markDirty(); updateCardStats(m);
-      }
-      m.noAxeOS=true; return;
-    }
+    if(d.error){ m.noAxeOS=true; return; }
     m._lastApiData=d;
     m.noAxeOS=false;
 
@@ -1771,28 +1863,56 @@ async function pollTemps(m){
     const hr1m = d.hashRate_1m != null ? d.hashRate_1m : hrInst;
     const hr = hrInst != null ? hrInst : hr1m;
     // ── Single restart trigger: hashrate drops to 0 or null ──
-    if((hr === null || hr === 0) && m.axeOSHashrate && m.axeOSHashrate > 0 && !m._reportedThisStall){
-      m._reportedThisStall = true;
-      // Grab last good point from hashSeries before it drops
+    if((hr === null || hr === 0) && m.axeOSHashrate && m.axeOSHashrate > 0 &&
+        (!m._lastReportTs || (Date.now() - m._lastReportTs) > 180000)){
+      // Capture fault state immediately while miner is still online
+      var faultState = null;
+      if(d && d.power_fault && d.power_fault.trim()) faultState = d.power_fault.trim();
+      else if(d && d.overheat_mode && d.overheat_mode > 0) faultState = 'Overheat';
+      else if(d && d.stratumURL && m._lastStratumURL && d.stratumURL !== m._lastStratumURL) faultState = 'Pool Switch';
+      m._lastReportTs = Date.now();
+      m._faultState = faultState; // store for later when resetReason arrives
+      // Grab stats from ~60 seconds before trigger to get healthy pre-crash values
       var lastGoodPt = null;
       if(m.hashSeries && m.hashSeries.length){
+        var target60 = Date.now() - 60000;
+        // Find the point closest to 60s ago that has a valid hashrate
         for(var rsi=m.hashSeries.length-1; rsi>=0; rsi--){
-          if(m.hashSeries[rsi].hr && m.hashSeries[rsi].hr > 0){ lastGoodPt=m.hashSeries[rsi]; break; }
+          if(m.hashSeries[rsi].ts <= target60 && m.hashSeries[rsi].hr && m.hashSeries[rsi].hr > 0){
+            lastGoodPt = m.hashSeries[rsi]; break;
+          }
+        }
+        // Fallback: if nothing 60s back (short session), use last good point
+        if(!lastGoodPt){
+          for(var rsi2=m.hashSeries.length-1; rsi2>=0; rsi2--){
+            if(m.hashSeries[rsi2].hr && m.hashSeries[rsi2].hr > 0){ lastGoodPt=m.hashSeries[rsi2]; break; }
+          }
         }
       }
-      saveSessionReport(m, 'restart', lastGoodPt);
-      m.topSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
-      m.bestDiff=0; m.sessionBest=0; m.lastDiff=0; m.lastFoundTs=null;
+      saveSessionReport(m, faultState || 'restart', lastGoodPt);
+      markSessionCleared(m);
+      m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
+      m.bestDiff=0; m.sessionBest=0; m.lastDiff=0;
       markDirty(); updateCardStats(m);
     }
-    if(hr && hr > 0) m._reportedThisStall = false; // reset when miner comes back
+
+    // Keep checking for fault state on subsequent polls while hr is still 0
+    if((hr === null || hr === 0) && m._lastReportTs && !m._faultState && d){
+      if(d.power_fault && d.power_fault.trim()) m._faultState = d.power_fault.trim();
+      else if(d.overheat_mode && d.overheat_mode > 0) m._faultState = 'Overheat';
+      else if(d.stratumURL && m._lastStratumURL && d.stratumURL !== m._lastStratumURL) m._faultState = 'Pool Switch';
+      if(m._faultState){
+        updateReportFaultState(m.ip, m._faultState);
+      }
+    }
     if(hr != null) m.axeOSHashrate = hr;
+    if(hr && hr > 0) hrRecord(m, hr, d.errorPercentage!=null?d.errorPercentage:null);
 
     // ── Record hashSeries for hash chart ──
     if(hr != null){
       m.hashSeries = m.hashSeries || [];
       m.hashSeries.push({ts:Date.now(), hr:hr, hr1m:d.hashRate_1m||hr, hr10m:d.hashRate_10m||hr, hr1h:d.hashRate_1h||hr, temps:temps.slice(), pwr:m.axeOSPower||0, uptime:m.axeOSUptime||null});
-      if(m.hashSeries.length > MAX_PTS) m.hashSeries.shift();
+      if(m.hashSeries.length > MAX_HASH_PTS) m.hashSeries.shift();
     }
 
     // ── All stats (shares, rejected, best diff, session best) ──
@@ -1801,8 +1921,9 @@ async function pollTemps(m){
       const prevSess = m.axeOSSessionBest ? parseDiff(m.axeOSSessionBest) : 0;
       const currSess = parseDiff(d.bestSessionDiff);
       if(prevSess > 0 && currSess < prevSess){
-        m.topSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
-        m.bestDiff=0; m.sessionBest=0; m.lastDiff=0; m.lastFoundTs=null;
+        markSessionCleared(m);
+        m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
+        m.bestDiff=0; m.sessionBest=0; m.lastDiff=0;
         showToast('🔄 Miner Restarted',
           m.ip+' — Session best reset ('+fmtD(prevSess)+' → '+fmtD(currSess)+'). Share list cleared.','warn');
         addLog('er',m.ip+' — Session best dropped. Share list cleared.',m.color);
@@ -1895,6 +2016,132 @@ window.addEventListener('beforeunload', () => {
 });
 
 // ── Close App button ──────────────────────────────────────────────────────────
+function fmtHr(hr){
+  if(hr>=1000) return (hr/1000).toFixed(3)+' TH/s';
+  return hr.toFixed(2)+' GH/s';
+}
+function renderHrList(el, entries, miners_ref, topN){
+  el.innerHTML='';
+  var hasData=false;
+  Object.values(miners_ref).forEach(function(m){
+    if(!m.ip||!entries[m.ip]||!entries[m.ip].length) return;
+    hasData=true;
+    var color=m.color||'var(--orange)';
+    var mname=m.name||m.ip;
+    var wrap=document.createElement('div');
+    wrap.style.cssText='border:1px solid var(--bdr);border-radius:8px;margin-bottom:10px;overflow:hidden';
+    var hdr=document.createElement('div');
+    hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;background:var(--surf)';
+    var caret=document.createElement('span');
+    caret.textContent='˅';
+    var ttl=document.createElement('span');
+    ttl.style.cssText='font-size:.85rem;font-weight:700;color:'+color;
+    ttl.textContent=mname+' ('+entries[m.ip].length+' entries)';
+    hdr.appendChild(ttl); hdr.appendChild(caret);
+    var body=document.createElement('div');
+    body.style.cssText='padding:10px 14px;display:block';
+    entries[m.ip].slice(0,topN).forEach(function(p,i){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;gap:8px;font-size:.78rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)';
+      var d=new Date(p.ts);
+      var ts=d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+      var errStr=p.err!=null?'<span style="color:'+(p.err>2?'var(--red)':p.err>0.5?'#f7931a':'var(--grn)')+'"> '+p.err.toFixed(2)+'%</span>':'';
+      row.innerHTML='<span style="color:var(--muted);min-width:24px">'+(i+1)+'.</span><span style="color:'+color+';font-weight:600;min-width:100px">'+fmtHr(p.hr)+'</span>'+errStr+'<span style="color:var(--muted);font-size:.72rem;margin-left:auto">'+ts+'</span>';
+      body.appendChild(row);
+    });
+    hdr.onclick=function(){
+      var open=body.style.display!=='none';
+      body.style.display=open?'none':'block';
+      caret.textContent=open?'›':'˅';
+    };
+    wrap.appendChild(hdr); wrap.appendChild(body);
+    el.appendChild(wrap);
+  });
+  if(!hasData) el.innerHTML='<div style="color:var(--muted);font-size:.8rem">No data yet</div>';
+}
+function renderHrListInPlace(el, entries, miners_ref, topN, isSession){
+  // Track collapsed state before rebuild
+  var collapsed={};
+  el.querySelectorAll('[data-miner-ip]').forEach(function(wrap){
+    var ip=wrap.dataset.minerIp;
+    var body=wrap.querySelector('.hr-body');
+    if(body) collapsed[ip]=body.style.display==='none';
+  });
+  el.innerHTML='';
+  var hasData=false;
+  Object.values(miners_ref).forEach(function(m){
+    if(!m.ip||!entries[m.ip]||!entries[m.ip].length) return;
+    hasData=true;
+    var color=m.color||'var(--orange)';
+    var mname=m.name||m.ip;
+    var isCollapsed=collapsed[m.ip]||false;
+    var wrap=document.createElement('div');
+    wrap.style.cssText='border:1px solid var(--bdr);border-radius:8px;margin-bottom:10px;overflow:hidden';
+    wrap.dataset.minerIp=m.ip;
+    var hdr=document.createElement('div');
+    hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;background:var(--surf)';
+    var caret=document.createElement('span');
+    caret.textContent=isCollapsed?'›':'˅';
+    var ttl=document.createElement('span');
+    ttl.style.cssText='font-size:.85rem;font-weight:700;color:'+color;
+    ttl.textContent=mname+' ('+entries[m.ip].length+' entries)';
+    if(isSession){
+      var trashH=document.createElement('button');
+      trashH.textContent='🗑';
+      trashH.title='Clear session HR scores for this miner';
+      trashH.style.cssText='background:transparent;border:none;cursor:pointer;font-size:.9rem;padding:0 6px;color:var(--muted)';
+      (function(mip){trashH.addEventListener('mousedown',function(ev){
+        ev.stopPropagation();
+        var mn=Object.values(miners).find(function(x){return x.ip===mip;});
+        if(mn){mn.topHrSeries=[];updateHrPanelContent();}
+      });})(m.ip);
+      hdr.appendChild(ttl); hdr.appendChild(trashH); hdr.appendChild(caret);
+    } else { hdr.appendChild(ttl); hdr.appendChild(caret); }
+    var body=document.createElement('div');
+    body.className='hr-body';
+    body.style.cssText='padding:10px 14px;display:'+(isCollapsed?'none':'block');
+    entries[m.ip].slice(0,topN).forEach(function(p,i){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;gap:8px;font-size:.78rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)';
+      var d=new Date(p.ts);
+      var ts=d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+      var errStr=p.err!=null?'<span style="color:'+(p.err>2?'var(--red)':p.err>0.5?'#f7931a':'var(--grn)')+'"> '+p.err.toFixed(2)+'%</span>':'';
+      row.innerHTML='<span style="color:var(--muted);min-width:24px">'+(i+1)+'.</span><span style="color:'+color+';font-weight:600;min-width:100px">'+fmtHr(p.hr)+'</span>'+errStr+'<span style="color:var(--muted);font-size:.72rem;margin-left:auto">'+ts+'</span>';
+      body.appendChild(row);
+    });
+    hdr.onclick=function(){
+      var open=body.style.display!=='none';
+      body.style.display=open?'none':'block';
+      caret.textContent=open?'›':'˅';
+    };
+    wrap.appendChild(hdr); wrap.appendChild(body);
+    el.appendChild(wrap);
+  });
+  if(!hasData) el.innerHTML='<div style="color:var(--muted);font-size:.8rem">No data yet</div>';
+}
+var _hrPanelTimer=null;
+function openHrPanel(){
+  var overlay=document.getElementById('hr-overlay');
+  overlay.style.display='flex';
+  updateHrPanelContent();
+  document.getElementById('hr-top-sel').onchange=function(){ updateHrPanelContent(); };
+  // Live update while panel is open
+  if(_hrPanelTimer) clearInterval(_hrPanelTimer);
+  _hrPanelTimer=setInterval(function(){
+    if(document.getElementById('hr-overlay').style.display!=='none') updateHrPanelContent();
+    else{ clearInterval(_hrPanelTimer); _hrPanelTimer=null; }
+  }, 2000);
+}
+function updateHrPanelContent(){
+  var topN=parseInt(document.getElementById('hr-top-sel').value)||10;
+  var sessData={};
+  Object.values(miners).forEach(function(m){ if(m.ip&&m.topHrSeries) sessData[m.ip]=m.topHrSeries; });
+  renderHrListInPlace(document.getElementById('hr-session-content'), sessData, miners, topN, true);
+  renderHrListInPlace(document.getElementById('hr-alltime-content'), hrLoad(), miners, topN, false);
+}
+
+document.getElementById('btn-hr-scores').onclick=function(){ openHrPanel(); };
+
 document.getElementById('btn-shutdown').onclick = async () => {
   try {
     await fetch(`${SERVER}/shutdown`, { signal: AbortSignal.timeout(2000) });
@@ -1924,72 +2171,7 @@ document.getElementById('btn-toggletemps').onclick=()=>{
 
 
 // ── Fullscreen best list ──────────────────────────────────────────────────────
-function renderBloList(){
-  const sel=document.getElementById('blo-topn-sel');
-  const n=sel?parseInt(sel.value)||topN:topN;
-  const body=document.getElementById('blo-body');
-  body.innerHTML='';
-  Object.values(miners).forEach(m=>{
-    const sorted=m.series.slice().sort((a,b)=>b.found-a.found).slice(0,n);
-    const col=document.createElement('div');
-    col.className='blo-miner-col';
-    const medals=['🥇','🥈','🥉'];
-    col.innerHTML=`
-      <div class="blo-miner-hdr" style="color:${m.color}">▸ ${(m.name&&m.name.trim())?m.name:(m.ip||'Miner')}</div>
-      <div class="blo-best-banner">
-        <div><span class="lbl">All-time best: </span><span class="val" style="color:${m.color}">${m.axeOSBestDiff!=null?fmtD(parseDiff(m.axeOSBestDiff)):fmtD(m.bestDiff)||'—'}</span></div>
-        <div style="margin-left:16px"><span class="lbl">Session best: </span><span class="val" style="color:var(--grn)">${m.axeOSSessionBest!=null?fmtD(parseDiff(m.axeOSSessionBest)):fmtD(m.sessionBest)||'—'}</span></div>
-      </div>
-      <div class="blo-list">${sorted.length?sorted.map((p,i)=>`
-        <div class="blo-row">
-          <span class="blo-rank">${i<3?medals[i]:i+1}</span>
-          <span class="blo-diff" style="color:${m.color}">${fmtD(p.found)}</span>
-          <div class="blo-meta">
-            <div class="${p.accepted?'blo-acc':''}">${p.accepted?'✅ accepted':'—'}</div>
-            <div>${new Date(p.ts).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div>
-          </div>
-        </div>`).join(''):'<div style="padding:16px;color:var(--muted);font-size:.75rem;text-align:center">No shares yet</div>'}
-      </div>`;
-    body.appendChild(col);
-  });
-}
 
-document.getElementById('btn-fulllist').onclick=()=>{
-  document.getElementById('bestlist-overlay').classList.add('open');
-  renderBloList();
-};
-document.getElementById('blo-close').onclick=()=>{
-  document.getElementById('bestlist-overlay').classList.remove('open');
-};
-document.getElementById('blo-topn-sel').onchange=renderBloList;
-
-// Auto-refresh fullscreen list
-setInterval(()=>{
-  if(document.getElementById('bestlist-overlay').classList.contains('open')) renderBloList();
-},3000);
-
-
-
-// ── Persistent toast notifications ───────────────────────────────────────────
-function showToast(title, msg, type){
-  _mobNotifQueue.push({title:String(title||''),msg:String(msg||'').replace(/<[^>]+>/g,' '),type:String(type||'warn'),ts:Date.now()});
-  if(_mobNotifQueue.length>20) _mobNotifQueue.shift();
-  const container = document.getElementById('toast-container');
-  const t = document.createElement('div');
-  t.className = 'toast ' + (type||'warn');
-  var now=new Date(); var hh=now.getHours()%12||12; var mm=String(now.getMinutes()).padStart(2,'0'); var ampm=now.getHours()>=12?'PM':'AM';
-  var ts=hh+':'+mm+' '+ampm;
-  t.innerHTML =
-    '<div class="toast-body">' +
-      '<div class="toast-title">' + title + ' <span style="font-size:.7em;opacity:.6;font-weight:400">'+ts+'</span></div>' +
-      '<div>' + msg + '</div>' +
-    '</div>' +
-    '<button class="toast-close" title="Dismiss">✕</button>';
-  t.querySelector('.toast-close').onclick = () => t.remove();
-  container.appendChild(t);
-  // Scroll into view if many stacked
-  t.scrollIntoView({behavior:'smooth', block:'end'});
-}
 
 // ── Save column width on page hide (backup for Close App) ────────────────────
 function saveColWidth(){
@@ -2011,6 +2193,7 @@ async function doRestartMiner(m){
     if(res.ok){
       addLog('er','⟳ '+m.ip+' restarted (5 min stall + near-zero hashrate). Share list cleared.',m.color);
       showToast('⟳ Miner Restarted', m.ip+' was restarted — no shares for 5 min AND hashrate near zero. Share list cleared.', 'warn');
+      markSessionCleared(m);
       m.topSeries=[];m.sharesFound=0;m.sharesAccepted=0;m.bestDiff=0;m.sessionBest=0;m.lastDiff=0;m.lastFoundTs=Date.now();
       markDirty();updateCardStats(m);
 
@@ -2040,10 +2223,11 @@ setInterval(()=>{
 
 function showBlockBanner(ip){
   document.getElementById('block-miner-label').textContent=ip?'Miner: '+ip:'';
-  document.getElementById('block-banner').classList.add('show');
+  var bb=document.getElementById('block-banner');
+  bb.style.display='flex';
   addLog('ok','BLOCK FOUND on '+ip+' !!!','#f7931a');
 }
-document.getElementById('block-banner').onclick=function(){this.classList.remove('show');};
+document.getElementById('block-banner').onclick=function(){this.style.display='none';};
 
 var savedDiffLayout='combined'; // remember layout when switching to hash mode
 document.getElementById('btn-mode-diff').onclick=function(){
@@ -2073,14 +2257,41 @@ document.getElementById('btn-mode-hash').onclick=function(){
 
 // ── Stats visibility dropdown ─────────────────────────────────────────────────
 var _mobNotifQueue=[];
-var statsVis = {best:true, status:true, stats:true, temps:true, top10:true, log:true};
+var statsVis = {best:true, status:true, stats:true, temps:true, top10:true, log:true, disco:false};
 
 function loadStatsVis(){
   try{
     var s=localStorage.getItem('bitaxe_statsvis');
     if(s){ var v=JSON.parse(s); Object.keys(statsVis).forEach(function(k){ if(v[k]!==undefined) statsVis[k]=v[k]; }); }
   }catch(e){}
+  if(statsVis.disco){
+    var cb=document.getElementById('sdrop-disco');
+    if(cb) cb.checked=true;
+    setTimeout(function(){ toggleDiscoMode(true); },100);
+  }
 }
+function toggleDiscoMode(on){
+  statsVis.disco=on;
+  saveStatsVis();
+  var cards=document.getElementById('cards');
+  var slog=document.getElementById('slog');
+  var rlog=document.getElementById('rlog');
+  if(on){
+    cards.style.display='none';
+    slog.style.flex='1';
+    slog.style.display='flex';
+    slog.style.flexDirection='column';
+    rlog.style.flex='1';
+  } else {
+    cards.style.display='';
+    slog.style.flex='';
+    slog.style.flexDirection='';
+    slog.style.display=statsVis.log?'block':'none';
+    rlog.style.flex='';
+  }
+}
+
+
 function saveStatsVis(){
   try{ localStorage.setItem('bitaxe_statsvis',JSON.stringify(statsVis)); }catch(e){}
 }
@@ -2236,6 +2447,11 @@ function pushSessionData(){
       out[m.ip]={
         avgShare:avgStr,
         top10:(m.topSeries&&m.topSeries.length?m.topSeries:m.series).slice().sort((a,b)=>b.found-a.found).slice(0,500),
+        topSeriesSnapshot:(m.topSeries&&m.topSeries.length) ? (m.topSeries||[]).slice() : [],
+        uptimeSnapshot:m.axeOSUptime||0,
+        snapshotTs:Date.now(),
+        sessionCleared:!!(m._sessionCleared),
+        hrScores:m.topHrSeries||[],
         series:recentSeries,
         hashSeries:hashPts,
         hashrate:m.axeOSHashrate,
@@ -2267,10 +2483,26 @@ function pushSessionData(){
 }
 // Push every 2 seconds matching poll rate
 setInterval(pushSessionData, 2000);
+// Push HR all-time on startup so mobile gets it immediately
+setTimeout(function(){ var d2=hrLoad(); if(Object.keys(d2).length) hrSave(d2); }, 3000);
 
 setInterval(function(){if(!_mobNotifQueue.length)return;var n=_mobNotifQueue.splice(0);fetch(SERVER+'/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(n)}).catch(function(){});},2000);
 
 // Poll for autoRestart changes from Safari
+setInterval(function(){
+  fetch(SERVER+'/getclearsession').then(function(r){return r.json();}).then(function(d){
+    if(!d||!d.ip) return;
+    var targets=d.ip==='all'?Object.values(miners):Object.values(miners).filter(function(m){return m.ip===d.ip;});
+    targets.forEach(function(m){
+      if(!d.type||d.type==='all'){ clearSession(m); }
+      else if(d.type==='diff'){ m.topSeries=[]; markSessionCleared(m); updateCardStats(m); if(document.getElementById('alltime-overlay').style.display!=='none') updateDiffPanelContent(); }
+      else if(d.type==='hr'){ m.topHrSeries=[]; if(document.getElementById('hr-overlay').style.display!=='none') updateHrPanelContent(); }
+    });
+    markDirty();
+    addLog('ok','Session cleared via mobile'+(d.ip==='all'?'':' for '+d.ip)+'.','#aaa');
+  }).catch(function(){});
+},5000);
+
 setInterval(function(){
   fetch(SERVER+'/getautorestart').then(function(r){return r.json();}).then(function(d){
     if(!d||!d.ip) return;
@@ -2531,6 +2763,8 @@ function loadMiners(){
 // ═══════════════════════════════════════════════════════════════════════════════
 const AT_KEY     = 'bitaxe_alltime_v1';
 const AT_MAX     = 500; // store up to 500 entries per miner internally
+const HR_MAX = 100;
+const HR_KEY = 'bitaxe_hashrate_ht_v1';
 
 // Load: { [ip]: [{found, target, accepted, ts, miner_ip}] }
 function atLoad(){
@@ -2556,6 +2790,40 @@ function atRecord(m, found, target, accepted){
   atSave(data);
 }
 
+// ── Hashrate High Scores ─────────────────────────────────────────────────────
+function hrLoad(){ try{ var r=localStorage.getItem(HR_KEY); return r?JSON.parse(r):{}; }catch(e){ return {}; } }
+function hrSave(d2){
+  try{ localStorage.setItem(HR_KEY, JSON.stringify(d2)); }catch(e){}
+  try{ fetch(SERVER+'/hralltime',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(d2)}).catch(function(){}); }catch(e){}
+}
+function syncAllTime(){
+  try{ fetch(SERVER+'/alltime',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({alltime:atLoad(),hashrate:hrLoad()})}).catch(function(){}); }catch(e){}
+}
+function hrRecord(m, hr, errRate){
+  if(!m.ip||!hr||hr<=0) return;
+  // Session top 100 - always update in memory
+  m.topHrSeries=m.topHrSeries||[];
+  var spt={hr:hr,ts:Date.now()};
+  if(errRate!=null) spt.err=parseFloat(errRate.toFixed(3));
+  m.topHrSeries.push(spt);
+  m.topHrSeries.sort(function(a,b){return b.hr-a.hr;});
+  if(m.topHrSeries.length>HR_MAX) m.topHrSeries.length=HR_MAX;
+  // All-time: only save if this beats the lowest in top 100
+  var d2=hrLoad();
+  if(!d2[m.ip]) d2[m.ip]=[];
+  var list=d2[m.ip];
+  if(list.length < HR_MAX || hr > list[list.length-1].hr){
+    var pt={hr:hr,ts:Date.now()};
+    if(errRate!=null) pt.err=parseFloat(errRate.toFixed(3));
+    list.push(pt);
+    list.sort(function(a,b){return b.hr-a.hr;});
+    if(list.length>HR_MAX) list.length=HR_MAX;
+    hrSave(d2);
+  }
+}
+
 // Also record best from AxeOS API (all-time best since miner first booted)
 // This ensures #1 is always at least as good as AxeOS shows
 function atRecordAxeOSBest(m){
@@ -2574,90 +2842,116 @@ function atRecordAxeOSBest(m){
 }
 
 function renderAtList(){
-  const n    = parseInt(document.getElementById('at-topn').value);
-  const body = document.getElementById('at-body');
-  const data = atLoad();
-  body.innerHTML = '';
+  if(document.getElementById("alltime-overlay").style.display!=="none") updateDiffPanelContent();
+}
 
-  const medals = ['🥇','🥈','🥉'];
-  let totalEntries = 0;
+function showToast(title, msg, type){
+  _mobNotifQueue.push({title:String(title||''),msg:String(msg||'').replace(/<[^>]+>/g,' '),type:String(type||'warn'),ts:Date.now()});
+  if(_mobNotifQueue.length>20) _mobNotifQueue.shift();
+  const container = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type||'warn');
+  var now=new Date(); var hh=now.getHours()%12||12; var mm=String(now.getMinutes()).padStart(2,'0'); var ampm=now.getHours()>=12?'PM':'AM';
+  var ts=hh+':'+mm+' '+ampm;
+  t.innerHTML =
+    '<div class="toast-body">' +
+      '<div class="toast-title">' + title + ' <span style="font-size:.7em;opacity:.6;font-weight:400">'+ts+'</span></div>' +
+      '<div>' + msg + '</div>' +
+    '</div>' +
+    '<button class="toast-close" title="Dismiss">✕</button>';
+  t.querySelector('.toast-close').onclick = () => t.remove();
+  container.appendChild(t);
+  // Scroll into view if many stacked
+  t.scrollIntoView({behavior:'smooth', block:'end'});
+}
 
-  const ips = Object.keys(data).filter(ip => data[ip] && data[ip].length);
-  if(!ips.length){
-    body.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:20px">No data yet — shares will appear here as your miners find them.</div>';
-    return;
-  }
-
-  ips.forEach(ip => {
-    const entries = data[ip].slice(0, n);
-    totalEntries += data[ip].length;
-
-    const miner = Object.values(miners).find(m=>m.ip===ip);
-    const color = miner ? miner.color : '#38bdf8';
-
-    const col = document.createElement('div');
-    col.style.cssText = 'flex:1;min-width:260px;background:var(--surf);border:1px solid var(--bdr);border-radius:8px;overflow:hidden';
-
-    // Header
-    const hdr = document.createElement('div');
-    hdr.style.cssText = 'padding:10px 14px;border-bottom:1px solid var(--bdr);font-size:.82rem;font-weight:bold;color:'+color;
-    hdr.textContent = '▸ ' + (miner&&miner.name&&miner.name.trim()?miner.name:ip);
-    col.appendChild(hdr);
-
-    // Summary bar
-    const summ = document.createElement('div');
-    summ.style.cssText = 'padding:7px 14px;border-bottom:1px solid var(--bdr);background:var(--surf2);font-size:.72rem;color:var(--muted)';
-    summ.innerHTML = 'All-time best: <span style="color:'+color+';font-weight:bold;font-size:.88rem">'+fmtD(entries[0]?entries[0].found:0)+'</span>'
-      + '&nbsp;&nbsp;Total recorded: <span style="color:var(--txt)">'+data[ip].length+'</span>';
-    col.appendChild(summ);
-
-    // Rows
-    const list = document.createElement('div');
-    list.style.paddingTop = '4px';
-    entries.forEach((e, i) => {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 14px;border-bottom:1px solid var(--muted2);font-size:.82rem';
-
-      const rankEl = document.createElement('span');
-      rankEl.style.cssText = 'width:24px;text-align:center;flex-shrink:0';
-      rankEl.textContent = i < 3 ? medals[i] : (i+1)+'';
-      row.appendChild(rankEl);
-
-      const diffEl = document.createElement('span');
-      diffEl.style.cssText = 'color:'+color+';font-weight:bold;flex:1';
-      diffEl.textContent = fmtD(e.found);
-      row.appendChild(diffEl);
-
-      const accEl = document.createElement('span');
-      accEl.style.fontSize = '.7rem';
-      if(e.fromAxeOS){ accEl.style.color='#38bdf8'; accEl.textContent='AxeOS'; }
-      else if(e.accepted){ accEl.style.color='var(--grn)'; accEl.textContent='✓'; }
-      else { accEl.style.color='var(--muted2)'; accEl.textContent='✗'; }
-      row.appendChild(accEl);
-
-      const timeEl = document.createElement('span');
-      timeEl.style.cssText = 'color:var(--muted);font-size:.65rem';
-      timeEl.textContent = e.ts ? new Date(e.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
-      row.appendChild(timeEl);
-
-      list.appendChild(row);
-    });
-    col.appendChild(list);
-    body.appendChild(col);
+function renderDiffListInPlace(el,entries_by_ip,topN,isSession){
+  var collapsed={};
+  el.querySelectorAll("[data-miner-ip]").forEach(function(wrap){
+    var ip=wrap.dataset.minerIp; var body=wrap.querySelector(".diff-body");
+    if(body) collapsed[ip]=body.style.display==="none";
   });
-
-  document.getElementById('at-count').textContent = totalEntries + ' total entries across all miners';
+  el.innerHTML=""; var hasData=false;
+  var medals=["🥇","🥈","🥉"];
+  Object.values(miners).forEach(function(m){
+    if(!m.ip) return; var entries=entries_by_ip[m.ip];
+    if(!entries||!entries.length) return; hasData=true;
+    var color=m.color||"var(--orange)"; var mname=m.name||m.ip;
+    var isCollapsed=collapsed[m.ip]||false;
+    var wrap=document.createElement("div");
+    wrap.style.cssText="border:1px solid var(--bdr);border-radius:8px;margin-bottom:10px;overflow:hidden";
+    wrap.dataset.minerIp=m.ip;
+    var hdr=document.createElement("div");
+    hdr.style.cssText="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;background:var(--surf)";
+    var caret=document.createElement("span"); caret.textContent=isCollapsed?"›":"˅";
+    var ttl=document.createElement("span"); ttl.style.cssText="font-size:.85rem;font-weight:700;color:"+color;
+    ttl.textContent=mname+" ("+entries.length+" entries)";
+    if(isSession){
+      var trashD=document.createElement("button");
+      trashD.textContent="🗑";
+      trashD.title="Clear session diffs for this miner";
+      trashD.style.cssText="background:transparent;border:none;cursor:pointer;font-size:.9rem;padding:0 6px;color:var(--muted)";
+      (function(mip){trashD.addEventListener("mousedown",function(ev){
+        ev.stopPropagation();
+        var mn=Object.values(miners).find(function(x){return x.ip===mip;});
+        if(mn){mn.topSeries=[];markSessionCleared(mn);markDirty();updateCardStats(mn);updateDiffPanelContent();}
+      });})(m.ip);
+      hdr.appendChild(ttl); hdr.appendChild(trashD); hdr.appendChild(caret);
+    } else { hdr.appendChild(ttl); hdr.appendChild(caret); }
+    var body=document.createElement("div"); body.className="diff-body";
+    body.style.cssText="padding:10px 14px;display:"+(isCollapsed?"none":"block");
+    entries.slice(0,topN).forEach(function(e,i){
+      var row=document.createElement("div");
+      row.style.cssText="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:.8rem";
+      var rankEl=document.createElement("span"); rankEl.style.cssText="width:24px;text-align:center;flex-shrink:0;color:var(--muted)";
+      rankEl.textContent=i<3?medals[i]:String(i+1);
+      var diffEl=document.createElement("span"); diffEl.style.cssText="color:"+color+";font-weight:bold;flex:1";
+      diffEl.textContent=fmtD(e.found);
+      var accEl=document.createElement("span"); accEl.style.fontSize=".7rem";
+      if(e.fromAxeOS){accEl.style.color="#38bdf8";accEl.textContent="AxeOS";}
+      else if(e.accepted){accEl.style.color="var(--grn)";accEl.textContent="✓";}
+      else{accEl.style.color="var(--muted2)";accEl.textContent="✗";}
+      var timeEl=document.createElement("span"); timeEl.style.cssText="color:var(--muted);font-size:.65rem";
+      timeEl.textContent=e.ts?new Date(e.ts).toLocaleDateString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}):"--";
+      row.appendChild(rankEl);row.appendChild(diffEl);row.appendChild(accEl);row.appendChild(timeEl);
+      body.appendChild(row);
+    });
+    hdr.onclick=function(){
+      var open=body.style.display!=="none";
+      body.style.display=open?"none":"block"; caret.textContent=open?"›":"˅";
+    };
+    wrap.appendChild(hdr);wrap.appendChild(body);el.appendChild(wrap);
+  });
+  if(!hasData) el.innerHTML="<div style='color:var(--muted);font-size:.85rem;padding:20px'>No data yet</div>";
+}
+var _diffPanelTimer=null;
+function updateDiffPanelContent(){
+  var topN=parseInt(document.getElementById("diff-top-sel").value)||10;
+  var sessData={};
+  Object.values(miners).forEach(function(m){
+    if(!m.ip) return;
+    var sorted=(m.topSeries&&m.topSeries.length?m.topSeries:m.series).slice().sort(function(a,b){return b.found-a.found;});
+    if(sorted.length) sessData[m.ip]=sorted;
+  });
+  renderDiffListInPlace(document.getElementById("diff-session-content"),sessData,topN,true);
+  renderDiffListInPlace(document.getElementById("diff-alltime-content"),atLoad(),topN,false);
+}
+function openDiffPanel(){
+  document.getElementById("alltime-overlay").style.display="flex";
+  updateDiffPanelContent();
+  document.getElementById("diff-top-sel").onchange=function(){updateDiffPanelContent();};
+  if(_diffPanelTimer) clearInterval(_diffPanelTimer);
+  _diffPanelTimer=setInterval(function(){
+    if(document.getElementById("alltime-overlay").style.display!=="none") updateDiffPanelContent();
+    else{clearInterval(_diffPanelTimer);_diffPanelTimer=null;}
+  },2000);
 }
 
 // Open / close
-document.getElementById('btn-alltime').onclick = ()=>{
-  document.getElementById('alltime-overlay').style.display='flex';
-  renderAtList();
-};
+document.getElementById('btn-alltime').onclick = ()=>{ openDiffPanel(); };
 document.getElementById('at-close').onclick = ()=>{
   document.getElementById('alltime-overlay').style.display='none';
 };
-document.getElementById('at-topn').onchange = renderAtList;
 document.getElementById('at-reset').onclick = ()=>{
   if(confirm('Reset the all-time list? This cannot be undone.')){
     localStorage.removeItem(AT_KEY);
@@ -2731,7 +3025,7 @@ if(_sc.length) setTimeout(function(){ try{ fetch(SERVER+'/scripts',{method:'POST
 var SC_FIELDS = ['hashrate','hashrate_1m','hashrate_10m','hashrate_1h','bestDiff','bestSessionDiff',
   'efficiency','asic1Temp','asic2Temp','asic3Temp','asic4Temp','asic5Temp','asic6Temp','asic7Temp','asic8Temp','vrTemp','fanRpm','fanMode','tempTarget','power','voltage','current',
   'poolConnected','rejectRate','staleRate','poolTarget','uptime','online','frequency',
-  'hourOfDay','minuteOfDay'];
+  'hourOfDay','minuteOfDay','autoRestarts'];
 var SC_OPS = ['>','>=','<','<=','==','!=','between','outside','is_true','is_false'];
 var SC_ACTIONS = ['restart','setFrequency','setCoreVoltage','setFanSpeed','setAutoFan',
   'setTargetTemp','setOverclock','setPrimaryPool','switchFallbackPool',
@@ -2769,6 +3063,7 @@ function _scVal(m, field){
     case 'online': return m.status === 'Live' ? 1 : 0;
     case 'hourOfDay': return new Date().getHours();
     case 'minuteOfDay': return new Date().getHours()*60 + new Date().getMinutes();
+    case 'autoRestarts': return (m.restartLog||[]).filter(function(t){return Date.now()-t<3600000;}).length;
     default: return 0;
   }
 }
@@ -2905,7 +3200,7 @@ async function _scRun(){
     var now = Date.now();
     for(var si=0; si<_sc.length; si++){
       var sc = _sc[si];
-      if(!sc.enabled){ console.log('[SC] skip disabled: '+sc.name); continue; }
+      if(!sc.enabled){ continue; }
       var targets = sc.miners==='all'
         ? Object.values(miners)
         : Object.values(miners).filter(function(m){ return String(m.id)===String(sc.miners)||m.ip===sc.miners||(m.name&&m.name===sc.miners); });
@@ -3036,12 +3331,20 @@ function _saveReports(data){
 
 function saveSessionReport(m, reason, lastGoodPt){
   if(!m.ip) return;
+  // Don't save if no meaningful data exists
+  if(!m.sharesFound && (!m.series || !m.series.length) && !m.axeOSHashrate) return;
   // lastGoodPt passed in from trigger - already the most recent good hashSeries point
   if(!lastGoodPt){
-    // Fallback: search hashSeries ourselves
+    // Fallback: search hashSeries for 60s back
     if(m.hashSeries && m.hashSeries.length){
+      var fb60 = Date.now() - 60000;
       for(var i=m.hashSeries.length-1; i>=0; i--){
-        if(m.hashSeries[i].hr && m.hashSeries[i].hr > 0){ lastGoodPt=m.hashSeries[i]; break; }
+        if(m.hashSeries[i].ts <= fb60 && m.hashSeries[i].hr && m.hashSeries[i].hr > 0){ lastGoodPt=m.hashSeries[i]; break; }
+      }
+      if(!lastGoodPt){
+        for(var j=m.hashSeries.length-1; j>=0; j--){
+          if(m.hashSeries[j].hr && m.hashSeries[j].hr > 0){ lastGoodPt=m.hashSeries[j]; break; }
+        }
       }
     }
   }
@@ -3085,6 +3388,39 @@ function saveSessionReport(m, reason, lastGoodPt){
   try{
     fetch(SERVER+'/reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(all)}).catch(function(){});
   }catch(e){}
+  // Wait for API to return resetReason after miner comes back online
+  m._awaitingResetReason = true;
+  clearTimeout(m._resetReasonTimeout);
+  m._resetReasonTimeout = setTimeout(function(){ m._awaitingResetReason = false; }, 120000);
+}
+
+function markSessionCleared(m){
+  // Mark this miner's session as intentionally cleared so restore skips it
+  m._sessionCleared = true;
+  m._sessionRestoreAttempted = true; // prevent restore on this session
+}
+
+function updateReportFaultState(ip, faultState){
+  // Update report with fault state
+  var all = _loadReports();
+  if(!all[ip] || !all[ip].length) return;
+  all[ip][0].reason = faultState;
+  _saveReports(all);
+  try{ fetch(SERVER+'/reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(all)}).catch(function(){}); }catch(e){}
+}
+
+function updateReportReason(ip, resetReason){
+  var all = _loadReports();
+  if(!all[ip] || !all[ip].length) return;
+  // Append reset reason to existing fault state rather than overwriting
+  var existing = all[ip][0].reason;
+  var combined = (existing && existing!=='restart' && existing!=='auto-restart' && existing!=='manual-restart')
+    ? existing + ' → ' + resetReason
+    : resetReason;
+  all[ip][0].reason = combined;
+  all[ip][0].resetReason = resetReason; // store separately too
+  _saveReports(all);
+  try{ fetch(SERVER+'/reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(all)}).catch(function(){}); }catch(e){}
 }
 
 function openReportsPanel(){
@@ -3106,7 +3442,7 @@ function openReportsPanel(){
     content.appendChild(minerHdr);
     reports.forEach(function(r, ri){
       var card = document.createElement('div');
-      card.style.cssText = 'background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:8px;overflow:hidden';
+      card.style.cssText = 'background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:10px;overflow:visible';
       var date = new Date(r.ts);
       var dateStr = date.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
       var dur = r.duration ? (r.duration>=3600?Math.floor(r.duration/3600)+'h '+Math.floor((r.duration%3600)/60)+'m':r.duration>=60?Math.floor(r.duration/60)+'m '+r.duration%60+'s':r.duration+'s') : '—';
@@ -3123,8 +3459,13 @@ function openReportsPanel(){
 
       var cardHdr = document.createElement('div');
       cardHdr.style.cssText = 'display:flex;align-items:center;padding:10px 14px;cursor:pointer;user-select:none;gap:8px';
+      var reasonLabel = r.reason==='auto-restart' ? 'Auto-Restart' :
+        r.reason==='manual-restart' ? 'Manual Restart' :
+        r.reason==='restart' ? 'Detected' :
+        r.reason ? r.reason : null;
       cardHdr.innerHTML =
         '<span style="font-size:.82rem;font-weight:600;color:var(--txt)">Session #'+(reports.length-ri)+'</span>'+
+        (reasonLabel?'<span style="font-size:.7rem;background:rgba(247,147,26,0.15);color:var(--orange);border-radius:4px;padding:1px 6px;margin-left:6px">'+reasonLabel+'</span>':'')+
         '<span style="font-size:.75rem;color:var(--muted);margin-left:4px">'+dateStr+'</span>'+
         '<span style="font-size:.75rem;color:var(--orange);margin-left:auto">'+fmtD(r.bestDiff)+'</span>'+
         '<span style="font-size:.75rem;color:var(--muted);margin-left:8px">'+hrStr+'</span>'+
@@ -3149,6 +3490,8 @@ function openReportsPanel(){
       cardBody.style.cssText = 'display:none;padding:0 14px 14px;border-top:1px solid var(--bdr)';
       cardBody.innerHTML =
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin:12px 0;font-size:.8rem">'+
+          (reasonLabel?'<div style="grid-column:1/-1"><span style="color:var(--muted)">Reset Reason</span><br><b style="color:var(--orange)">'+reasonLabel+'</b></div>':'')+
+          (r.resetReason&&r.resetReason!==r.reason?'<div style="grid-column:1/-1"><span style="color:var(--muted)">Restart Reason</span><br><b style="color:var(--muted)">'+r.resetReason+'</b></div>':'')+
           '<div><span style="color:var(--muted)">Duration</span><br><b>'+dur+'</b></div>'+
           '<div><span style="color:var(--muted)">Hashrate</span><br><b>'+hrStr+'</b></div>'+
           '<div><span style="color:var(--muted)">Efficiency</span><br><b>'+effStr+'</b></div>'+

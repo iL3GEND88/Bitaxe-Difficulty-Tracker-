@@ -249,8 +249,16 @@ function showTab(name){
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('on'));
   document.getElementById('tab-'+name).classList.add('on');
   if(name==='addminer') renderAddMiner();
-  if(name==='top10') renderTop10();
-  if(name==='alltime') renderAllTime();
+  if(name==='top10'){
+    var t10c=document.getElementById('tab-top10');
+    if(t10c) t10c.innerHTML='';
+    renderTop10();
+  }
+  if(name==='alltime'){
+    var atc=document.getElementById('tab-alltime');
+    if(atc) atc.innerHTML='';
+    renderAllTime();
+  }
   if(name==='pool') renderPool();
   if(name==='settings') renderSettings();
 }
@@ -278,8 +286,10 @@ async function loadAllMinerData(){
   }));
   results.forEach(r=>{if(r.status==='fulfilled'&&r.value) minerData[r.value.ip]=r.value;});
 }
+var hrAllTimeData={};
 async function loadAllTime(){
-  try{const r=await fetch(SERVER+'/alltime');if(r.ok) allTimeData=await r.json();}catch(e){}
+  try{ const r=await fetch(SERVER+'/alltime'); if(r.ok) allTimeData=await r.json(); }catch(e){}
+  try{ const r2=await fetch(SERVER+'/hralltime'); if(r2.ok) hrAllTimeData=await r2.json(); }catch(e){}
 }
 async function loadSession(){
   try{const r=await fetch(SERVER+'/session');if(r.ok) sessionData=await r.json();}catch(e){}
@@ -881,59 +891,190 @@ function renderAddMiner(){
   });
 }
 // ── SESSION TOP 10 TAB (best shares from current session via alltime) ─────────
+function fmtHrMob(hr){
+  if(!hr&&hr!==0) return '—';
+  if(hr>=1000) return (hr/1000).toFixed(3)+' TH/s';
+  return parseFloat(hr).toFixed(2)+' GH/s';
+}
+function mkCollapsible(title, color, contentEl, defaultOpen, bodyId, onTrash){
+  var wrap=document.createElement('div');
+  wrap.style.cssText='border:1px solid var(--bdr);border-radius:8px;margin-bottom:8px;overflow:hidden';
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;background:var(--surf2)';
+  var caret=document.createElement('span');
+  caret.textContent=defaultOpen?'˅':'›';
+  var ttl=document.createElement('span');
+  ttl.style.cssText='font-size:.82rem;font-weight:700;color:'+color;
+  ttl.textContent=title;
+  if(onTrash){
+    var trashBtn=document.createElement('button');
+    trashBtn.textContent='🗑';
+    trashBtn.style.cssText='background:transparent;border:none;cursor:pointer;font-size:.9rem;color:var(--muted);padding:0 4px;margin-left:4px';
+    trashBtn.addEventListener('mousedown',function(ev){ev.stopPropagation();onTrash();});
+    hdr.appendChild(ttl); hdr.appendChild(trashBtn); hdr.appendChild(caret);
+  } else {
+    hdr.appendChild(ttl); hdr.appendChild(caret);
+  }
+  var body=document.createElement('div');
+  if(bodyId) body.id=bodyId;
+  body.style.cssText='padding:10px 14px;display:'+(defaultOpen?'block':'none');
+  body.appendChild(contentEl);
+  hdr.onclick=function(){
+    var open=body.style.display!=='none';
+    body.style.display=open?'none':'block';
+    caret.textContent=open?'›':'˅';
+  };
+  wrap.appendChild(hdr); wrap.appendChild(body);
+  return wrap;
+}
+function updateCollapsibleContent(bodyId, newContentEl){
+  var body=document.getElementById(bodyId);
+  if(!body) return false;
+  body.innerHTML='';
+  body.appendChild(newContentEl);
+  return true;
+}
+function mkDiffList(entries, color, topN){
+  var el=document.createElement('div');
+  if(!entries||!entries.length){
+    el.innerHTML='<div style="color:var(--muted);font-size:.78rem;padding:4px 0">No data yet</div>';
+    return el;
+  }
+  entries.slice(0,topN).forEach(function(e,i){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;gap:6px;align-items:center;font-size:.78rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)';
+    var ts=e.ts?new Date(e.ts).toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit'}):'—';
+    var medal=i<3?MEDALS[i]:String(i+1);
+    row.innerHTML='<span style="color:var(--muted);min-width:22px">'+medal+'</span>'+
+      '<span style="color:'+color+';font-weight:600;flex:1">'+fmtD(e.found)+'</span>'+
+      '<span style="color:'+(e.accepted||e.fromAxeOS?'#4ade80':'var(--red)')+'">'+
+        (e.fromAxeOS?'<span style="color:#38bdf8">OS</span>':e.accepted?'✓':'✗')+'</span>'+
+      '<span style="color:var(--muted);font-size:.72rem">'+ts+'</span>';
+    el.appendChild(row);
+  });
+  return el;
+}
+function mkHrList(entries, color, topN){
+  var el=document.createElement('div');
+  if(!entries||!entries.length){
+    el.innerHTML='<div style="color:var(--muted);font-size:.78rem;padding:4px 0">No data yet</div>';
+    return el;
+  }
+  entries.slice(0,topN).forEach(function(p,i){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;gap:6px;align-items:center;font-size:.78rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)';
+    var errStr='';
+    if(p.err!=null){
+      var ec=p.err>2?'var(--red)':p.err>0.5?'#f7931a':'#4ade80';
+      errStr='<span style="color:'+ec+'"> '+parseFloat(p.err).toFixed(2)+'%</span>';
+    }
+    var ts=p.ts?new Date(p.ts).toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit'}):'—';
+    row.innerHTML='<span style="color:var(--muted);min-width:22px">'+(i+1)+'.</span>'+
+      '<span style="color:'+color+';font-weight:600;flex:1">'+fmtHrMob(p.hr)+'</span>'+
+      errStr+
+      '<span style="color:var(--muted);font-size:.72rem;margin-left:auto">'+ts+'</span>';
+    el.appendChild(row);
+  });
+  return el;
+}
+function showMobToast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--surf2);color:var(--txt);padding:8px 16px;border-radius:8px;font-size:.8rem;z-index:999;border:1px solid var(--bdr)';
+  t.textContent=msg; document.body.appendChild(t);
+  setTimeout(function(){t.remove();},2500);
+}
 function renderTop10(){
   var c=document.getElementById('tab-top10');
-  // Selector header
+  var sessionIPs=Object.keys(sessionData).filter(function(ip){return ip&&ip!=='undefined';});
+  // Build selector bar once
   var existing=document.getElementById('top10-topn-bar');
   if(!existing){
     var bar=document.createElement('div');
     bar.id='top10-topn-bar';
     bar.style.cssText='display:flex;gap:8px;align-items:center;margin-bottom:12px';
     bar.innerHTML='<span style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Show:</span>';
+    var clrBtn=document.createElement('button');
+    clrBtn.textContent='🗑 Clear Sessions';
+    clrBtn.style.cssText='background:transparent;border:1px solid var(--bdr);color:var(--muted);font-size:.7rem;padding:4px 10px;border-radius:6px;cursor:pointer;margin-left:auto';
+    clrBtn.onclick=function(){
+      if(!confirm('Clear session best lists for all miners?')) return;
+      fetch(SERVER+'/setclearsession',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ip:'all'})}).catch(function(){});
+      showMobToast('Session lists cleared');
+    };
+    bar.appendChild(clrBtn);
     [10,25,50,100,250,500].forEach(function(n){
       var btn=document.createElement('button');
-      btn.textContent=n;
-      btn.dataset.n=n;
+      btn.textContent=n; btn.dataset.n=n;
       btn.style.cssText='background:'+(mobTopN===n?'var(--orange)':'var(--surf2)')+';border:1px solid '+(mobTopN===n?'var(--orange)':'var(--bdr)')+';color:'+(mobTopN===n?'#000':'#e8f4ff')+';font-family:inherit;font-size:.72rem;padding:4px 12px;border-radius:6px;cursor:pointer';
-      btn.onclick=function(){mobTopN=parseInt(this.dataset.n);renderTop10();};
+      btn.onclick=function(){mobTopN=parseInt(this.dataset.n);updateTop10Content();};
       bar.appendChild(btn);
     });
-    c.innerHTML='';
-    c.appendChild(bar);
+    c.innerHTML=''; c.appendChild(bar);
   } else {
-    // Update button styles
     document.querySelectorAll('#top10-topn-bar button').forEach(function(btn){
       var n=parseInt(btn.dataset.n);
       btn.style.background=mobTopN===n?'var(--orange)':'var(--surf2)';
       btn.style.borderColor=mobTopN===n?'var(--orange)':'var(--bdr)';
       btn.style.color=mobTopN===n?'#000':'#e8f4ff';
     });
-    // Remove old cards but keep bar
-    var children=Array.from(c.children);
-    children.forEach(function(ch){ if(ch.id!=='top10-topn-bar') c.removeChild(ch); });
   }
-  var sessionIPs=Object.keys(sessionData).filter(function(ip){return ip&&ip!=='undefined';});
+  var nd2=document.getElementById('top10-nodata'); if(nd2) nd2.remove();
   if(!sessionIPs.length){
-    var nd=document.createElement('div');nd.className='loading';
+    var nd=document.createElement('div'); nd.id='top10-nodata'; nd.className='loading';
     nd.textContent='No session data yet — open Windows app';
-    c.appendChild(nd); return;
+    c.appendChild(nd);
+    return;
   }
+  window._sessionEverLoaded=true;
+  // Build cards for new miners only
   sessionIPs.forEach(function(ip){
+    var safeIp=ip.replace(/[^a-zA-Z0-9]/g,'_');
     var color=getMinerColor(ip);
-    // Use live session top10 from Windows app
-    var entries=(sessionData[ip]&&sessionData[ip].top10)?sessionData[ip].top10.slice(0,mobTopN):[];
-    var card=document.createElement('div'); card.className='card';
-    card.innerHTML='<div class="top10-hdr" style="color:'+color+'">▸ '+(getMinerName(ip)||ip)+'</div>'+
-      (entries.length?entries.map(function(e,i){
-        return '<div class="top10-row">'+
-          '<div class="top10-rank">'+(i<3?MEDALS[i]:i+1)+'</div>'+
-          '<div class="top10-diff" style="color:'+color+'">'+fmtD(e.found)+'</div>'+
-          '<div class="top10-meta">'+
-            '<div class="'+(e.accepted?'acc':'')+'">'+( e.accepted?'✓':'✗')+'</div>'+
-            '<div>'+(e.ts?new Date(e.ts).toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit'}):'—')+'</div>'+
-          '</div></div>';
-      }).join(''):'<div class="top10-row"><div style="color:var(--muted);font-size:.78rem;padding:4px 0">No session data yet — open Windows app</div></div>');
-    c.appendChild(card);
+    var mname2=(getMinerName(ip)||ip);
+    var cardId='sess-card-'+safeIp;
+    if(!document.getElementById(cardId)){
+      var card=document.createElement('div'); card.className='card'; card.id=cardId;
+      var diffEl=mkDiffList([], color, mobTopN);
+      card.appendChild(mkCollapsible('📋 Best Diffs — '+mname2, color, diffEl, true, 'sess-diff-'+safeIp,
+        (function(cip){return function(){
+          fetch(SERVER+'/setclearsession',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ip:cip,type:'diff'})}).catch(function(){});
+          showMobToast('Diff scores cleared for '+(getMinerName(cip)||cip));
+        };})(ip)
+      ));
+      var hrEl=mkHrList([], color, mobTopN);
+      card.appendChild(mkCollapsible('⚡ HR Scores — '+mname2, color, hrEl, false, 'sess-hr-'+safeIp,
+        (function(cip){return function(){
+          fetch(SERVER+'/setclearsession',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ip:cip,type:'hr'})}).catch(function(){});
+          showMobToast('HR scores cleared for '+(getMinerName(cip)||cip));
+        };})(ip)
+      ));
+      c.appendChild(card);
+    }
+  });
+  updateTop10Content();
+}
+function updateTabButtons(barId, activeN){
+  document.querySelectorAll('#'+barId+' button').forEach(function(btn){
+    var n=parseInt(btn.dataset.n);
+    btn.style.background=n===activeN?'var(--orange)':'var(--surf2)';
+    btn.style.borderColor=n===activeN?'var(--orange)':'var(--bdr)';
+    btn.style.color=n===activeN?'#000':'#e8f4ff';
+  });
+}
+
+function updateTop10Content(){
+  updateTabButtons('top10-topn-bar', mobTopN);
+  var sessionIPs=Object.keys(sessionData).filter(function(ip){return ip&&ip!=='undefined';});
+  sessionIPs.forEach(function(ip){
+    var safeIp=ip.replace(/[^a-zA-Z0-9]/g,'_');
+    var color=getMinerColor(ip);
+    var diffEntries=(sessionData[ip]&&sessionData[ip].top10)?sessionData[ip].top10.slice(0,mobTopN):[];
+    updateCollapsibleContent('sess-diff-'+safeIp, mkDiffList(diffEntries, color, mobTopN));
+    var hrEntries=(sessionData[ip]&&sessionData[ip].hrScores)?sessionData[ip].hrScores.slice(0,mobTopN):[];
+    updateCollapsibleContent('sess-hr-'+safeIp, mkHrList(hrEntries, color, mobTopN));
   });
 }
 
@@ -941,8 +1082,9 @@ function renderTop10(){
 var mobAllTimeN=10;
 function renderAllTime(){
   var c=document.getElementById('tab-alltime');
-  var ips=Object.keys(allTimeData).filter(function(ip){return allTimeData[ip]&&allTimeData[ip].length;});
-  // Selector bar
+  var atDiff=allTimeData.alltime||allTimeData;
+  var ips=Object.keys(atDiff).filter(function(ip){return ip&&ip!=='undefined'&&atDiff[ip]&&atDiff[ip].length;});
+  // Build selector bar once
   var existBar=document.getElementById('alltime-topn-bar');
   if(!existBar){
     var bar2=document.createElement('div');
@@ -951,12 +1093,12 @@ function renderAllTime(){
     bar2.innerHTML='<span style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Show:</span>';
     [10,25,50,100,250,500].forEach(function(n){
       var btn=document.createElement('button');
-      btn.textContent=n;btn.dataset.n=n;
+      btn.textContent=n; btn.dataset.n=n;
       btn.style.cssText='background:'+(mobAllTimeN===n?'var(--orange)':'var(--surf2)')+';border:1px solid '+(mobAllTimeN===n?'var(--orange)':'var(--bdr)')+';color:'+(mobAllTimeN===n?'#000':'#e8f4ff')+';font-family:inherit;font-size:.72rem;padding:4px 12px;border-radius:6px;cursor:pointer';
-      btn.onclick=function(){mobAllTimeN=parseInt(this.dataset.n);renderAllTime();};
+      btn.onclick=function(){mobAllTimeN=parseInt(this.dataset.n);updateAllTimeContent();};
       bar2.appendChild(btn);
     });
-    c.innerHTML='';c.appendChild(bar2);
+    c.innerHTML=''; c.appendChild(bar2);
   } else {
     document.querySelectorAll('#alltime-topn-bar button').forEach(function(btn){
       var n=parseInt(btn.dataset.n);
@@ -964,34 +1106,48 @@ function renderAllTime(){
       btn.style.borderColor=mobAllTimeN===n?'var(--orange)':'var(--bdr)';
       btn.style.color=mobAllTimeN===n?'#000':'#e8f4ff';
     });
-    var ch2=Array.from(c.children);
-    ch2.forEach(function(ch){ if(ch.id!=='alltime-topn-bar') c.removeChild(ch); });
   }
   if(!ips.length){
-    var nd=document.createElement('div');nd.className='loading';nd.textContent='No all-time data yet';
-    c.appendChild(nd);return;
+    var nd3=document.getElementById('at-nodata');
+    if(!nd3){ nd3=document.createElement('div'); nd3.id='at-nodata'; nd3.className='loading'; nd3.textContent='No all-time data yet'; c.appendChild(nd3); }
+    return;
   }
+  var nd4=document.getElementById('at-nodata'); if(nd4) nd4.remove();
+  // Build cards for new miners only
   ips.forEach(function(ip){
+    var safeIp=ip.replace(/[^a-zA-Z0-9]/g,'_');
     var color=getMinerColor(ip);
-    var entries=(allTimeData[ip]||[]).slice(0,mobAllTimeN);
-    var total=(allTimeData[ip]||[]).length;
-    var card=document.createElement('div'); card.className='card';
-    // Summary bar
-    var summ='<div style="padding:8px 16px;border-bottom:1px solid var(--muted2);font-size:.72rem;color:var(--muted)">'+
-      'Best: <span style="color:'+color+';font-weight:700">'+fmtD(entries[0]?entries[0].found:0)+'</span>'+
-      ' &nbsp; Total recorded: <span style="color:var(--txt)">'+total+'</span></div>';
-    card.innerHTML='<div class="top10-hdr" style="color:'+color+'">▸ '+(getMinerName(ip)||ip)+'</div>'+summ+
-      entries.map(function(e,i){
-        return '<div class="top10-row">'+
-          '<div class="top10-rank">'+(i<3?MEDALS[i]:i+1)+'</div>'+
-          '<div class="top10-diff" style="color:'+color+'">'+fmtD(e.found)+'</div>'+
-          '<div class="top10-meta">'+
-            '<div class="'+(e.accepted||e.fromAxeOS?'acc':'')+'">'+
-              (e.fromAxeOS?'<span style="color:#38bdf8">AxeOS</span>':e.accepted?'✓':'✗')+'</div>'+
-            '<div>'+(e.ts?new Date(e.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}):'—')+'</div>'+
-          '</div></div>';
-      }).join('');
-    c.appendChild(card);
+    var mname3=(getMinerName(ip)||ip);
+    var cardId='at-card-'+safeIp;
+    if(!document.getElementById(cardId)){
+      var card=document.createElement('div'); card.className='card'; card.id=cardId;
+      var atDiffEl=mkDiffList([], color, mobAllTimeN);
+      card.appendChild(mkCollapsible('📋 Best Diffs — '+mname3, color, atDiffEl, true, 'at-diff-'+safeIp));
+      var atHrEl=mkHrList([], color, mobAllTimeN);
+      card.appendChild(mkCollapsible('⚡ HR Scores — '+mname3, color, atHrEl, false, 'at-hr-'+safeIp));
+      c.appendChild(card);
+    }
+  });
+  updateAllTimeContent();
+}
+function updateAllTimeContent(){
+  updateTabButtons('alltime-topn-bar', mobAllTimeN);
+  var atDiff=allTimeData.alltime||allTimeData;
+  var ips=Object.keys(atDiff).filter(function(ip){return ip&&ip!=='undefined'&&atDiff[ip]&&atDiff[ip].length;});
+  ips.forEach(function(ip){
+    var safeIp=ip.replace(/[^a-zA-Z0-9]/g,'_');
+    var color=getMinerColor(ip);
+    var entries=atDiff[ip].slice(0,mobAllTimeN);
+    var total=atDiff[ip].length;
+    // Update diff title to include total count
+    var diffBody=document.getElementById('at-diff-'+safeIp);
+    if(diffBody){
+      var hdr=diffBody.previousElementSibling;
+      if(hdr){ var ttl=hdr.querySelector('span:first-child'); if(ttl) ttl.textContent='📋 Best Diffs — '+(getMinerName(ip)||ip); }
+      diffBody.innerHTML=''; diffBody.appendChild(mkDiffList(entries, color, mobAllTimeN));
+    }
+    var atHrArr=hrAllTimeData[ip]?hrAllTimeData[ip].slice(0,mobAllTimeN):[];
+    updateCollapsibleContent('at-hr-'+safeIp, mkHrList(atHrArr, color, mobAllTimeN));
   });
 }
 
@@ -1562,7 +1718,7 @@ var _mobScView = ''; // '' = miner settings, 'list' = scripts list, 'editor' = s
 var MOB_SC_FIELDS = ['hashrate','hashrate_1m','hashrate_10m','hashrate_1h','bestDiff','bestSessionDiff',
   'efficiency','asic1Temp','asic2Temp','asic3Temp','asic4Temp','asic5Temp','asic6Temp','asic7Temp','asic8Temp','vrTemp','fanRpm','fanMode','tempTarget','power','voltage','current',
   'poolConnected','rejectRate','staleRate','poolTarget','uptime','online','frequency',
-  'hourOfDay','minuteOfDay'];
+  'hourOfDay','minuteOfDay','autoRestarts'];
 var MOB_SC_OPS = ['>','>=','<','<=','==','!=','between','outside','is_true','is_false'];
 var MOB_SC_ACTIONS = ['restart','setFrequency','setCoreVoltage','setFanSpeed','setAutoFan',
   'setTargetTemp','setOverclock','setPrimaryPool','switchFallbackPool',
@@ -1631,11 +1787,22 @@ function renderMobReports(){
     var minerName=r0.name&&r0.name.trim()?r0.name.trim():ip;
     var color=r0.color||'#f7931a';
 
-    // Miner section header
+    // Miner section - collapsible
+    var minerOpen = true;
     var mhdr=document.createElement('div');
-    mhdr.style.cssText='font-size:.85rem;font-weight:700;color:'+color+';padding:4px 0;border-bottom:1px solid var(--bdr)';
-    mhdr.textContent='▸ '+minerName;
+    mhdr.style.cssText='font-size:.85rem;font-weight:700;color:'+color+';padding:10px 0;border-bottom:1px solid var(--bdr);display:flex;align-items:center;cursor:pointer;user-select:none';
+    mhdr.innerHTML='<span style="flex:1">▸ '+minerName+'</span><span style="color:var(--muted);font-size:.8rem">'+reports.length+' report'+(reports.length!==1?'s':'')+'</span><span class="miner-chev" style="color:var(--muted);margin-left:8px;font-size:.85rem">˅</span>';
     content.appendChild(mhdr);
+
+    var minerBody=document.createElement('div');
+    minerBody.style.cssText='display:block';
+    content.appendChild(minerBody);
+
+    mhdr.onclick=function(){
+      minerOpen=!minerOpen;
+      minerBody.style.display=minerOpen?'block':'none';
+      mhdr.querySelector('.miner-chev').textContent=minerOpen?'˅':'›';
+    };
 
     reports.forEach(function(r,ri){
       var card=document.createElement('div');
@@ -1660,6 +1827,10 @@ function renderMobReports(){
       var chevron=document.createElement('span');
       chevron.style.cssText='color:var(--muted);font-size:.8rem;margin-left:6px';
       chevron.textContent='›';
+      var mobReasonLabel = r.reason==='auto-restart' ? 'Auto-Restart' :
+        r.reason==='manual-restart' ? 'Manual Restart' :
+        r.reason==='restart' ? 'Detected' :
+        r.reason ? r.reason : null;
       var mobDelBtn=document.createElement('button');
       mobDelBtn.style.cssText='background:transparent;border:none;color:var(--red);font-size:.8rem;padding:0 4px;cursor:pointer;opacity:.7';
       mobDelBtn.textContent='✕';
@@ -1686,6 +1857,8 @@ function renderMobReports(){
 
       cardBody.innerHTML=
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 0;font-size:.78rem">'+
+          (mobReasonLabel?'<div style="grid-column:1/-1"><div style="color:var(--muted)">Reset Reason</div><div style="font-weight:600;color:var(--orange)">'+mobReasonLabel+'</div></div>':'')+
+          (r.resetReason&&r.resetReason!==r.reason?'<div style="grid-column:1/-1"><div style="color:var(--muted)">Restart Reason</div><div style="font-weight:600;color:var(--muted)">'+r.resetReason+'</div></div>':'')+
           '<div><div style="color:var(--muted)">Duration</div><div style="font-weight:600">'+dur+'</div></div>'+
           '<div><div style="color:var(--muted)">Hashrate</div><div style="font-weight:600">'+hrStr+'</div></div>'+
           '<div><div style="color:var(--muted)">Efficiency</div><div style="font-weight:600">'+effStr+'</div></div>'+
@@ -1706,7 +1879,7 @@ function renderMobReports(){
       };
 
       card.appendChild(cardHdr); card.appendChild(cardBody);
-      content.appendChild(card);
+      minerBody.appendChild(card);
     });
   });
 
@@ -2293,8 +2466,7 @@ function updateFactCard(){
   var ratio=miningOdds/fact.odds;
   var ratioStr, comparison;
   function fmtRatio(n){
-    var rounded=n>=1000?Math.round(n/100)*100:Math.round(n);
-    return rounded.toLocaleString()+'x';
+    return Math.round(n).toLocaleString()+'x';
   }
   if(ratio>=2){
     ratioStr=fmtRatio(ratio);
@@ -2570,8 +2742,23 @@ async function doRefresh(){
     }
     // Always re-render active tab to keep data fresh
     if(activeTab==='addminer'&&!settingsDirty) renderAddMiner();
-    if(activeTab==='top10') renderTop10();
-    else if(activeTab==='alltime') renderAllTime();
+    if(activeTab==='top10'){
+      if(!document.getElementById('top10-topn-bar')){ renderTop10(); }
+      else {
+        // Check for new miners not yet in DOM
+        var sIPs=Object.keys(sessionData).filter(function(ip){return ip&&ip!=='undefined';});
+        var needRebuild=sIPs.some(function(ip){ return !document.getElementById('sess-card-'+ip.replace(/[^a-zA-Z0-9]/g,'_')); });
+        if(needRebuild) renderTop10(); else updateTop10Content();
+      }
+    } else if(activeTab==='alltime'){
+      if(!document.getElementById('alltime-topn-bar')){ renderAllTime(); }
+      else {
+        var atDiff2=allTimeData.alltime||allTimeData;
+        var aIPs=Object.keys(atDiff2).filter(function(ip){return ip&&ip!=='undefined'&&atDiff2[ip]&&atDiff2[ip].length;});
+        var needAtRebuild=aIPs.some(function(ip){ return !document.getElementById('at-card-'+ip.replace(/[^a-zA-Z0-9]/g,'_')); });
+        if(needAtRebuild) renderAllTime(); else updateAllTimeContent();
+      }
+    }
     else if(activeTab==='pool') renderPool();
     else if(activeTab==='settings'&&!refreshPaused&&!settingsDirty&&!_mobReportsView) renderSettings();
     if(activeTab==='addminer'&&!refreshPaused&&!settingsDirty) renderAddMiner();
