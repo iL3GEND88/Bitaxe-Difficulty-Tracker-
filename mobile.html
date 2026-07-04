@@ -101,7 +101,17 @@ input[type=checkbox].toggle{width:20px;height:20px;accent-color:var(--grn);curso
 
 .loading{text-align:center;padding:40px;color:var(--muted);font-size:.82rem}
 
-#mob-notif-wrap{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+#mob-notif-wrap{margin-bottom:10px;}
+#mob-notif-bar{display:none;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
+#mob-notif-bar.show{display:flex;}
+#mob-notif-count{background:var(--red);color:#fff;font-size:.72rem;font-weight:700;border-radius:11px;padding:2px 9px;min-width:22px;text-align:center;}
+#mob-notif-clear{background:var(--surf2);border:1px solid var(--bdr);color:var(--muted);font-size:.72rem;border-radius:7px;padding:4px 11px;font-family:inherit;}
+#mob-notif-list{display:flex;flex-direction:column;gap:8px;}
+#mob-notif-list.deck{gap:0;}
+#mob-notif-list.deck .mob-notif{margin-top:-46px;transition:margin .15s ease;}
+#mob-notif-list.deck .mob-notif:first-child{margin-top:0;}
+#mob-notif-list.deck .mob-notif-msg{max-height:1.3em;overflow:hidden;}
+#mob-notif-list.deck .mob-notif-x{display:none;}
 .mob-notif{display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border-radius:10px;background:var(--surf2);border-left:4px solid var(--orange);box-shadow:0 4px 16px rgba(0,0,0,.5);}
 .mob-notif.ok{border-left-color:var(--grn);}.mob-notif.err{border-left-color:var(--red);}
 .mob-notif-body{flex:1;}.mob-notif-title{font-weight:700;color:var(--txt);font-size:.84rem;margin-bottom:1px;}
@@ -231,6 +241,21 @@ var minerNames={};
 function loadMinerNames(){ try{var s=localStorage.getItem('mob_names');if(s)minerNames=JSON.parse(s);}catch(e){} }
 function saveMinerNames(){ try{localStorage.setItem('mob_names',JSON.stringify(minerNames));}catch(e){} }
 function getMinerName(ip){ return minerNames[ip]||''; }
+
+function buildTempsArray(d){
+  var asics=[], vrs=[];
+  if(d.temp!=null && d.temp>0) asics.push(d.temp);
+  for(var i=2;i<=16;i++){ if(d['temp'+i]!=null && d['temp'+i]>0) asics.push(d['temp'+i]); }
+  if(d.vrTemp!=null && d.vrTemp>0) vrs.push(d.vrTemp);
+  for(var j=2;j<=16;j++){ if(d['vrTemp'+j]!=null && d['vrTemp'+j]>0) vrs.push(d['vrTemp'+j]); }
+  if(d.vrr!=null && d.vrr>0) vrs.push(d.vrr);
+  for(var k=2;k<=16;k++){ if(d['vrr'+k]!=null && d['vrr'+k]>0) vrs.push(d['vrr'+k]); }
+  var out=[];
+  asics.forEach(function(v,idx){ out.push({label: asics.length>1?('ASIC '+(idx+1)):'ASIC', val:v, isVR:false, kind:'asic', idx:idx}); });
+  vrs.forEach(function(v,idx){ out.push({label: vrs.length>1?('VR '+(idx+1)):'VR', val:v, isVR:true, kind:'vr', idx:idx}); });
+  return out;
+}
+
 loadMinerNames();
 
 
@@ -269,10 +294,16 @@ async function loadMiners(){
     const r=await fetch(SERVER+'/miners');
     if(r.ok){
       const d=await r.json();
-      if(d.ips&&d.ips.length){ minerIPs=d.ips; return; }
+      // The server's /miners list is authoritative (explicitly-added miners only).
+      // Trust it even when empty — do NOT resurrect miners from history keys, or a
+      // removed miner whose history we keep would reappear in the active list.
+      minerIPs = (d.ips&&d.ips.length) ? d.ips : [];
+      return;
     }
   }catch(e){}
-  // Fallback: pull IPs from session data or all-time data keys
+  // Only reached if the server is unreachable. As a last resort (offline server),
+  // fall back to history keys so the UI isn't empty — this does not run when the
+  // server is up and returns its authoritative (possibly empty) list.
   var fromSession=Object.keys(sessionData).filter(function(k){return k&&k!=='undefined';});
   var fromAllTime=Object.keys(allTimeData).filter(function(k){return k&&k!=='undefined';});
   if(fromSession.length) minerIPs=fromSession;
@@ -296,10 +327,73 @@ async function loadSession(){
 }
 
 // ── MINERS TAB ────────────────────────────────────────────────────────────────
+// ── Manual miner reordering — long-press a card then drag (no icon). Per-device, persisted. ──
+var _mobDragIp=null;
+function saveMobOrder(){ try{ localStorage.setItem('mob_miner_order', JSON.stringify(minerIPs.slice())); }catch(e){} }
+function applyMobOrder(){
+  try{
+    var raw=localStorage.getItem('mob_miner_order'); if(!raw) return;
+    var order=JSON.parse(raw); if(!Array.isArray(order)) return;
+    minerIPs.sort(function(a,b){
+      var ia=order.indexOf(a); if(ia<0)ia=9999;
+      var ib=order.indexOf(b); if(ib<0)ib=9999;
+      return ia-ib;
+    });
+  }catch(e){}
+}
+function reorderMobMiners(fromIp,toIp){
+  var fi=minerIPs.indexOf(fromIp), ti=minerIPs.indexOf(toIp);
+  if(fi<0||ti<0||fi===ti) return;
+  minerIPs.splice(ti,0,minerIPs.splice(fi,1)[0]);
+  saveMobOrder();
+  renderMiners();
+}
+function _mobClearOutlines(){ document.querySelectorAll('.card').forEach(function(c){ c.style.outline=''; }); }
+function mobWireDrag(card, ip){
+  var lpTimer=null, dragging=false, sx=0, sy=0;
+  card.addEventListener('touchstart',function(e){
+    var t=e.touches[0]; sx=t.clientX; sy=t.clientY; dragging=false;
+    lpTimer=setTimeout(function(){
+      dragging=true; _mobDragIp=ip;
+      card.style.opacity='0.55'; card.style.transform='scale(1.02)';
+      if(navigator.vibrate){ try{navigator.vibrate(20);}catch(_){} }
+    },350);
+  },{passive:true});
+  card.addEventListener('touchmove',function(e){
+    var t=e.touches[0];
+    if(!dragging){
+      // movement before the long-press fires = a scroll; cancel the pickup
+      if(Math.abs(t.clientX-sx)>10||Math.abs(t.clientY-sy)>10){ clearTimeout(lpTimer); }
+      return;
+    }
+    e.preventDefault(); // dragging now: block scroll
+    var over=document.elementFromPoint(t.clientX,t.clientY);
+    var oc=over&&over.closest?over.closest('.card'):null;
+    _mobClearOutlines();
+    if(oc&&oc!==card&&oc.dataset&&oc.dataset.ip) oc.style.outline='2px dashed #f7931a';
+  },{passive:false});
+  function endDrag(e){
+    clearTimeout(lpTimer);
+    card.style.opacity=''; card.style.transform='';
+    if(dragging){
+      var t=(e.changedTouches&&e.changedTouches[0])||null;
+      if(t){
+        var over=document.elementFromPoint(t.clientX,t.clientY);
+        var oc=over&&over.closest?over.closest('.card'):null;
+        if(oc&&oc.dataset&&oc.dataset.ip&&oc.dataset.ip!==ip) reorderMobMiners(ip, oc.dataset.ip);
+      }
+    }
+    _mobClearOutlines();
+    dragging=false; _mobDragIp=null;
+  }
+  card.addEventListener('touchend',endDrag);
+  card.addEventListener('touchcancel',endDrag);
+}
 function renderMiners(){
   var c=document.getElementById('tab-miners');
   if(!minerIPs.length){c.innerHTML='<div id="mob-notif-wrap"></div><div class="loading">No miners configured</div>';return;}
   c.innerHTML='<div id="mob-notif-wrap"></div>';
+  applyMobOrder();
   var totalShares=0, globalBest=0;
 
   
@@ -340,6 +434,8 @@ function renderMiners(){
     // ── Stats card ────────────────────────────────────────────────────────────
     var card=document.createElement('div'); card.className='card';
     card.style.borderLeft='3px solid '+(isLive?color:'var(--muted2)');
+    card.dataset.ip=ip;
+    mobWireDrag(card, ip);
 
     var hdr=document.createElement('div'); hdr.className='card-hdr';
     var dotEl=document.createElement('div'); dotEl.id='dot-'+key; dotEl.className='card-dot'+(isLive?' live':d.error?' err':'');
@@ -435,11 +531,13 @@ function renderMiners(){
       ['Frequency',      d.frequency?d.frequency+' MHz':'—', ''],
       ['Avg/share',      avgStr, ''],
       ['Voltage',        d.coreVoltage?d.coreVoltage+' mV':'—', ''],
+      ['Power',          sd.power!=null?sd.power.toFixed(1)+' W':(d.power!=null?d.power.toFixed(1)+' W':'—'), ''],
+      ['Amps',           (function(){var a=sd.current!=null?sd.current:(d.currentA!=null?d.currentA:(d.current!=null?d.current/1000:null));return a!=null?a.toFixed(2)+' A':'—';})(), ''],
       ['Target',         winTarget, ''],
       ['Fan Speed',      d.fanspeed!=null?Math.round(d.fanspeed)+'%':(d.autofanspeed?'Auto':'—'), ''],
       ['Efficiency',     winEff, ''],
     ];
-    var rowKeys=['atbest','sessbest','status','shares','freq','avg','volt','target','fan','eff'];
+    var rowKeys=['atbest','sessbest','status','shares','freq','avg','volt','power','amps','target','fan','eff'];
     // Render stats in 2-column grid (pairs of rows)
     var statsGrid=document.createElement('div');
     statsGrid.className='mob-stats-grid';
@@ -468,12 +566,10 @@ function renderMiners(){
     if(sd2.temps&&sd2.temps.length){
       temps=sd2.temps; // already formatted as [{label,val}]
     } else {
-      if(d.temp>0) temps.push({label:'ASIC 1',val:d.temp,isVR:false});
-      for(var i=2;i<=8;i++){if(d['temp'+i]>0) temps.push({label:'ASIC '+i,val:d['temp'+i],isVR:false});}
-      if(d.vrTemp>0) temps.push({label:'VR',val:d.vrTemp,isVR:true});
+      temps=buildTempsArray(d);
     }
     // Normalize - add isVR if missing
-    temps=temps.map(function(t){return {label:t.label,val:t.val,isVR:t.isVR||(t.label==='VR')};});
+    temps=temps.map(function(t){return {label:t.label,val:t.val,isVR:t.isVR||(t.label&&t.label.indexOf('VR')===0),kind:t.kind,idx:t.idx};});
     if(temps.length){
       var ts=document.createElement('div'); ts.className='temp-section';
       ts.innerHTML='<div class="temp-sec-lbl">Temperatures</div>';
@@ -760,14 +856,40 @@ function renderAddMiner(){
       rnBtn.textContent='✏ Rename';
       rnBtn.dataset.ip=ip;
       rnBtn.onclick=function(){
-        var cur=getMinerName(this.dataset.ip)||'';
-        var n=prompt('Name for '+this.dataset.ip+':',cur);
-        if(n===null) return;
-        minerNames[this.dataset.ip]=n.trim();
-        saveMinerNames();
-        minersBuilt=false;
-        renderAddMiner();
-        doRefresh();
+        var ip2=this.dataset.ip;
+        var cur=getMinerName(ip2)||'';
+        // Inline rename - avoid prompt() which conflicts with iOS refresh
+        var existing=document.getElementById('mob-rename-input-'+ip2.replace(/[^a-zA-Z0-9]/g,'_'));
+        if(existing){ existing.focus(); return; }
+        refreshPaused=true;
+        var wrap=document.createElement('div');
+        wrap.style.cssText='display:flex;gap:6px;align-items:center;margin-top:6px';
+        var inp=document.createElement('input');
+        inp.id='mob-rename-input-'+ip2.replace(/[^a-zA-Z0-9]/g,'_');
+        inp.value=cur; inp.placeholder='Miner name';
+        inp.style.cssText='flex:1;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:6px 10px;font-size:.85rem;font-family:inherit';
+        var saveBtn=document.createElement('button');
+        saveBtn.textContent='Save';
+        saveBtn.style.cssText='background:var(--orange);color:#000;border:none;border-radius:6px;padding:6px 12px;font-size:.82rem;cursor:pointer;font-family:inherit';
+        var cancelBtn=document.createElement('button');
+        cancelBtn.textContent='Cancel';
+        cancelBtn.style.cssText='background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:6px 10px;font-size:.82rem;cursor:pointer;font-family:inherit';
+        function cleanup(){ refreshPaused=false; wrap.remove(); }
+        saveBtn.onclick=function(){
+          minerNames[ip2]=inp.value.trim();
+          saveMinerNames();
+          cleanup();
+          minersBuilt=false;
+          renderMiners();
+        };
+        cancelBtn.onclick=cleanup;
+        inp.addEventListener('keydown',function(e){
+          if(e.key==='Enter'){ saveBtn.onclick(); }
+          if(e.key==='Escape'){ cleanup(); }
+        });
+        wrap.appendChild(inp); wrap.appendChild(saveBtn); wrap.appendChild(cancelBtn);
+        rnBtn.parentNode.insertBefore(wrap, rnBtn.nextSibling);
+        setTimeout(function(){ inp.focus(); inp.select(); }, 50);
       };
       // Remove button
       var rmBtn=document.createElement('button');
@@ -777,7 +899,13 @@ function renderAddMiner(){
       rmBtn.onclick=function(){
         mobRemoveMiner(this.dataset.ip);
       };
-      row.appendChild(label); row.appendChild(rnBtn); row.appendChild(rmBtn);
+      var pgBtn=document.createElement('button');
+      pgBtn.style.cssText='background:transparent;border:1px solid var(--muted2);color:var(--muted);font-size:.68rem;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit';
+      pgBtn.textContent='🧹';
+      pgBtn.title='Purge this miner completely (history + server, stops ghost IPs)';
+      pgBtn.dataset.ip=ip;
+      pgBtn.onclick=function(){ mobPurgeMiner(this.dataset.ip); };
+      row.appendChild(label); row.appendChild(rnBtn); row.appendChild(pgBtn); row.appendChild(rmBtn);
       listCard.appendChild(row);
     });
   } else {
@@ -871,15 +999,32 @@ function renderAddMiner(){
       '<input type="checkbox" class="toggle" id="m-autofan-'+key+'" '+(autoFan?'checked':'')+
       ' onchange="settingsDirty=true;toggleFan(\''+key+'\',this.checked)"></div>'+
       '<div id="m-fanauto-'+key+'" style="display:'+(autoFan?'block':'none')+'">'+
-        '<div class="field-group"><label class="field-lbl">Target Temp (35–66°C)</label>'+
-        '<input class="field-input" type="number" id="m-temptgt-'+key+'" value="'+(d.temptarget||60)+'" min="35" max="66"></div>'+
-        '<div class="field-group"><label class="field-lbl">Min Fan Speed (0–99%)</label>'+
-        '<input class="field-input" type="number" id="m-minfan-'+key+'" oninput="settingsDirty=true" value="'+(d.minFanSpeed||35)+'" min="0" max="99"></div>'+
+        '<div class="field-group"><label class="field-lbl">Target Temp (°C)</label>'+
+        '<input class="field-input" type="number" id="m-temptgt-'+key+'" value="'+(d.temptarget!=null?d.temptarget:(d.pidTargetTemp!=null?d.pidTargetTemp:((Array.isArray(d.fans)&&d.fans[0]&&d.fans[0].pid&&d.fans[0].pid.targetTemp!=null)?d.fans[0].pid.targetTemp:60)))+'" min="20" max="90" oninput="settingsDirty=true"></div>'+
+        ((d.minFanSpeed!=null||d.minfanspeed!=null)?
+          '<div class="field-group"><label class="field-lbl">Min Fan Speed (0–99%)</label>'+
+          '<input class="field-input" type="number" id="m-minfan-'+key+'" oninput="settingsDirty=true" value="'+(d.minFanSpeed!=null?d.minFanSpeed:d.minfanspeed)+'" min="0" max="99"></div>'
+        :'')+
       '</div>'+
       '<div id="m-fanmanual-'+key+'" style="display:'+(autoFan?'none':'block')+'">'+
         '<div class="field-group"><label class="field-lbl">Manual Fan Speed (0–100%)</label>'+
         '<input class="field-input" type="number" id="m-fanspd-'+key+'" value="'+(d.fanspeed!=null?Math.round(d.fanspeed):100)+'" min="0" max="100" oninput=\'settingsDirty=true\'></div>'+
       '</div>'+
+      ((d.fanCount>1||(Array.isArray(d.fans)&&d.fans.length>1)) ?
+        '<div class="set-sec">VR Fan Control</div>'+
+        '<div class="field-group"><label class="field-lbl">VR Fan Mode</label>'+
+        '<select class="field-input" id="m-vrmode-'+key+'" onchange="settingsDirty=true;mVrToggle(\''+key+'\',this.value)">'+
+          (function(vm){var o='';[['Linked',3],['Manual',0],['Auto (PID)',2]].forEach(function(x){o+='<option value="'+x[1]+'"'+(x[1]===vm?' selected':'')+'>'+x[0]+'</option>';});return o;})((Array.isArray(d.fans)&&d.fans[1]&&d.fans[1].mode!=null)?d.fans[1].mode:3)+
+        '</select></div>'+
+        '<div id="m-vrmanual-'+key+'" style="display:'+(((Array.isArray(d.fans)&&d.fans[1]&&d.fans[1].mode)===0)?'block':'none')+'">'+
+          '<div class="field-group"><label class="field-lbl">VR Manual Fan Speed (0–100%)</label>'+
+          '<input class="field-input" type="number" id="m-vrfanspd-'+key+'" value="'+((Array.isArray(d.fans)&&d.fans[1]&&d.fans[1].manualSpeed!=null)?d.fans[1].manualSpeed:100)+'" min="0" max="100" oninput=\'settingsDirty=true\'></div>'+
+        '</div>'+
+        '<div id="m-vrpid-'+key+'" style="display:'+(((Array.isArray(d.fans)&&d.fans[1]&&d.fans[1].mode)===2)?'block':'none')+'">'+
+          '<div class="field-group"><label class="field-lbl">VR Target Temp (°C)</label>'+
+          '<input class="field-input" type="number" id="m-vrpidtgt-'+key+'" value="'+((Array.isArray(d.fans)&&d.fans[1]&&d.fans[1].pid&&d.fans[1].pid.targetTemp!=null)?d.fans[1].pid.targetTemp:65)+'" min="20" max="90" oninput=\'settingsDirty=true\'></div>'+
+        '</div>'
+      : '')+
       '<div class="btn-row">'+
         '<button class="btn-save" onclick="mSave(\''+ip+'\')">✓ Save</button>'+
         '<button class="btn-restart" onclick="mRestart(\''+ip+'\')">↻ Restart</button>'+
@@ -896,13 +1041,15 @@ function fmtHrMob(hr){
   if(hr>=1000) return (hr/1000).toFixed(3)+' TH/s';
   return parseFloat(hr).toFixed(2)+' GH/s';
 }
+var _mobCollapse={}; // remembers open/closed per bodyId across tab switches
 function mkCollapsible(title, color, contentEl, defaultOpen, bodyId, onTrash){
+  var isOpen=(bodyId&&_mobCollapse[bodyId]!==undefined)?_mobCollapse[bodyId]:defaultOpen;
   var wrap=document.createElement('div');
   wrap.style.cssText='border:1px solid var(--bdr);border-radius:8px;margin-bottom:8px;overflow:hidden';
   var hdr=document.createElement('div');
   hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;background:var(--surf2)';
   var caret=document.createElement('span');
-  caret.textContent=defaultOpen?'˅':'›';
+  caret.textContent=isOpen?'˅':'›';
   var ttl=document.createElement('span');
   ttl.style.cssText='font-size:.82rem;font-weight:700;color:'+color;
   ttl.textContent=title;
@@ -917,12 +1064,13 @@ function mkCollapsible(title, color, contentEl, defaultOpen, bodyId, onTrash){
   }
   var body=document.createElement('div');
   if(bodyId) body.id=bodyId;
-  body.style.cssText='padding:10px 14px;display:'+(defaultOpen?'block':'none');
+  body.style.cssText='padding:10px 14px;display:'+(isOpen?'block':'none');
   body.appendChild(contentEl);
   hdr.onclick=function(){
     var open=body.style.display!=='none';
     body.style.display=open?'none':'block';
     caret.textContent=open?'›':'˅';
+    if(bodyId) _mobCollapse[bodyId]=!open;
   };
   wrap.appendChild(hdr); wrap.appendChild(body);
   return wrap;
@@ -943,7 +1091,7 @@ function mkDiffList(entries, color, topN){
   entries.slice(0,topN).forEach(function(e,i){
     var row=document.createElement('div');
     row.style.cssText='display:flex;gap:6px;align-items:center;font-size:.78rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)';
-    var ts=e.ts?new Date(e.ts).toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit'}):'—';
+    var ts=e.ts?(new Date(e.ts).toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+new Date(e.ts).toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit'})):'—';
     var medal=i<3?MEDALS[i]:String(i+1);
     row.innerHTML='<span style="color:var(--muted);min-width:22px">'+medal+'</span>'+
       '<span style="color:'+color+';font-weight:600;flex:1">'+fmtD(e.found)+'</span>'+
@@ -954,7 +1102,7 @@ function mkDiffList(entries, color, topN){
   });
   return el;
 }
-function mkHrList(entries, color, topN){
+function mkHrList(entries, color, topN, minerIp, isAllTime){
   var el=document.createElement('div');
   if(!entries||!entries.length){
     el.innerHTML='<div style="color:var(--muted);font-size:.78rem;padding:4px 0">No data yet</div>';
@@ -968,11 +1116,27 @@ function mkHrList(entries, color, topN){
       var ec=p.err>2?'var(--red)':p.err>0.5?'#f7931a':'#4ade80';
       errStr='<span style="color:'+ec+'"> '+parseFloat(p.err).toFixed(2)+'%</span>';
     }
-    var ts=p.ts?new Date(p.ts).toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit'}):'—';
+    var ts=p.ts?(new Date(p.ts).toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+new Date(p.ts).toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit'})):'—';
     row.innerHTML='<span style="color:var(--muted);min-width:22px">'+(i+1)+'.</span>'+
       '<span style="color:'+color+';font-weight:600;flex:1">'+fmtHrMob(p.hr)+'</span>'+
       errStr+
       '<span style="color:var(--muted);font-size:.72rem;margin-left:auto">'+ts+'</span>';
+    if(isAllTime&&minerIp&&p.ts){
+      var delBtn=document.createElement('button');
+      delBtn.textContent='×';
+      delBtn.style.cssText='background:transparent;border:none;cursor:pointer;color:var(--muted);font-size:1rem;padding:0 4px;flex-shrink:0';
+      (function(cip,cts){
+        delBtn.onclick=function(){
+          // Remove from local hrAllTimeData
+          if(hrAllTimeData[cip]) hrAllTimeData[cip]=hrAllTimeData[cip].filter(function(x){return x.ts!==cts;});
+          // Tell server to delete it
+          fetch(SERVER+'/deletehrentry',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ip:cip,ts:cts})}).catch(function(){});
+          updateAllTimeContent();
+        };
+      })(minerIp, p.ts);
+      row.appendChild(delBtn);
+    }
     el.appendChild(row);
   });
   return el;
@@ -1122,13 +1286,44 @@ function renderAllTime(){
     if(!document.getElementById(cardId)){
       var card=document.createElement('div'); card.className='card'; card.id=cardId;
       var atDiffEl=mkDiffList([], color, mobAllTimeN);
-      card.appendChild(mkCollapsible('📋 Best Diffs — '+mname3, color, atDiffEl, true, 'at-diff-'+safeIp));
+      card.appendChild(mkCollapsible('📋 Best Diffs — '+mname3, color, atDiffEl, true, 'at-diff-'+safeIp,
+        (function(mip){ return function(){ mobClearAllTimeDiffs(mip); }; })(ip)));
       var atHrEl=mkHrList([], color, mobAllTimeN);
-      card.appendChild(mkCollapsible('⚡ HR Scores — '+mname3, color, atHrEl, false, 'at-hr-'+safeIp));
+      card.appendChild(mkCollapsible('⚡ HR Scores — '+mname3, color, atHrEl, false, 'at-hr-'+safeIp,
+        (function(mip){ return function(){ mobClearAllTimeHr(mip); }; })(ip)));
       c.appendChild(card);
     }
   });
   updateAllTimeContent();
+}
+// Clear ONE miner's all-time BEST DIFFS (keeps the miner + its HR scores + everything else).
+// Uses the /setdiffclear pipeline so the SERVER cache is cleared AND the desktop (which re-pushes
+// all-time diffs whenever a new share lands) clears its local copy too — otherwise it comes back.
+function mobClearAllTimeDiffs(ip){
+  if(!confirm('Clear all-time best difficulties for '+(getMinerName(ip)||ip)+'?')) return;
+  try{
+    var at=allTimeData.alltime||allTimeData;
+    if(at && at[ip]!==undefined){ delete at[ip]; }
+  }catch(e){}
+  try{
+    fetch(SERVER+'/setdiffclear',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ip:ip})}).catch(function(){});
+  }catch(e){}
+  var card=document.getElementById('at-card-'+ip.replace(/[^a-zA-Z0-9]/g,'_')); if(card) card.remove();
+  renderAllTime();
+}
+// Clear ONE miner's all-time HR high scores (keeps the miner + its best diffs + everything else).
+// Uses the /deletehrentry pipeline with ts:'all' so the SERVER cache is cleared AND the desktop
+// (which owns and re-pushes HR data) clears its local copy — otherwise it just gets re-pushed back.
+function mobClearAllTimeHr(ip){
+  if(!confirm('Clear all-time hashrate high scores for '+(getMinerName(ip)||ip)+'?')) return;
+  try{ if(hrAllTimeData && hrAllTimeData[ip]!==undefined){ delete hrAllTimeData[ip]; } }catch(e){}
+  try{
+    fetch(SERVER+'/deletehrentry',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ip:ip,ts:'all'})}).catch(function(){});
+  }catch(e){}
+  var card=document.getElementById('at-card-'+ip.replace(/[^a-zA-Z0-9]/g,'_')); if(card) card.remove();
+  renderAllTime();
 }
 function updateAllTimeContent(){
   updateTabButtons('alltime-topn-bar', mobAllTimeN);
@@ -1147,7 +1342,7 @@ function updateAllTimeContent(){
       diffBody.innerHTML=''; diffBody.appendChild(mkDiffList(entries, color, mobAllTimeN));
     }
     var atHrArr=hrAllTimeData[ip]?hrAllTimeData[ip].slice(0,mobAllTimeN):[];
-    updateCollapsibleContent('at-hr-'+safeIp, mkHrList(atHrArr, color, mobAllTimeN));
+    updateCollapsibleContent('at-hr-'+safeIp, mkHrList(atHrArr, color, mobAllTimeN, ip, true));
   });
 }
 
@@ -1284,8 +1479,15 @@ function renderSettings(){
     c.appendChild(sumCard);
   }
 
-  // Scripts button at top
+  // Dynamic Governor button (top of settings)
   if(_mobScView==='list'||_mobScView==='editor'){ renderMobScripts(); return; }
+  var govBtn=document.createElement('button');
+  govBtn.style.cssText='width:100%;background:var(--surf);border:1px solid var(--bdr);color:var(--txt);padding:14px 16px;border-radius:10px;text-align:left;display:flex;align-items:center;cursor:pointer;font-size:.85rem;margin-bottom:14px';
+  govBtn.innerHTML='⚙ <span style="flex:1;margin-left:8px">Dynamic Governor</span><span style="color:var(--muted);font-size:.75rem">'+(_mobGovEnabled?'ON':'OFF')+' ›</span>';
+  govBtn.onclick=function(){ renderMobGovernor(); };
+  c.appendChild(govBtn);
+
+  // Scripts button
   var scBtn=document.createElement('button');
   scBtn.style.cssText='width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);font-size:.85rem;font-weight:600;padding:11px 14px;border-radius:8px;cursor:pointer;text-align:left;margin-bottom:14px;display:flex;align-items:center;gap:8px';
   scBtn.innerHTML='📜 <span style="flex:1">Scripts</span><span style="color:var(--muted);font-size:.75rem">'+_mobSc.length+' saved ›</span>';
@@ -1301,6 +1503,13 @@ function renderSettings(){
     mobLoadReports().then(function(){ renderMobReports(); }).catch(function(){ renderMobReports(); });
   };
   c.appendChild(rpBtn);
+
+  // Last Hour Report button
+  var hrpBtn=document.createElement('button');
+  hrpBtn.style.cssText='width:100%;background:var(--surf);border:1px solid var(--bdr);color:var(--txt);padding:14px 16px;border-radius:10px;text-align:left;display:flex;align-items:center;cursor:pointer;font-size:.85rem;margin-bottom:14px';
+  hrpBtn.innerHTML='⏱ <span style="flex:1;margin-left:8px">Last Hour Report</span><span style="color:var(--muted);font-size:.75rem">rolling 60 min ›</span>';
+  hrpBtn.onclick=function(){ renderMobHourReport(); };
+  c.appendChild(hrpBtn);
 
   // Hash Rain toggle
   var hrCard=document.createElement('div');
@@ -1449,6 +1658,12 @@ function toggleFan(key, checked){
   document.getElementById('m-fanauto-'+key).style.display=checked?'block':'none';
   document.getElementById('m-fanmanual-'+key).style.display=checked?'none':'block';
 }
+function mVrToggle(key, val){
+  var d=document.getElementById('m-vrmanual-'+key);
+  if(d) d.style.display=(parseInt(val)===0)?'block':'none';
+  var p=document.getElementById('m-vrpid-'+key);
+  if(p) p.style.display=(parseInt(val)===2)?'block':'none';
+}
 
 async function mSave(ip){
   refreshPaused=true; // pause refresh during save so card doesn't get wiped
@@ -1492,6 +1707,24 @@ async function mSave(ip){
       fanBody={autofanspeed:1,temptarget:body.temptarget,minfanspeed:body.minfanspeed};
     } else {
       fanBody={manualFanSpeed:body.fanspeed,autofanspeed:0};
+    }
+    // VR (2nd) fan: include the fans[] array (write-shape), preserving each fan's pid/overheat.
+    var vrSel=document.getElementById('m-vrmode-'+key);
+    var dCur=minerData[ip]||{};
+    if(vrSel && Array.isArray(dCur.fans) && dCur.fans.length>1){
+      var wf=function(o){ return {mode:o.mode, manualSpeed:o.manualSpeed,
+        overheatTemp:(o.overheatTemp!=null?o.overheatTemp:90),
+        pid:o.pid?{targetTemp:o.pid.targetTemp,p:o.pid.p,i:o.pid.i,d:o.pid.d}:{targetTemp:60,p:6,i:0.1,d:10}}; };
+      var f0=wf(dCur.fans[0]), f1=wf(dCur.fans[1]);
+      f0.mode=autoFan?2:0;
+      if(!autoFan) f0.manualSpeed=body.fanspeed;
+      if(autoFan) f0.pid.targetTemp=body.temptarget;
+      f1.mode=parseInt(vrSel.value);
+      var vspd=document.getElementById('m-vrfanspd-'+key);
+      if(f1.mode===0 && vspd && !isNaN(parseInt(vspd.value))) f1.manualSpeed=parseInt(vspd.value);
+      var vpt=document.getElementById('m-vrpidtgt-'+key);
+      if(f1.mode===2 && vpt && !isNaN(parseInt(vpt.value)) && f1.pid) f1.pid.targetTemp=parseInt(vpt.value);
+      fanBody.fans=[f0,f1];
     }
     var r=await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(8000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(fanBody)}});
     if(r.ok){
@@ -1563,14 +1796,37 @@ function mobSetAutoRestart(ip, val){
 }
 
 var _lastNotifTs=0;
+function _mobNotifSync(){
+  var bar=document.getElementById('mob-notif-bar'), cnt=document.getElementById('mob-notif-count'), list=document.getElementById('mob-notif-list');
+  if(!list) return;
+  var n=list.children.length;
+  if(cnt) cnt.textContent=n;
+  if(bar) bar.classList.toggle('show', n>0);
+  if(n===0) list.classList.add('deck');
+}
+function _mobNotifToggle(){
+  var list=document.getElementById('mob-notif-list'); if(list) list.classList.toggle('deck');
+}
 function showMobNotif(title,msg,type,ts){
   var wrap=document.getElementById('mob-notif-wrap');
   if(!wrap){wrap=document.createElement('div');wrap.id='mob-notif-wrap';var tm=document.getElementById('tab-miners');if(tm)tm.insertBefore(wrap,tm.firstChild);}
+  // ensure deck structure (bar + list) exists inside wrap
+  var list=document.getElementById('mob-notif-list');
+  if(!list){
+    wrap.innerHTML='<div id="mob-notif-bar"><span id="mob-notif-count">0</span><button id="mob-notif-clear">Clear all</button></div><div id="mob-notif-list" class="deck"></div>';
+    list=document.getElementById('mob-notif-list');
+    document.getElementById('mob-notif-count').onclick=_mobNotifToggle;
+    document.getElementById('mob-notif-clear').onclick=function(e){e.stopPropagation();list.innerHTML='';_mobNotifSync();};
+  }
   var now2=new Date(ts||Date.now()); var hh2=now2.getHours()%12||12; var mm2=String(now2.getMinutes()).padStart(2,'0'); var ampm2=now2.getHours()>=12?'PM':'AM';
   var ts2=hh2+':'+mm2+' '+ampm2;
   var n=document.createElement('div');n.className='mob-notif '+(type||'warn');
-  n.innerHTML='<div class="mob-notif-body"><div class="mob-notif-title">'+title+' <span style="font-size:.75em;opacity:.55;font-weight:400">'+ts2+'</span></div><div class="mob-notif-msg">'+msg+'</div></div><button class="mob-notif-x" onclick="this.parentNode.remove()">✕</button>';
-  wrap.insertBefore(n,wrap.firstChild);
+  n.innerHTML='<div class="mob-notif-body"><div class="mob-notif-title">'+title+' <span style="font-size:.75em;opacity:.55;font-weight:400">'+ts2+'</span></div><div class="mob-notif-msg">'+msg+'</div></div><button class="mob-notif-x">✕</button>';
+  n.querySelector('.mob-notif-x').onclick=function(e){e.stopPropagation();n.remove();_mobNotifSync();};
+  n.addEventListener('click',function(){ _mobNotifToggle(); });
+  list.insertBefore(n,list.firstChild);  // newest on top of the deck
+  list.classList.add('deck');            // new notifications keep it collapsed
+  _mobNotifSync();
 }
 
 var _mobLastBlockTs=0;
@@ -1718,7 +1974,7 @@ var _mobScView = ''; // '' = miner settings, 'list' = scripts list, 'editor' = s
 var MOB_SC_FIELDS = ['hashrate','hashrate_1m','hashrate_10m','hashrate_1h','bestDiff','bestSessionDiff',
   'efficiency','asic1Temp','asic2Temp','asic3Temp','asic4Temp','asic5Temp','asic6Temp','asic7Temp','asic8Temp','vrTemp','fanRpm','fanMode','tempTarget','power','voltage','current',
   'poolConnected','rejectRate','staleRate','poolTarget','uptime','online','frequency',
-  'hourOfDay','minuteOfDay','autoRestarts'];
+  'timeOfDay','autoRestarts'];
 var MOB_SC_OPS = ['>','>=','<','<=','==','!=','between','outside','is_true','is_false'];
 var MOB_SC_ACTIONS = ['restart','setFrequency','setCoreVoltage','setFanSpeed','setAutoFan',
   'setTargetTemp','setOverclock','setPrimaryPool','switchFallbackPool',
@@ -1748,6 +2004,84 @@ function fmtDMob(v){
   if(v>=1e6)  return (v/1e6).toFixed(2)+'M';
   if(v>=1e3)  return (v/1e3).toFixed(2)+'K';
   return v.toFixed ? v.toFixed(2) : v;
+}
+
+
+var _mobHourCollapsed={};
+try{ var _mhcRaw=localStorage.getItem('mob_hour_collapsed'); if(_mhcRaw) _mobHourCollapsed=JSON.parse(_mhcRaw); }catch(e){}
+function toggleMobHourCard(ip,hkey){
+  _mobHourCollapsed[ip]=!_mobHourCollapsed[ip];
+  var b=document.getElementById('mhbody-'+hkey);
+  var c=document.getElementById('mhcar-'+hkey);
+  if(b) b.style.display=_mobHourCollapsed[ip]?'none':'block';
+  if(c) c.textContent=_mobHourCollapsed[ip]?'\u203a':'\u02c5';
+  try{ localStorage.setItem('mob_hour_collapsed',JSON.stringify(_mobHourCollapsed)); }catch(e){}
+}
+function renderMobHourReport(){
+  var sv=document.getElementById('settings-view')||document.getElementById('app');
+  var view=document.getElementById('mob-hour-view');
+  if(!view){
+    view=document.createElement('div');
+    view.id='mob-hour-view';
+    view.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;flex-direction:column;overflow:hidden';
+    document.body.appendChild(view);
+  }
+  view.innerHTML='';
+  view.style.display='flex';
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bdr)';
+  var back=document.createElement('button');
+  back.textContent='\u2039 Back';
+  back.style.cssText='background:transparent;border:1px solid var(--muted2);color:var(--muted);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:.8rem';
+  back.onclick=function(){ view.style.display='none'; if(activeTab==='settings') renderSettings(); };
+  var title=document.createElement('div');
+  title.style.cssText='font-size:1rem;font-weight:700;color:var(--txt)';
+  title.textContent='\u23f1 Last Hour Report';
+  var sub=document.createElement('div');
+  sub.style.cssText='font-size:.68rem;color:var(--muted);margin-left:auto';
+  sub.textContent='snapshot taken now';
+  hdr.appendChild(back); hdr.appendChild(title); hdr.appendChild(sub);
+  view.appendChild(hdr);
+  var body=document.createElement('div');
+  body.style.cssText='flex:1;overflow-y:auto;padding:16px;min-height:0';
+  view.appendChild(body);
+
+  function fmtHrS(v){ if(v==null)return '\u2014'; return v>=1000?(v/1000).toFixed(2)+' TH/s':v.toFixed(1)+' GH/s'; }
+  function fmtSecS(s){ if(s==null)return '\u2014'; if(s<60)return s.toFixed(1)+'s'; if(s<3600)return (s/60).toFixed(1)+'m'; return (s/3600).toFixed(1)+'h'; }
+  function rowH(label,val){ return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:.8rem"><span style="color:var(--muted)">'+label+'</span><span style="color:var(--txt);font-weight:600">'+val+'</span></div>'; }
+
+  var any=false;
+  minerIPs.forEach(function(ip){
+    var sd=sessionData[ip]||{};
+    var st=sd.hourStats;
+    var nm=getMinerName(ip)||ip;
+    var color=getMinerColor(ip)||'var(--accent)';
+    var card=document.createElement('div');
+    card.style.cssText='background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:14px;padding:14px 16px';
+    var hkey=ip.replace(/[^a-zA-Z0-9]/g,'_');
+    var hcoll=!!_mobHourCollapsed[ip];
+    var hd='<div onclick="toggleMobHourCard(\''+ip+'\',\''+hkey+'\')" style="font-size:.92rem;font-weight:700;color:'+color+';margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bdr);cursor:pointer;display:flex;align-items:center;gap:6px"><span id="mhcar-'+hkey+'" style="font-size:.8em;color:var(--muted)">'+(hcoll?'\u203a':'\u02c5')+'</span><span>\u25b8 '+nm+'</span></div>';
+    if(!st){ card.innerHTML=hd+'<div id="mhbody-'+hkey+'" style="display:'+(hcoll?'none':'block')+';color:var(--muted);font-size:.8rem">No data yet (needs the Windows app running and collecting).</div>'; body.appendChild(card); return; }
+    any=true;
+    var g='<div id="mhbody-'+hkey+'" style="display:'+(hcoll?'none':'block')+'"><div style="display:grid;grid-template-columns:1fr;gap:0">';
+    g+=rowH('ASIC temp (hi/lo)',(st.asicHi!=null?st.asicHi.toFixed(1):'\u2014')+' / '+(st.asicLo!=null?st.asicLo.toFixed(1):'\u2014')+' \u00b0C');
+    g+=rowH('VR temp (hi/lo)',(st.vrHi!=null?st.vrHi.toFixed(1):'\u2014')+' / '+(st.vrLo!=null?st.vrLo.toFixed(1):'\u2014')+' \u00b0C');
+    g+=rowH('Avg hashrate',fmtHrS(st.avgHr));
+    g+=rowH('Best diff',st.bestDiff!=null?fmtD(st.bestDiff):'\u2014');
+    g+=rowH('Amps (hi/lo)',(st.ampsHi!=null?st.ampsHi.toFixed(2):'\u2014')+' / '+(st.ampsLo!=null?st.ampsLo.toFixed(2):'\u2014')+' A');
+    g+=rowH('Avg efficiency',st.avgEff!=null?st.avgEff.toFixed(1)+' W/TH':'\u2014');
+    g+=rowH('Voltage',st.mv!=null?st.mv+' mV':'\u2014');
+    g+=rowH('Frequency',st.mhz!=null?st.mhz+' MHz':'\u2014');
+    g+=rowH('Fan (hi/lo)',(st.fanHi!=null?Math.round(st.fanHi):'\u2014')+' / '+(st.fanLo!=null?Math.round(st.fanLo):'\u2014')+' %');
+    g+=rowH('Avg error rate',st.avgErr!=null?st.avgErr.toFixed(2)+' %':'\u2014');
+    g+=rowH('Shares / rej',(st.shares!=null?st.shares:'\u2014')+' / '+(st.rej!=null?st.rej:'\u2014'));
+    g+=rowH('Avg share time',fmtSecS(st.avgShareSec));
+    g+='</div></div>';
+    card.innerHTML=hd+g;
+    body.appendChild(card);
+  });
+  if(!any && minerIPs.length){ body.innerHTML='<div style="color:var(--muted);text-align:center;padding:40px;font-size:.85rem">No last-hour data yet. The Windows app collects this and pushes it \u2014 give it a few minutes.</div>'; }
+  if(!minerIPs.length){ body.innerHTML='<div style="color:var(--muted);text-align:center;padding:40px">No miners.</div>'; }
 }
 
 function renderMobReports(){
@@ -1842,7 +2176,7 @@ function renderMobReports(){
       cardBody.style.cssText='display:none;padding:0 14px 14px;border-top:1px solid var(--bdr)';
 
       var tempStr=(r.lastTemps&&r.lastTemps.length)?r.lastTemps.map(function(t){
-        var tc=t.label==='VR'?(t.val>80?'var(--red)':t.val>70?'#f7931a':'var(--grn)'):(t.val>=70?'var(--red)':t.val>=65?'#f7931a':'var(--grn)');
+        var tc=(t.isVR||(t.label&&t.label.indexOf('VR')===0))?(t.val>80?'var(--red)':t.val>70?'#f7931a':'var(--grn)'):(t.val>=70?'var(--red)':t.val>=65?'#f7931a':'var(--grn)');
         return '<span style="color:'+tc+'">'+t.label+': '+t.val.toFixed(1)+'°</span>';
       }).join('  '):'—';
 
@@ -2187,12 +2521,12 @@ function mobMkCrow(cond,ci){
   var os=document.createElement('select'); os.className='mob-sc-sel'; os.style.width='80px';
   MOB_SC_OPS.forEach(function(op){var o=document.createElement('option');o.value=op;o.textContent=op;if(op===cond.op)o.selected=true;os.appendChild(o);});
   os.onchange=function(){cond.op=this.value;renderMobScripts();};
-  if(cond.field==='hourOfDay'||cond.field==='minuteOfDay'){
+  if(cond.field==='hourOfDay'||cond.field==='minuteOfDay'||cond.field==='timeOfDay'){
     var now2=new Date();
     var hh3=now2.getHours()%12||12; var mm3=String(now2.getMinutes()).padStart(2,'0'); var ap2=now2.getHours()>=12?'PM':'AM';
     var hint2=document.createElement('span');
     hint2.style.cssText='font-size:.68rem;color:var(--muted);white-space:nowrap';
-    hint2.textContent=cond.field==='hourOfDay'?'now='+now2.getHours()+'('+hh3+ap2+')':'now='+(now2.getHours()*60+now2.getMinutes())+'('+hh3+':'+mm3+' '+ap2+')';
+    hint2.textContent=cond.field==='timeOfDay'?('now='+String(now2.getHours()*100+now2.getMinutes()).padStart(4,'0')):cond.field==='hourOfDay'?'now='+now2.getHours()+'('+hh3+ap2+')':'now='+(now2.getHours()*60+now2.getMinutes())+'('+hh3+':'+mm3+' '+ap2+')';
     row.appendChild(hint2);
   }
   row.appendChild(fs); row.appendChild(os);
@@ -2483,13 +2817,69 @@ function updateFactCard(){
     comparison+
   '</div>';
 }
+function mobPurgeMiner(ip){
+  ip=(ip||'').trim(); if(!ip) return;
+  if(!confirm('Purge ALL data for '+ip+'?\nThis removes the miner and its history everywhere and cannot be undone.')) return;
+  // remove from the live list
+  var i=minerIPs.indexOf(ip); if(i>=0) minerIPs.splice(i,1);
+  // delete every in-memory IP-keyed store
+  ['sessionData','allTimeData','minerData','hrAllTimeData','_mobARState','_mobARTapTime',
+   '_mobGovLastSensors','_mobReports','_prevShares'].forEach(function(store){
+    try{ var s=window[store]; if(s && typeof s==='object' && s[ip]!==undefined) delete s[ip]; }catch(e){}
+  });
+  try{ if(_mobTempsOnly && _mobTempsOnly.has && _mobTempsOnly.has(ip)) _mobTempsOnly.delete(ip); }catch(e){}
+  try{ if(_mobGovernors && _mobGovernors[ip]){ delete _mobGovernors[ip]; localStorage.setItem('mob_governors_v1', JSON.stringify(_mobGovernors)); } }catch(e){}
+  try{ if(Array.isArray(_mobSc)){ var ch=false; _mobSc.forEach(function(s){ if(s && s.miners===ip){ s.miners='all'; ch=true; } }); if(ch) localStorage.setItem('mob_scripts', JSON.stringify(_mobSc)); } }catch(e){}
+  // persistent localStorage maps keyed by ip
+  ['mob_names','mob_colors','mob_tempsonly','mob_ar','mob_hour_collapsed'].forEach(function(lk){
+    try{ var raw=localStorage.getItem(lk); if(!raw) return; var o=JSON.parse(raw);
+      if(o && typeof o==='object'){
+        if(Array.isArray(o)){ var idx=o.indexOf(ip); if(idx>=0){ o.splice(idx,1); localStorage.setItem(lk, JSON.stringify(o)); } }
+        else if(o[ip]!==undefined){ delete o[ip]; localStorage.setItem(lk, JSON.stringify(o)); }
+      }
+    }catch(e){}
+  });
+  ['mob_govcard_open_','mob_mscard_open_'].forEach(function(pfx){ try{ localStorage.removeItem(pfx+ip); }catch(e){} });
+  try{ var raw=localStorage.getItem('mob_miner_order'); if(raw){ var o=JSON.parse(raw); if(Array.isArray(o)){ var j=o.indexOf(ip); if(j>=0){ o.splice(j,1); localStorage.setItem('mob_miner_order', JSON.stringify(o)); } } } }catch(e){}
+  // push cleaned stores to the SERVER so the desktop/server can't resurrect it
+  //  (the server rebuilds its miner list from all-time keys, so all-time MUST be cleaned there)
+  try{
+    fetch(SERVER+'/setminers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ips:minerIPs})}).catch(function(){});
+    fetch(SERVER+'/alltime',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(allTimeData)}).catch(function(){});
+    fetch(SERVER+'/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sessionData)}).catch(function(){});
+    if(typeof hrAllTimeData==='object') fetch(SERVER+'/hralltime',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(hrAllTimeData)}).catch(function(){});
+    if(typeof _mobReports==='object') fetch(SERVER+'/setreports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(_mobReports)}).catch(function(){});
+  }catch(e){}
+  minersBuilt=false;
+  manualRefresh();
+  try{ alert(ip+' purged. If it still lingers, restart the Windows server once to clear its memory.'); }catch(e){}
+}
 function mobRemoveMiner(ip){
   if(!confirm('Remove '+ip+'?')) return;
   var i=minerIPs.indexOf(ip);
-  if(i<0) return;
-  minerIPs.splice(i,1);
+  if(i>=0) minerIPs.splice(i,1);
   delete sessionData[ip];
   delete allTimeData[ip];
+  try{ if(typeof hrAllTimeData==='object') delete hrAllTimeData[ip]; }catch(e){}
+  try{ if(typeof minerData==='object') delete minerData[ip]; }catch(e){}
+  // Persist the removal to the SERVER, or it comes right back on the next refresh:
+  //  - /setminers overwrites the server's miner-IP list (now without this ip)
+  //  - /session and /alltime overwrite those stores (so the fallback can't revive it)
+  try{
+    fetch(SERVER+'/setminers',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ips:minerIPs})}).catch(function(){});
+    fetch(SERVER+'/session',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(sessionData)}).catch(function(){});
+    fetch(SERVER+'/alltime',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(allTimeData)}).catch(function(){});
+    if(typeof hrAllTimeData==='object'){
+      fetch(SERVER+'/hralltime',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(hrAllTimeData)}).catch(function(){});
+    }
+  }catch(e){}
+  // remove from any local order/name/color maps so it doesn't linger in the UI
+  try{ var raw=localStorage.getItem('mob_miner_order'); if(raw){ var o=JSON.parse(raw); if(Array.isArray(o)){ var j=o.indexOf(ip); if(j>=0){ o.splice(j,1); localStorage.setItem('mob_miner_order', JSON.stringify(o)); } } } }catch(e){}
+  minersBuilt=false;
   manualRefresh();
 }
 
@@ -2559,11 +2949,9 @@ function updateMinerData(){
     var sd2=sessionData[ip]||{};
     var temps=[];
     if(sd2.temps&&sd2.temps.length){
-      temps=sd2.temps.map(function(t){return {label:t.label,val:t.val,isVR:t.isVR||(t.label==='VR')};});
+      temps=sd2.temps.map(function(t){return {label:t.label,val:t.val,isVR:t.isVR||(t.label&&t.label.indexOf('VR')===0),kind:t.kind,idx:t.idx};});
     } else {
-      if(d.temp>0) temps.push({label:'ASIC 1',val:d.temp,isVR:false});
-      for(var ti=2;ti<=8;ti++){if(d['temp'+ti]>0) temps.push({label:'ASIC '+ti,val:d['temp'+ti],isVR:false});}
-      if(d.vrTemp>0) temps.push({label:'VR',val:d.vrTemp,isVR:true});
+      temps=buildTempsArray(d);
     }
     temps.forEach(function(t){
       var tc=tempColor(t.val,t.isVR);
@@ -2823,6 +3211,10 @@ async function doRefresh(){
         var eff2=sd2.efficiency!=null?sd2.efficiency:(sd2.power&&sd2.hashrate&&sd2.hashrate>0?sd2.power/sd2.hashrate*1000:null);
         effEl2.textContent=eff2!=null?eff2.toFixed(1)+' W/TH':'—';
       }
+      var pwrEl2=document.getElementById('sv-'+key+'-power');
+      if(pwrEl2){ pwrEl2.textContent=sd2.power!=null?sd2.power.toFixed(1)+' W':'—'; }
+      var ampEl2=document.getElementById('sv-'+key+'-amps');
+      if(ampEl2){ ampEl2.textContent=sd2.current!=null?sd2.current.toFixed(2)+' A':'—'; }
     }
   });
 
@@ -2840,6 +3232,288 @@ function setMobRefresh(ms){
   _mobRefreshTimer=setInterval(doRefresh, ms);
 }
 doRefresh();
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DYNAMIC GOVERNOR (mobile) — reader/editor; syncs with Windows via /governors
+// ═══════════════════════════════════════════════════════════════════════════════
+var _mobGovernors = {};
+var _mobGovEnabled = false;
+var _mobGovInteracting = false;
+var _mobGovInteractTimer = null;
+function _mobGovTouch(){ _mobGovInteracting=true; if(_mobGovInteractTimer) clearTimeout(_mobGovInteractTimer); _mobGovInteractTimer=setTimeout(function(){ _mobGovInteracting=false; },6000); }
+try{ var _mgRaw=localStorage.getItem('mob_governors_v1'); if(_mgRaw) _mobGovernors=JSON.parse(_mgRaw); }catch(e){}
+try{ _mobGovEnabled = (localStorage.getItem('mob_gov_enabled')==='1'); }catch(e){}
+function _saveMobGov(){
+  try{ localStorage.setItem('mob_governors_v1', JSON.stringify(_mobGovernors)); }catch(e){}
+  try{ localStorage.setItem('mob_gov_enabled', _mobGovEnabled?'1':'0'); }catch(e){}
+  // write to Windows (mobile -> Windows channel)
+  fetch(SERVER+'/setgovernors',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({enabled:_mobGovEnabled, data:_mobGovernors})}).catch(function(){});
+}
+function _mobGovList(ip){ return _mobGovernors[ip]||[]; }
+
+var MGOV_DEFS = {
+  allday:"Run this profile around the clock, no time window. A 24hr profile can\u2019t coexist with other enabled profiles on the same miner.",
+  window:"The hours this profile is active (24h HHMM, e.g. 2200 to 0600). Windows may wrap past midnight. No two profiles on the same miner may overlap.",
+  uptime:"How many minutes the miner must have been running before this profile makes any change. Prevents adjustments during warm-up after a (re)start.",
+  fanDown:"Step DOWN only when the fan is at or above this %. If the fan still has room to ramp, let it handle the heat first.",
+  fanUp:"Step UP only when the fan is at or below this %. If the fan is working hard, there is no real thermal headroom.",
+  asicMax:"If ASIC temp goes above this, step DOWN. Blank disables the hot side for ASIC.",
+  asicMin:"If ASIC temp drops below this, step UP (when both-ways on). Blank disables the cool side for ASIC.",
+  vrMax:"If VR temp goes above this, step DOWN. Blank disables the hot side for VR.",
+  vrMin:"If VR temp drops below this, step UP (when both-ways on). Blank disables the cool side for VR.",
+  ampsMax:"If total current draw (A) goes above this, step DOWN \u2014 protective, like a too-hot sensor (guards the PSU/connector). Blank disables the high side.",
+  ampsMin:"If total current draw (A) drops below this, step UP (when both-ways on). Blank disables the low side.",
+  priority:"When ASIC and VR disagree, which sensor wins. A 'too hot' from either always wins for safety.",
+  mhzStep:"MHz to change per adjustment. Blank leaves frequency alone.",
+  mvStep:"mV to change per adjustment. Blank leaves voltage alone.",
+  mhzFloor:"Never set frequency below this.",
+  mhzCeil:"Never set frequency above this.",
+  mvFloor:"Never set voltage below this.",
+  mvCeil:"Never set voltage above this. Keep within your safe limit.",
+  fanStep:"% to change the manual fan per adjustment. Fan moves OPPOSITE to MHz/mV: too hot raises it, too cool lowers it. Blank = don't control the fan. Setting this puts the fan in manual mode (auto/PID off).",
+  fanFloor:"Never set the fan below this %.",
+  fanCeil:"Never set the fan above this %. Usually 100.",
+  dwell:"Temps must stay out of band continuously for this many seconds before acting. Filters momentary spikes.",
+  settle:"After any adjustment, wait this many seconds before evaluating again.",
+  both:"ON = both ways (down hot, up cool). OFF = only step DOWN when hot. Same-direction steps repeat freely; reversing waits out the dwell.",
+  restart:"Restart the miner automatically after each adjustment. Some boards apply changes more reliably after a restart."
+};
+var _mgFieldCtr=0;
+function _mgField(label, defKey, inputHtml){
+  var fid='mgdef-'+defKey+'-'+(_mgFieldCtr++);
+  return '<div style="margin-bottom:10px">'+
+    '<div style="display:flex;align-items:center;gap:8px">'+
+      '<span onclick="_mobGovTouch();var e=document.getElementById(\''+fid+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\';this.textContent=e.style.display===\'none\'?\'\u25b8\':\'\u25be\';" style="cursor:pointer;color:var(--muted);font-size:.8rem;width:14px;flex-shrink:0">\u25b8</span>'+
+      '<label style="font-size:.8rem;color:var(--txt);flex:1">'+label+'</label>'+
+      inputHtml+
+    '</div>'+
+    '<div id="'+fid+'" style="display:none;font-size:.72rem;color:var(--muted);margin:4px 0 0 22px;line-height:1.45">'+MGOV_DEFS[defKey]+'</div>'+
+  '</div>';
+}
+function _mgInp(ip, pid, key, val, ph, w){
+  w=w||64;
+  return '<input type="text" value="'+(val!=null?val:'')+'" placeholder="'+(ph||'')+'" '+
+    'onchange="mobGovSet(\''+ip+'\',\''+pid+'\',\''+key+'\',this.value)" '+
+    'style="width:'+w+'px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:5px 7px;font-size:.8rem;font-family:inherit">';
+}
+
+function renderMobGovernor(){
+  var view=document.getElementById('mob-gov-view');
+  if(!view){
+    view=document.createElement('div'); view.id='mob-gov-view';
+    view.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;flex-direction:column;overflow:hidden';
+    document.body.appendChild(view);
+  }
+  view.innerHTML=''; view.style.display='flex'; _mgFieldCtr=0;
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bdr)';
+  var back=document.createElement('button');
+  back.textContent='\u2039 Back';
+  back.style.cssText='background:transparent;border:1px solid var(--muted2);color:var(--muted);padding:5px 12px;border-radius:6px;font-size:.8rem';
+  back.onclick=function(){ view.style.display='none'; if(activeTab==='settings') renderSettings(); };
+  var title=document.createElement('div'); title.style.cssText='font-size:1rem;font-weight:700;color:var(--txt)'; title.textContent='\u2699 Dynamic Governor';
+  hdr.appendChild(back); hdr.appendChild(title);
+  view.appendChild(hdr);
+  var body=document.createElement('div'); body.style.cssText='flex:1;overflow-y:auto;padding:16px;min-height:0';
+  view.appendChild(body);
+
+  // master toggle
+  var mt=document.createElement('div');
+  mt.style.cssText='display:flex;align-items:center;gap:10px;padding:12px 14px;margin-bottom:16px;background:var(--surf);border:1px solid '+(_mobGovEnabled?'var(--orange,#f7931a)':'var(--bdr)')+';border-radius:10px';
+  mt.innerHTML='<span style="font-size:.85rem;font-weight:700;color:var(--txt);flex:1">Governor system '+(_mobGovEnabled?'ON':'OFF')+'</span>'+
+    '<button id="mob-gov-master-tog" class="mob-sc-tog '+(_mobGovEnabled?'on':'off')+'" onclick="_mobGovEnabled=!_mobGovEnabled;_saveMobGov();renderMobGovernor();"></button>';
+  body.appendChild(mt);
+
+  if(!minerIPs.length){ var n=document.createElement('div'); n.style.cssText='color:var(--muted);text-align:center;padding:40px'; n.textContent='No miners.'; body.appendChild(n); return; }
+
+  minerIPs.forEach(function(ip){
+    var nm=getMinerName(ip)||ip; var color=getMinerColor(ip)||'var(--accent)';
+    var mc=document.createElement('div');
+    mc.style.cssText='background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;padding:14px';
+    var head='<div style="font-size:.92rem;font-weight:700;color:'+color+';margin-bottom:10px;display:flex;align-items:center;gap:8px"><span style="flex:1">'+nm+'</span><button onclick="mobGovAdd(\''+ip+'\')" style="background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);font-size:.74rem;padding:4px 10px;border-radius:6px">+ Add Profile</button></div>';
+    mc.innerHTML=head;
+    var profs=_mobGovList(ip);
+    if(!profs.length){ var e=document.createElement('div'); e.style.cssText='color:var(--muted);font-size:.78rem'; e.textContent='No profiles yet.'; mc.appendChild(e); }
+    profs.forEach(function(p){ mc.appendChild(_mobGovCard(ip,p)); });
+    body.appendChild(mc);
+  });
+}
+function _mobGovSensors(ip){
+  var sd=sessionData[ip]||{};
+  var temps=(sd.temps&&sd.temps.length)?sd.temps:null;
+  if(!temps){ var last=_mobGovLastSensors[ip]; if(last) return last; return [{kind:'asic',idx:0,label:'ASIC'}]; }
+  var sens=temps.map(function(t){ var k=t.kind||(t.isVR?'vr':((t.label&&t.label.indexOf('VR')===0)?'vr':'asic')); return {kind:k, idx:(t.idx!=null?t.idx:0), label:t.label}; });
+  _mobGovLastSensors[ip]=sens; return sens;
+}
+var _mobGovLastSensors={};
+
+// Persist each governor profile's expanded/collapsed state per profile id, in its own
+// localStorage key — independent of the synced governor data (which the 4s poll replaces
+// wholesale, wiping any in-memory flag). Same approach the Miner Settings cards use, so an
+// expanded profile stays expanded when you leave and come back. Falls back to p._open for a
+// freshly-added profile that has no saved key yet.
+function _mobGovCardOpen(p){
+  try{ var v=localStorage.getItem('mob_govcard_open_'+p.id); if(v!==null) return v==='1'; }catch(e){}
+  return !!p._open;
+}
+function _mobGovCardSetOpen(pid,o){ try{ localStorage.setItem('mob_govcard_open_'+pid,o?'1':'0'); }catch(e){} }
+// Clone the governors map without the UI-only `_open` flag, so change-detection compares
+// real governor data only. Open/closed state lives in localStorage now and must not make the
+// sync think data changed (or suppress a real change). Note: the push to Windows is left
+// untouched — desktop relies on `_open` traveling in the shared data, so we only strip it for
+// the local comparison here, never from what we send.
+function _mobGovStripOpen(g){
+  var out={};
+  try{ Object.keys(g||{}).forEach(function(ip){ out[ip]=(g[ip]||[]).map(function(p){ var q={}; for(var k in p){ if(k!=='_open') q[k]=p[k]; } return q; }); }); }catch(e){ return g; }
+  return out;
+}
+
+function _mobGovCard(ip,p){
+  var card=document.createElement('div');
+  card.style.cssText='border:1px solid var(--bdr);border-radius:8px;margin-bottom:10px;overflow:hidden';
+  var open=_mobGovCardOpen(p); p._open=open;
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surf2)';
+  hdr.innerHTML='<span style="color:var(--muted);font-size:.85rem">'+(open?'\u25be':'\u25b8')+'</span>'+
+    '<button class="mob-sc-tog '+(p.enabled?'on':'off')+'" data-govid="'+p.id+'" onclick="event.stopPropagation();mobGovToggleEnable(this,\''+ip+'\',\''+p.id+'\')"></button>'+
+    '<input type="text" value="'+(p.name||'')+'" placeholder="Profile name" onclick="event.stopPropagation()" onchange="mobGovSet(\''+ip+'\',\''+p.id+'\',\'name\',this.value)" style="background:transparent;border:none;color:var(--txt);font-size:.84rem;font-weight:600;flex:1;font-family:inherit">'+
+    '<span style="font-size:.7rem;color:var(--muted)">'+(p.allDay?'24hr':((p.startHHMM!=null?String(p.startHHMM).padStart(4,'0'):'----')+'\u2013'+(p.endHHMM!=null?String(p.endHHMM).padStart(4,'0'):'----')))+'</span>'+
+    '<button onclick="event.stopPropagation();mobGovDel(\''+ip+'\',\''+p.id+'\')" style="background:transparent;border:none;color:var(--muted);font-size:.9rem">\uD83D\uDDD1</button>';
+  var bd=document.createElement('div');
+  bd.style.cssText='padding:12px 14px;display:'+(open?'block':'none');
+  hdr.onclick=function(){ _mobGovTouch(); var o=bd.style.display!=='none'; bd.style.display=o?'none':'block'; hdr.firstChild.textContent=o?'\u25b8':'\u25be'; p._open=!o; _mobGovCardSetOpen(p.id,!o); };
+  var h='';
+  h+='<div style="font-size:.74rem;color:var(--muted);background:var(--surf2);border-left:3px solid var(--muted);border-radius:5px;padding:8px 10px;margin-bottom:12px;line-height:1.5">Tip: leave any field blank to skip it \u2014 only the values you fill in factor into governing.</div>';
+  h+=_mgField('24hr governance','allday','<button class="mob-sc-tog '+(p.allDay?'on':'off')+'" onclick="mobGovSet(\''+ip+'\',\''+p.id+'\',\'allDay\','+(p.allDay?'false':'true')+');renderMobGovernor();"></button>');
+  if(!p.allDay){
+    h+=_mgField('Time window','window',_mgInp(ip,p.id,'startHHMM',p.startHHMM,'e.g. 2200',74)+'<span style="color:var(--muted);margin:0 4px">to</span>'+_mgInp(ip,p.id,'endHHMM',p.endHHMM,'e.g. 0600',74));
+  }
+  h+=_mgField('Uptime gate (min)','uptime',_mgInp(ip,p.id,'uptimeMin',p.uptimeMin,'e.g. 10'));
+  h+=_mgField('Step-down fan min (%)','fanDown',_mgInp(ip,p.id,'fanStepDownMin',p.fanStepDownMin,'e.g. 100'));
+  h+=_mgField('Step-up fan max (%)','fanUp',_mgInp(ip,p.id,'fanStepUpMax',p.fanStepUpMax,'e.g. 15'));
+  p.asicBands=p.asicBands||[]; p.vrBands=p.vrBands||[];
+  _mobGovSensors(ip).forEach(function(sn){
+    var bands = sn.kind==='vr' ? p.vrBands : p.asicBands;
+    var b = bands[sn.idx]||(bands[sn.idx]={max:null,min:null});
+    var bkey = sn.kind+':'+sn.idx;
+    h+=_mgField(sn.label+' max \u00b0C', sn.kind==='vr'?'vrMax':'asicMax',
+      '<input type="text" value="'+(b.max!=null?b.max:'')+'" placeholder="e.g. 70" onchange="mobGovSetBand(\''+ip+'\',\''+p.id+'\',\''+bkey+'\',\'max\',this.value)" style="width:64px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:5px 7px;font-size:.8rem;font-family:inherit">');
+    h+=_mgField(sn.label+' min \u00b0C', sn.kind==='vr'?'vrMin':'asicMin',
+      '<input type="text" value="'+(b.min!=null?b.min:'')+'" placeholder="e.g. 60" onchange="mobGovSetBand(\''+ip+'\',\''+p.id+'\',\''+bkey+'\',\'min\',this.value)" style="width:64px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:5px 7px;font-size:.8rem;font-family:inherit">');
+  });
+  // Amps band (single scalar — total current draw in A; protective like temps)
+  p.ampsBand = p.ampsBand || {max:null,min:null};
+  h+=_mgField('Amps max (high)','ampsMax',
+    '<input type="text" value="'+(p.ampsBand.max!=null?p.ampsBand.max:'')+'" placeholder="e.g. 30" onchange="mobGovSetBand(\''+ip+'\',\''+p.id+'\',\'amps:0\',\'max\',this.value)" style="width:64px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:5px 7px;font-size:.8rem;font-family:inherit">');
+  h+=_mgField('Amps min (low)','ampsMin',
+    '<input type="text" value="'+(p.ampsBand.min!=null?p.ampsBand.min:'')+'" placeholder="e.g. 25" onchange="mobGovSetBand(\''+ip+'\',\''+p.id+'\',\'amps:0\',\'min\',this.value)" style="width:64px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:5px 7px;font-size:.8rem;font-family:inherit">');
+  
+  h+=_mgField('MHz step','mhzStep',_mgInp(ip,p.id,'mhzStep',p.mhzStep,'e.g. 10'));
+  h+=_mgField('mV step','mvStep',_mgInp(ip,p.id,'mvStep',p.mvStep,'e.g. 10'));
+  h+=_mgField('MHz floor','mhzFloor',_mgInp(ip,p.id,'mhzFloor',p.mhzFloor,'e.g. 400'));
+  h+=_mgField('MHz ceiling','mhzCeil',_mgInp(ip,p.id,'mhzCeil',p.mhzCeil,'e.g. 650'));
+  h+=_mgField('mV floor','mvFloor',_mgInp(ip,p.id,'mvFloor',p.mvFloor,'e.g. 1000'));
+  h+=_mgField('mV ceiling','mvCeil',_mgInp(ip,p.id,'mvCeil',p.mvCeil,'e.g. 1300'));
+  h+=_mgField('Fan step (%)','fanStep',_mgInp(ip,p.id,'fanStep',p.fanStep,'e.g. 5'));
+  h+=_mgField('Fan floor (%)','fanFloor',_mgInp(ip,p.id,'fanFloor',p.fanFloor,'e.g. 35'));
+  h+=_mgField('Fan ceiling (%)','fanCeil',_mgInp(ip,p.id,'fanCeil',p.fanCeil,'e.g. 100'));
+  h+=_mgField('Dwell time (sec)','dwell',_mgInp(ip,p.id,'dwellSec',p.dwellSec,'e.g. 120'));
+  h+=_mgField('Settle time (sec)','settle',_mgInp(ip,p.id,'settleSec',p.settleSec,'e.g. 30'));
+  h+=_mgField('Both directions','both','<button class="mob-sc-tog '+(p.bothWays?'on':'off')+'" onclick="mobGovSet(\''+ip+'\',\''+p.id+'\',\'bothWays\',!'+(p.bothWays?'true':'false')+');this.className=\'mob-sc-tog \'+((_mobGovList(\''+ip+'\').find(function(x){return x.id===\''+p.id+'\';})||{}).bothWays?\'on\':\'off\');"></button>');
+  h+=_mgField('Restart after adjust','restart','<button class="mob-sc-tog '+(p.restartAfter?'on':'off')+'" onclick="mobGovSet(\''+ip+'\',\''+p.id+'\',\'restartAfter\',!'+(p.restartAfter?'true':'false')+');this.className=\'mob-sc-tog \'+((_mobGovList(\''+ip+'\').find(function(x){return x.id===\''+p.id+'\';})||{}).restartAfter?\'on\':\'off\');"></button>');
+  bd.innerHTML=h;
+  card.appendChild(hdr); card.appendChild(bd);
+  return card;
+}
+function mobGovAdd(ip){
+  _mobGovernors[ip]=_mobGovernors[ip]||[];
+  _mobGovernors[ip].push({ id:'g'+Date.now()+Math.floor(Math.random()*1000), name:'New Profile',
+    enabled:false, startHHMM:null, endHHMM:null, uptimeMin:null, fanStepDownMin:null, fanStepUpMax:null,
+    asicBands:[], vrBands:[], ampsBand:{max:null,min:null}, priority:'asic', mhzStep:null, mvStep:null,
+    mhzFloor:null, mhzCeil:null, mvFloor:null, mvCeil:null, fanStep:null, fanFloor:null, fanCeil:null, dwellSec:null, settleSec:null,
+    bothWays:false, restartAfter:false, _open:true });
+  _saveMobGov(); renderMobGovernor();
+}
+function mobGovDel(ip,pid){ if(!_mobGovernors[ip]) return; _mobGovernors[ip]=_mobGovernors[ip].filter(function(p){return p.id!==pid;}); _saveMobGov(); renderMobGovernor(); }
+var MGOV_NUM={startHHMM:1,endHHMM:1,uptimeMin:1,fanStepDownMin:1,fanStepUpMax:1,mhzStep:1,mvStep:1,mhzFloor:1,mhzCeil:1,mvFloor:1,mvCeil:1,fanStep:1,fanFloor:1,fanCeil:1,dwellSec:1,settleSec:1};
+function mobGovToggleEnable(btn, ip, pid){
+  var list=_mobGovernors[ip]; if(!list) return;
+  var p=list.find(function(x){return x.id===pid;}); if(!p) return;
+  mobGovSet(ip, pid, 'enabled', !p.enabled);
+  // reflect the (possibly overlap-rejected) result on the switch without a full re-render
+  btn.className='mob-sc-tog '+(p.enabled?'on':'off');
+}
+function mobGovSetBand(ip,pid,bkey,which,val){
+  _mobGovTouch();
+  var list=_mobGovernors[ip]; if(!list) return;
+  var p=list.find(function(x){return x.id===pid;}); if(!p) return;
+  var parts=bkey.split(':'); var kind=parts[0], idx=parseInt(parts[1],10);
+  var v=(val===''||val==null)?null:parseFloat(val);
+  if(kind==='amps'){ p.ampsBand=p.ampsBand||{max:null,min:null}; p.ampsBand[which]=v; _saveMobGov(); return; }
+  var bands = kind==='vr' ? (p.vrBands=p.vrBands||[]) : (p.asicBands=p.asicBands||[]);
+  if(!bands[idx]) bands[idx]={max:null,min:null};
+  bands[idx][which]=v;
+  _saveMobGov();
+}
+function mobGovSet(ip,pid,key,val){
+  _mobGovTouch();
+  var list=_mobGovernors[ip]; if(!list) return;
+  var p=list.find(function(x){return x.id===pid;}); if(!p) return;
+  if(key==='enabled'||key==='bothWays'||key==='restartAfter'||key==='allDay'){ p[key]=!!val; }
+  else if(MGOV_NUM[key]){ p[key]=(val===''||val==null)?null:parseInt(val,10); }
+  else { p[key]=val; }
+  if(key==='startHHMM'||key==='endHHMM'||key==='enabled'){
+    var conflict=_mobGovOverlap(ip,p);
+    if(conflict){ showMobToast('\u26a0 Window overlaps "'+conflict+'"'); if(key==='enabled') p.enabled=false; }
+  }
+  _saveMobGov();
+  if(key==='startHHMM'||key==='endHHMM') renderMobGovernor();
+}
+function _mgHM(v){ if(v==null) return null; return Math.floor(v/100)*60+(v%100); }
+function _mobGovOverlap(ip,p){
+  if(!p.enabled) return null;
+  if(!p.allDay && (p.startHHMM==null||p.endHHMM==null)) return null;
+  function ranges(pp){ if(pp.allDay) return [[0,1440]]; var a=_mgHM(pp.startHHMM),b=_mgHM(pp.endHHMM); if(a===b) return []; if(a<b) return [[a,b]]; return [[a,1440],[0,b]]; }
+  var mine=ranges(p);
+  var others=(_mobGovernors[ip]||[]).filter(function(x){return x.id!==p.id&&x.enabled&&(x.allDay||(x.startHHMM!=null&&x.endHHMM!=null));});
+  for(var i=0;i<others.length;i++){ var o=ranges(others[i]);
+    for(var a=0;a<mine.length;a++) for(var b=0;b<o.length;b++){ if(mine[a][0]<o[b][1]&&o[b][0]<mine[a][1]) return others[i].name||'(unnamed)'; } }
+  return null;
+}
+// Read channel: poll Windows-pushed governor config every 4s
+setInterval(function(){
+  fetch(SERVER+'/governors',{signal:AbortSignal.timeout(3000)}).then(function(r){ return r.ok?r.json():null; }).then(function(d){
+    if(!d||typeof d!=='object') return;
+    var incoming=JSON.stringify(_mobGovStripOpen(d.data||{}));
+    if(incoming===JSON.stringify(_mobGovStripOpen(_mobGovernors)) && (!!d.enabled)===_mobGovEnabled) return;
+    if(d.data){ _mobGovernors=d.data; }
+    if(typeof d.enabled==='boolean'){ _mobGovEnabled=d.enabled; }
+    try{ localStorage.setItem('mob_governors_v1',JSON.stringify(_mobGovernors)); localStorage.setItem('mob_gov_enabled',_mobGovEnabled?'1':'0'); }catch(e){}
+    var v=document.getElementById('mob-gov-view');
+    if(!v || v.style.display!=='flex') return; // view closed: nothing to update visually
+    // Match the scripts pattern: update toggle switches IN PLACE (no DOM rebuild) so an
+    // open profile / dropdown is never collapsed by a background sync.
+    var mtog=document.getElementById('mob-gov-master-tog');
+    if(mtog) mtog.className='mob-sc-tog '+(_mobGovEnabled?'on':'off');
+    Object.keys(_mobGovernors).forEach(function(ip){
+      (_mobGovernors[ip]||[]).forEach(function(p){
+        var t=document.querySelector('[data-govid="'+p.id+'"]');
+        if(t) t.className='mob-sc-tog '+(p.enabled?'on':'off');
+      });
+    });
+    // A real data change arrived (24hr toggle, time window, numeric fields, etc.). Rebuild so
+    // those reflect on mobile too — matching how the master/enable toggles already sync both
+    // ways. The rebuild preserves each profile's open/closed state from localStorage, so an
+    // open profile stays open. Skip only while the user is actively editing a field or just
+    // interacted, so we never yank a value out from under them.
+    var ae=document.activeElement;
+    var editing = ae && v.contains(ae) && (ae.tagName==='INPUT'||ae.tagName==='SELECT'||ae.tagName==='TEXTAREA');
+    if(!editing && !_mobGovInteracting) renderMobGovernor();
+  }).catch(function(){});
+}, 4000);
+
 </script>
 <div id="mob-donate-overlay" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'"><div style="background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:20px;max-width:420px;width:92%;max-height:85vh;overflow-y:auto"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><h2 style="font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;color:#f7931a">💛 Support This Project</h2><button onclick="document.getElementById('mob-donate-overlay').style.display='none'" style="background:transparent;border:1px solid var(--muted2);color:var(--muted);font-family:inherit;font-size:.68rem;padding:4px 12px;border-radius:6px;cursor:pointer">✕</button></div><p style="font-size:.76rem;color:var(--muted);margin-bottom:14px;line-height:1.6">If this app has helped your mining operation, any donation is greatly appreciated. Tap any address to copy it.</p><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#f7931a;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BTC</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('bc1q7cddtk0leg6n7phpe8ershfx5ue6ksd2lgut0s').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">bc1q7cddtk0leg6n7phpe8ershfx5ue6ksd2lgut0s</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#8dc351;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BCH</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('qru9pw3v76wk8m4taac4670dmnlyk5c6kceu763rnm').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">qru9pw3v76wk8m4taac4670dmnlyk5c6kceu763rnm</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#627eea;font-weight:700;letter-spacing:.1em;margin-bottom:6px">ETH</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('0x8d89ad340A131429fE76bBeC547476e6a6Ae16db').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">0x8d89ad340A131429fE76bBeC547476e6a6Ae16db</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#bfbbbb;font-weight:700;letter-spacing:.1em;margin-bottom:6px">LTC</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('ltc1q4jeadmeunm397vqmuycxvpdhasvzatx7te5z2g').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">ltc1q4jeadmeunm397vqmuycxvpdhasvzatx7te5z2g</div></div><div style="background:var(--surf2);border-radius:8px;padding:12px 14px;margin-bottom:10px"><div style="font-size:.7rem;color:#f3ba2f;font-weight:700;letter-spacing:.1em;margin-bottom:6px">BNB</div><div style="font-size:.78rem;color:#e8f4ff;word-break:break-all;font-family:monospace" onclick="navigator.clipboard&&navigator.clipboard.writeText('0x8d89ad340A131429fE76bBeC547476e6a6Ae16db').then(function(){var e=document.getElementById('mob-donate-copied');e.textContent='Copied!';setTimeout(function(){e.textContent=''},2000)})">0x8d89ad340A131429fE76bBeC547476e6a6Ae16db</div></div><div id="mob-donate-copied" style="text-align:center;color:var(--grn);font-size:.8rem;min-height:18px;margin-top:6px"></div></div></div>
 <div id="mob-block-banner">

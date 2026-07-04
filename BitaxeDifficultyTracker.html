@@ -61,18 +61,19 @@ button.opt:hover{border-color:var(--txt);color:var(--txt)}
 button.opt.on{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,.08)}
 
 /* TOOLBAR */
-#toolbar{padding:5px 16px;border-bottom:1px solid var(--bdr);background:var(--surf);
-  display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0}
+#toolbar{padding:5px 12px;border-bottom:1px solid var(--bdr);background:var(--surf);
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0}
 .tlbl{font-size:.6rem;color:#e8f4ff;white-space:nowrap;letter-spacing:.07em;text-transform:uppercase}
 .btngrp{display:flex;gap:3px}
-.tbtn{border:1px solid var(--muted2);color:#e8f4ff;font-size:.62rem;padding:2px 8px;border-radius:3px}
+input::placeholder{color:var(--muted);opacity:.6}
+.tbtn{border:1px solid var(--muted2);color:#e8f4ff;font-size:.62rem;padding:2px 6px;border-radius:3px;white-space:nowrap}
 .tbtn:hover{border-color:#fff;color:#fff}
 .tbtn.on{border-color:var(--grn);color:var(--grn);background:rgba(34,211,122,.08)}
 .sep{width:1px;height:18px;background:var(--bdr);flex-shrink:0}
 
 /* CHART LAYOUT */
 #body{display:flex;flex:1;min-height:0}
-#side{width:220px;min-width:160px;max-width:600px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surf);overflow:hidden;font-size:var(--side-fs,13px)}
+#side{width:440px;min-width:160px;max-width:600px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surf);overflow:hidden;font-size:var(--side-fs,24px)}
 #cards{overflow-y:auto;flex:1;padding:8px 8px;scrollbar-width:thin;scrollbar-color:var(--bdr) transparent;display:block;width:100%}
 .mcard{background:var(--bg);border-radius:5px;padding:6px 8px 0 8px;margin-bottom:7px;border-left:3px solid var(--muted2);transition:border-color .4s;overflow:hidden;min-height:52px;display:flex;flex-direction:column;width:100%;box-sizing:border-box}
 .mcard.live{border-left-color:var(--clr,#f7931a)}.mcard.lerr{border-left-color:var(--red)}
@@ -195,9 +196,20 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
 .best-banner .lbl{color:#8ab4cc}
 .best-banner .val{font-weight:bold;font-size:1em;color:#f0f8ff}
 
-/* Restart notification toasts */
-#toast-container{position:fixed;bottom:16px;right:16px;z-index:9998;
-  display:flex;flex-direction:column;gap:8px;max-width:380px}
+/* Notification deck (collapsed = stacked cards; expanded = full list) */
+#toast-container{position:fixed;bottom:16px;right:16px;z-index:9998;max-width:380px}
+#toast-deckbar{display:none;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+#toast-deckbar.show{display:flex}
+#toast-count{background:var(--red);color:#fff;font-size:.7rem;font-weight:bold;border-radius:10px;padding:1px 8px;min-width:20px;text-align:center}
+#toast-clearall{background:var(--surf2);border:1px solid var(--bdr);color:var(--muted);cursor:pointer;font-size:.7rem;border-radius:6px;padding:3px 9px;font-family:inherit}
+#toast-clearall:hover{color:var(--red);border-color:var(--red)}
+#toast-list{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 130px);overflow-y:auto;overflow-x:visible}
+/* collapsed: cards overlap into a deck, only top fully visible, edges peek */
+#toast-list.deck{gap:0;overflow:visible}
+#toast-list.deck .toast{margin-top:-44px;cursor:pointer;transition:margin .15s ease}
+#toast-list.deck .toast:first-child{margin-top:0}
+#toast-list.deck .toast .toast-body{max-height:1.4em;overflow:hidden}
+#toast-list.deck .toast-close{display:none}
 .toast{background:var(--surf2);border:1px solid var(--bdr);border-radius:7px;
   padding:10px 14px;font-size:.75rem;color:var(--txt);
   box-shadow:0 4px 20px rgba(0,0,0,.5);display:flex;align-items:flex-start;gap:10px;
@@ -227,6 +239,7 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
 .sdrop-sep{height:1px;background:var(--bdr);margin:4px 0}
 
 .sc-card.drag-over{border:1px dashed var(--orange);background:rgba(247,147,26,0.08);}
+.mcard.drag-over{outline:2px dashed var(--orange);outline-offset:-2px;background:rgba(247,147,26,0.06);}
 .sc-card{background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px}
 .sc-name{font-weight:600;font-size:.9rem;color:var(--txt)}
 .sc-sub{font-size:.73rem;color:var(--muted);margin-top:2px}
@@ -261,6 +274,7 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
     
     <div class="chip">TARGET: <b id="h-target">—</b></div>
     <span id="pause-badge">⏸ PAUSED</span>
+    <button id="btn-purgeminer" onclick="purgeMinerData()" style="background:transparent;border:1px solid var(--muted2);color:var(--muted);font-family:inherit;font-size:.65rem;padding:3px 12px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .18s" title="Completely remove a miner's stored data (history, ghost IPs) from app and server">🧹 Purge Miner</button>
     <button id="btn-shutdown" style="background:transparent;border:1px solid var(--red);color:var(--red);font-family:inherit;font-size:.65rem;padding:3px 12px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .18s" title="Shut down server and close">⏻ Close App</button>
   </div>
 </div>
@@ -298,6 +312,20 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
     <button class="tbtn" id="btn-lin">Linear</button>
   </div>
   <div class="sep"></div>
+  <div id="mindiff-dd" style="position:relative;display:inline-block">
+    <button class="tbtn" id="btn-mindiff" title="Minimum-difficulty filters">Min Diff &#9662;</button>
+    <div id="mindiff-pop" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:60;background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.45);white-space:nowrap">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span class="tlbl" style="width:38px;text-align:right">Chart</span>
+        <input id="diff-filter" type="text" inputmode="numeric" placeholder="off" style="width:80px;background:var(--surf);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:4px 8px;font-size:.8rem;font-family:inherit" title="Only show shares at or above this difficulty (e.g. 4100). Removes low points and rescales the chart. Supports k/M/G/T suffixes.">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="tlbl" style="width:38px;text-align:right">Dot</span>
+        <input id="dot-filter" type="text" inputmode="numeric" placeholder="off" style="width:80px;background:var(--surf);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:4px 8px;font-size:.8rem;font-family:inherit" title="Only place a dot on accepted shares at or above this difficulty (e.g. 4000). Markers only - the line and chart scale are unchanged. Supports k/M/G/T suffixes.">
+      </div>
+    </div>
+  </div>
+  <div class="sep"></div>
   <span class="tlbl">Chart:</span>
   <div class="btngrp">
     <button class="tbtn on" id="btn-mode-diff">Difficulty</button>
@@ -326,8 +354,10 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
   <button class="tbtn" id="btn-settings">⚙ Settings</button>
   <button class="tbtn" id="btn-pool">⛁ Pool</button>
   <button class="tbtn" onclick="openScriptsPanel()">📜 Scripts</button>
+  <button class="tbtn" onclick="openGovernorPanel()">⚙ Governor</button>
   <button class="tbtn" onclick="openReportsPanel()">📋 Reports</button>
-  <div id="stats-dropdown-wrap"><button class="tbtn on" id="btn-toggletemps">📊 Stats ▾</button><div id="stats-dropdown-menu"><div class="sdrop-item"><input type="checkbox" id="sdrop-best" checked><label for="sdrop-best">Best Difficulty</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-status" checked><label for="sdrop-status">Status / Uptime</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-stats" checked><label for="sdrop-stats">Shares / Rejected / Last</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-temps" checked><label for="sdrop-temps">Temperatures</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-top10" checked><label for="sdrop-top10">Top Diffs List</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-log" checked onchange="statsVis.log=this.checked;saveStatsVis();var s=document.getElementById('slog');if(s)s.style.display=this.checked?'block':'none';" ><label for="sdrop-log">Live Log</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-disco" onchange="toggleDiscoMode(this.checked)"><label for="sdrop-disco">🪩 Disco Mode</label></div></div></div>
+  <button class="tbtn" onclick="openHourReport()">⏱ Last Hour</button>
+  <div id="stats-dropdown-wrap"><button class="tbtn on" id="btn-toggletemps">📊 Stats ▾</button><div id="stats-dropdown-menu"><div class="sdrop-item"><input type="checkbox" id="sdrop-best" checked><label for="sdrop-best">Best Difficulty</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-status" checked><label for="sdrop-status">Status / Uptime</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-stats" checked><label for="sdrop-stats">Shares / Rejected / Last</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-temps" checked><label for="sdrop-temps">Temperatures</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-power" checked onchange="statsVis.power=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-power">Power (W)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-amps" checked onchange="statsVis.amps=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-amps">Amps (A)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-volt" checked onchange="statsVis.volt=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-volt">Voltage (mV)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-freq" checked onchange="statsVis.freq=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-freq">Frequency (MHz)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-asics" checked onchange="statsVis.asics=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-asics">Per-ASIC HR/Err</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-top10" checked><label for="sdrop-top10">Top Diffs List</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-log" checked onchange="statsVis.log=this.checked;saveStatsVis();var s=document.getElementById('slog');if(s)s.style.display=this.checked?'block':'none';" ><label for="sdrop-log">Live Log</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-disco" onchange="toggleDiscoMode(this.checked)"><label for="sdrop-disco">🪩 Disco Mode</label></div></div></div>
 </div>
 
 <div id="body">
@@ -375,6 +405,24 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
     <button onclick="closeReportsPanel()" style="margin-left:auto;background:transparent;border:1px solid var(--muted2);color:var(--muted);padding:4px 14px;border-radius:6px;cursor:pointer">✕ Close</button>
   </div>
   <div id="reports-content" style="flex:1;overflow-y:auto;padding:20px;min-height:0;display:block"></div>
+</div>
+
+<div id="hour-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:300;flex-direction:column">
+  <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--bdr);gap:12px">
+    <h2 style="margin:0;font-size:1.1rem;color:var(--txt)">⏱ Last Hour Report</h2>
+    <span style="font-size:.72rem;color:var(--muted)">rolling 60 min · snapshot taken now</span>
+    <button onclick="document.getElementById('hour-overlay').style.display='none'" style="margin-left:auto;background:transparent;border:1px solid var(--muted2);color:var(--muted);padding:4px 14px;border-radius:6px;cursor:pointer">✕ Close</button>
+  </div>
+  <div id="hour-content" style="flex:1;overflow-y:auto;padding:20px;min-height:0;display:block"></div>
+</div>
+
+<div id="governor-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:300;flex-direction:column">
+  <div style="display:flex;align-items:center;padding:14px 20px;border-bottom:1px solid var(--bdr);gap:12px">
+    <h2 style="margin:0;font-size:1.1rem;color:var(--txt)">⚙ Dynamic Governor</h2>
+    <span style="font-size:.72rem;color:var(--muted)">auto-tune MHz/mV to hold a temp band, per time-window profile</span>
+    <button onclick="document.getElementById('governor-overlay').style.display='none'" style="margin-left:auto;background:transparent;border:1px solid var(--muted2);color:var(--muted);padding:4px 14px;border-radius:6px;cursor:pointer">✕ Close</button>
+  </div>
+  <div id="governor-content" style="flex:1;overflow-y:auto;padding:18px;min-height:0"></div>
 </div>
 
 <div id="tooltip"></div>
@@ -445,25 +493,39 @@ const SERVER = window.location.protocol + "//" + window.location.host;
 // ═══════════════════════════════════════════════════════════════════════════════
 // Multiple regex patterns to catch different firmware log formats
 // Pattern 1: Standard Bitaxe/AxeOS:  "diff 512.3 of 256"
-const DIFF_RE   = /diff[:\s]+([\d.]+)\s+of\s+([\d.]+)/i;
-const POOLDIFF_RE = /(?:stratum\s+)?difficulty\s+(?:set\s+to|changed\s+to|:)\s*([\d.]+)/i;
+const DIFF_RE   = /diff[:\s]+([\d.]+[kKmMgGtT]?)\s+of\s+([\d.]+[kKmMgGtT]?)/i;
+const POOLDIFF_RE = /(?:stratum\s+)?difficulty\s+(?:set\s+to|changed\s+to|:)\s*([\d.]+[kKmMgGtT]?)/i;
 const BLOCK_RE  = /block\s*found/i;
 // Pattern 1b: NerdQaxe++ slash format: "diff 8999.3/8192/284M"
-const DIFF_RE1B = /diff\s+([\d.]+)\/([\d.]+)/i;
+const DIFF_RE1B = /diff\s+([\d.]+[kKmMgGtT]?)\/([\d.]+[kKmMgGtT]?)/i;
 // Pattern 2: NerdQaxe++ style:       "Diff: 512.3 (of 256)" or "share diff: X / pool diff: Y"  
-const DIFF_RE2  = /(?:share\s+diff|difficulty)[:\s]+([\d.]+)[^\d]+(?:pool\s+diff|target|of)[:\s\/]+([\d.]+)/i;
+const DIFF_RE2  = /(?:share\s+diff|difficulty)[:\s]+([\d.]+[kKmMgGtT]?)[^\d]+(?:pool\s+diff|target|of)[:\s\/]+([\d.]+[kKmMgGtT]?)/i;
 // Pattern 3: Generic fallback:       any two numbers near "diff"
-const DIFF_RE3  = /([\d.]+)\s*\/\s*([\d.]+).*diff/i;
+const DIFF_RE3  = /([\d.]+[kKmMgGtT]?)\s*\/\s*([\d.]+[kKmMgGtT]?).*diff/i;
+
+// Parse a difficulty token that may carry a K/M/G/T suffix (e.g. "2.0M" -> 2000000)
+function parseDiffToken(tok){
+  if(tok==null) return NaN;
+  var s=String(tok).trim();
+  var last=s.slice(-1).toLowerCase();
+  var mult=1;
+  if(last==='k'){mult=1e3;s=s.slice(0,-1);}
+  else if(last==='m'){mult=1e6;s=s.slice(0,-1);}
+  else if(last==='g'){mult=1e9;s=s.slice(0,-1);}
+  else if(last==='t'){mult=1e12;s=s.slice(0,-1);}
+  var n=parseFloat(s);
+  return isFinite(n)?n*mult:NaN;
+}
 
 function parseDiffLine(line){
   let m = DIFF_RE.exec(line);
-  if(m) return {found:parseFloat(m[1]), target:parseFloat(m[2])};
+  if(m) return {found:parseDiffToken(m[1]), target:parseDiffToken(m[2])};
   m = DIFF_RE1B.exec(line);
-  if(m) return {found:parseFloat(m[1]), target:parseFloat(m[2])};
+  if(m) return {found:parseDiffToken(m[1]), target:parseDiffToken(m[2])};
   m = DIFF_RE2.exec(line);
-  if(m) return {found:parseFloat(m[1]), target:parseFloat(m[2])};
+  if(m) return {found:parseDiffToken(m[1]), target:parseDiffToken(m[2])};
   m = DIFF_RE3.exec(line);
-  if(m) return {found:parseFloat(m[1]), target:parseFloat(m[2])};
+  if(m) return {found:parseDiffToken(m[1]), target:parseDiffToken(m[2])};
   return null;
 }
 // Strip ANSI escape codes from log lines before parsing
@@ -480,12 +542,29 @@ let viewMs    = 60000;  // window width in ms (24h default)
 let paused    = false;
 let panelEnd  = null;      // null = live (use latest ts), else fixed ms timestamp
 let logScale  = true;
+let diffFilterMin = 0; // min difficulty filter for chart (0=off)
+let dotFilterMin  = 0; // min difficulty to draw an accepted-share dot (0=off); markers only, does not rescale or filter the line
 let topN      = 10;
 let chartMode = 'diff'; // 'diff' or 'hash' // how many best scores to show
 let layout    = 'combined'; // 'combined' | 'split' | 'both'
 
 // Per-panel vScale
 const panelVScale = {};    // panelId -> 0..1
+// Per-panel HASHRATE vertical zoom (0..100). Higher = wider Y-axis = line shrinks
+// into a band, so a big stable miner (e.g. Nexus) can be made to look like the others.
+const hashVScale = {};
+try{ var _hvsSaved=JSON.parse(localStorage.getItem('bitaxe_hashvscale')||'{}'); if(_hvsSaved&&typeof _hvsSaved==='object') Object.assign(hashVScale,_hvsSaved); }catch(e){}
+function setHashVScale(id, v){
+  hashVScale[id]=parseInt(v)||0;
+  var lbl=document.getElementById('vval-'+id); if(lbl) lbl.textContent=hashVScale[id]+'%';
+  try{ localStorage.setItem('bitaxe_hashvscale', JSON.stringify(hashVScale)); }catch(e){}
+  try{
+    if(typeof redrawHash==='function'){ redrawHash(); }
+    else if(typeof panels!=='undefined' && typeof drawHashPanel==='function'){
+      panels.forEach(function(p){ if(p&&p.id===id) drawHashPanel(p); });
+    }
+  }catch(e){}
+}
 
 // Hit targets for tooltip
 let hitTargets = [];
@@ -554,11 +633,11 @@ function setDot(id,cls){ const d=document.getElementById('dot-'+id); if(d) d.cla
 
 function renderCards(){
   const el=document.getElementById('cards'); el.innerHTML='';
-  Object.values(miners).forEach(m=>{
+  orderedMiners().forEach(m=>{
     const d=document.createElement('div');
     d.className='mcard'+(m.status==='Live'?' live':m.status==='Error'?' lerr':'');
     d.style.setProperty('--clr',m.color); d.id='card-'+m.id;
-    d.innerHTML=`<div class="mcip" id="mcip-${m.id}" style="color:${m.color};margin-bottom:5px;font-size:1.05em">${(m.name&&m.name.trim())?m.name:(m.ip||'—')}</div>
+    d.innerHTML=`<div class="mcip" id="mcip-${m.id}" draggable="true" title="Drag to reorder" style="cursor:grab;color:${m.color};margin-bottom:5px;font-size:1.05em">${(m.name&&m.name.trim())?m.name:(m.ip||'—')}</div>
     <div class="best-banner">
       <div><span class="lbl">All-time best: </span><span class="val" id="cb-at-${m.id}" style="color:${m.color}">—</span></div>
       <div><span class="lbl">Session best:  </span><span class="val" id="cb-ss-${m.id}" style="color:var(--grn)">—</span></div>
@@ -571,27 +650,91 @@ function renderCards(){
         Shares:<span class="mg" id="cs-${m.id}"> —</span><br>
         <div style="display:flex;align-items:baseline;gap:0;white-space:nowrap">Rej:<span class="mr" id="cr-${m.id}"> —</span><span id="crpct-${m.id}" style="font-size:.75em;color:#8ab4cc;margin-left:3px"></span></div>
         <div style="display:flex;align-items:baseline;white-space:nowrap">HR:<span class="mg" id="chr-${m.id}"> —</span></div>
-        <div style="display:flex;align-items:baseline;white-space:nowrap;font-size:.8em;color:var(--muted)">Err:<span id="cerr-${m.id}" style="margin-left:2px;color:var(--red)"> —</span></div>
+        <div style="display:flex;align-items:baseline;white-space:nowrap;font-size:.8em;color:var(--muted)">Err:<span id="cerr-${m.id}" style="margin-left:2px;color:var(--red)"> —</span></div><div id="row-volt-${m.id}" style="display:flex;align-items:baseline;white-space:nowrap">Voltage:<span class="mg" id="cvolt-${m.id}"> —</span></div><div id="row-freq-${m.id}" style="display:flex;align-items:baseline;white-space:nowrap">Freq:<span class="mg" id="cfreq-${m.id}"> —</span></div>
       </div>
       <div style="width:1px;background:var(--bdr);flex-shrink:0"></div>
       <div style="min-width:0;color:var(--muted);line-height:1.95;padding-left:18px">
         Avg/share:<span class="mg" id="cavg-${m.id}"> —</span><br>
         Target:<span class="mg" id="cp-${m.id}"> —</span><br>
         Last:<span class="mg" id="cl-${m.id}"> —</span><br>
-        Eff:<span class="mg" id="ce-${m.id}"> —</span>
+        Eff:<span class="mg" id="ce-${m.id}"> —</span><span id="row-pwr-${m.id}"><br>Power:<span class="mg" id="cpwr-${m.id}"> —</span></span><span id="row-amp-${m.id}"><br>Amps:<span class="mg" id="camp-${m.id}"> —</span></span>
       </div>
     </div>
     <div id="temps-${m.id}" style="font-size:.8em;line-height:1.9;margin:5px 0 4px 0"></div>
+    <div id="asics-${m.id}" style="font-size:.62em;line-height:1.5;margin:2px 0 4px 0"></div>
     <div style="font-size:.8em;color:#8ab4cc;letter-spacing:.1em;text-transform:uppercase;margin:3px 0 4px 0">Top Diffs</div>
     <div id="top10-${m.id}" style="font-size:.95em;line-height:1;width:100%"></div>
     <div class="mcard-resize" id="mcr-${m.id}" title="Drag to resize">⠿</div>`;
     el.appendChild(d);
   });
+  wireCardDrag();
+}
+
+// ── Manual miner reordering (drag a card's name row) — per-device, persisted ──
+// NOTE: miner ids are integers, and JS iterates integer object keys in NUMERIC order
+// regardless of insertion order — so reordering the object can never work. Instead we keep
+// an explicit saved key list and sort by it at render time via orderedMiners().
+var _cardDragId=null, _dragging=false;
+function _minerKey(m){ return m.ip||('__id'+m.id); }
+function _loadOrderKeys(){
+  try{ var raw=localStorage.getItem('bitaxe_miner_order'); if(raw){ var o=JSON.parse(raw); if(Array.isArray(o)) return o; } }catch(e){}
+  return [];
+}
+function orderedMiners(){
+  var arr=Object.values(miners);
+  var order=_loadOrderKeys();
+  if(!order.length) return arr;
+  return arr.slice().sort(function(a,b){
+    var ia=order.indexOf(_minerKey(a)); if(ia<0)ia=9999;
+    var ib=order.indexOf(_minerKey(b)); if(ib<0)ib=9999;
+    return ia-ib;
+  });
+}
+function saveMinerOrder(){
+  try{ localStorage.setItem('bitaxe_miner_order', JSON.stringify(orderedMiners().map(_minerKey))); }catch(e){}
+}
+function applyMinerOrder(){ /* order is applied at render via orderedMiners(); nothing to mutate */ }
+function reorderMiners(fromId,toId){
+  var fromM=miners[fromId], toM=miners[toId]; if(!fromM||!toM) return;
+  var keys=orderedMiners().map(_minerKey);
+  var fi=keys.indexOf(_minerKey(fromM)), ti=keys.indexOf(_minerKey(toM));
+  if(fi<0||ti<0||fi===ti) return;
+  keys.splice(ti,0,keys.splice(fi,1)[0]);
+  try{ localStorage.setItem('bitaxe_miner_order', JSON.stringify(keys)); }catch(e){}
+  renderCards(); buildPanels(); renderMinerList(); markDirty();
+}
+// Wired ONCE on the container (delegation) so rebuilt cards never lose their drop ability.
+function wireCardDrag(){
+  var container=document.getElementById('cards'); if(!container||container._dragWired) return;
+  container._dragWired=true;
+  container.addEventListener('dragstart',function(e){
+    var h=e.target.closest&&e.target.closest('.mcip'); if(!h) return;
+    var card=h.closest('.mcard'); if(!card) return;
+    _cardDragId=card.id.replace('card-',''); _dragging=true;
+    e.dataTransfer.effectAllowed='move'; try{e.dataTransfer.setData('text/plain',_cardDragId);}catch(_){}
+    setTimeout(function(){card.style.opacity='0.4';},0);
+  });
+  container.addEventListener('dragover',function(e){
+    if(_cardDragId==null) return; e.preventDefault(); e.dataTransfer.dropEffect='move';
+    var card=e.target.closest&&e.target.closest('.mcard');
+    container.querySelectorAll('.mcard').forEach(function(c){ c.classList.toggle('drag-over', !!card && c===card && c.id!=='card-'+_cardDragId); });
+  });
+  container.addEventListener('drop',function(e){
+    if(_cardDragId==null) return; e.preventDefault();
+    var card=e.target.closest&&e.target.closest('.mcard');
+    var from=_cardDragId; _cardDragId=null; _dragging=false;
+    container.querySelectorAll('.mcard').forEach(function(c){ c.classList.remove('drag-over'); c.style.opacity='1'; });
+    if(card){ var toId=card.id.replace('card-',''); if(toId!==from) reorderMiners(from,toId); }
+  });
+  container.addEventListener('dragend',function(){
+    _dragging=false; _cardDragId=null;
+    container.querySelectorAll('.mcard').forEach(function(c){ c.style.opacity='1'; c.classList.remove('drag-over'); });
+  });
 }
 
 function updateCardStats(m){
   const card=document.getElementById('card-'+m.id);
-  if(!card){ renderCards(); return; }
+  if(!card){ if(_dragging) return; renderCards(); return; }
   // Stall detection: if Live but no chart data for 60s, show as stalled
   var _stalled = m.status==='Live' && ((m.lastFoundTs&&(Date.now()-m.lastFoundTs>30000))||(!m.lastFoundTs&&m.connectedAt&&(Date.now()-m.connectedAt>30000)));
   card.className='mcard'+(m.status==='Live'&&!_stalled?' live':m.status==='Live'&&_stalled?' lerr':m.status==='Error'?' lerr':'');
@@ -646,12 +789,47 @@ function updateCardStats(m){
         ? (m.axeOSPower / m.axeOSHashrate * 1000).toFixed(1) + ' W/TH'
         : '—';
       g('ce-'+m.id).textContent = ' ' + eff;
+    if(g('cpwr-'+m.id)) g('cpwr-'+m.id).textContent = ' ' + (m.axeOSPower!=null ? m.axeOSPower.toFixed(1)+' W' : '—');
+    if(g('camp-'+m.id)) g('camp-'+m.id).textContent = ' ' + (m.axeOSCurrent!=null ? m.axeOSCurrent.toFixed(2)+' A' : '—');
+    if(g('cvolt-'+m.id)) g('cvolt-'+m.id).textContent = ' ' + (m._lastApiData&&m._lastApiData.coreVoltage!=null ? m._lastApiData.coreVoltage+' mV' : '—');
+    if(g('cfreq-'+m.id)) g('cfreq-'+m.id).textContent = ' ' + (m._lastApiData&&m._lastApiData.frequency!=null ? m._lastApiData.frequency+' MHz' : '—');
     }
   }
   // Average time between accepted shares (seconds per share)
   // Temperatures - dynamic, only show what exists
   // Temps visibility handled by statsVis
+  if(g('row-pwr-'+m.id)) g('row-pwr-'+m.id).style.display=statsVis.power?'':'none';
+  if(g('row-amp-'+m.id)) g('row-amp-'+m.id).style.display=statsVis.amps?'':'none';
+  if(g('row-volt-'+m.id)) g('row-volt-'+m.id).style.display=statsVis.volt?'':'none';
+  if(g('row-freq-'+m.id)) g('row-freq-'+m.id).style.display=statsVis.freq?'':'none';
   if(g('temps-'+m.id)) g('temps-'+m.id).style.display=(statsVis.temps&&tempsVisible)?'':'none';
+  // Per-ASIC hashrate/error breakdown (from hashrateMonitor.asics[])
+  var asicsEl=g('asics-'+m.id);
+  if(asicsEl){
+    var d=m._lastApiData;
+    var arr=(d&&d.hashrateMonitor&&d.hashrateMonitor.asics)?d.hashrateMonitor.asics:null;
+    if(statsVis.asics && arr && arr.length){
+      asicsEl.style.display='';
+      // total hashes across all asics for error% context; err% per asic = errorCount/(total hashes seen) is not provided,
+      // so we show errorCount directly alongside the asic's hashrate share.
+      var rows='';
+      var half=Math.ceil(arr.length/2);
+      function fmtHR(gh){ return gh>=1000?(gh/1000).toFixed(2)+'T':Math.round(gh)+'G'; }
+      for(var i=0;i<arr.length;i++){
+        var a=arr[i];
+        var hr=a.total!=null?a.total:0;
+        var err=a.errorCount!=null?a.errorCount:0;
+        var side = (i%2===0)?'left':'right';
+        rows += '<div style="display:inline-block;width:50%;white-space:nowrap;text-align:'+(i%2===0?'left':'right')+'">'+
+          '<span style="color:var(--muted)">ASIC '+(i+1)+':</span> '+
+          '<span style="color:var(--grn)">'+fmtHR(hr)+'</span>'+
+          '<span style="color:var(--red)">('+(err>=1000?(err/1000).toFixed(0)+'k':err)+')</span></div>';
+      }
+      asicsEl.innerHTML=rows;
+    } else {
+      asicsEl.style.display='none'; asicsEl.innerHTML='';
+    }
+  }
   const tempsEl = (statsVis.temps&&tempsVisible) ? g('temps-'+m.id) : null;
   if(tempsEl){
     if(!tempsVisible){ tempsEl.innerHTML=''; }
@@ -665,7 +843,7 @@ function updateCardStats(m){
         // ASIC temps: green <65, orange 65-70, red 70+
         // VR temp:    green <=70, orange 70-80, red 80+
         let c;
-        if(t.label === 'VR'){
+        if(t.isVR || t.label==='VR' || (t.label&&t.label.indexOf('VR')===0)){
           c = t.val > 80 ? 'var(--red)' : t.val > 70 ? '#f7931a' : 'var(--grn)';
         } else {
           c = t.val >= 70 ? 'var(--red)' : t.val >= 65 ? '#f7931a' : 'var(--grn)';
@@ -783,7 +961,7 @@ function updateHeader(){
 // ═══════════════════════════════════════════════════════════════════════════════
 function renderMinerList(){
   const list=document.getElementById('miner-list'); list.innerHTML='';
-  Object.values(miners).forEach(m=>{
+  orderedMiners().forEach(m=>{
     const tag=document.createElement('div'); tag.className='mtag';
     tag.innerHTML=`
       <span class="mdot" id="dot-${m.id}"></span>
@@ -840,6 +1018,7 @@ function renderMinerList(){
       const id=e.target.dataset.id;
       disconnectMiner(miners[id]); delete miners[id];
       renderMinerList(); renderCards(); buildPanels(); updateHeader(); saveMiners(); markDirty();
+      if(typeof pushMinerList==='function') pushMinerList();
     };
   });
 }
@@ -850,11 +1029,13 @@ function renderMinerList(){
 function connectMiner(m){
   disconnectMiner(m);
   if(!m.ip) return;
+  if(typeof pushMinerList==='function') pushMinerList();
   m.status='Connecting…'; setDot(m.id,'wait'); updateCardStats(m);
   setTimeout(function(){fetchScoreboard(m);},2000); // fetch scoreboard on connect
   const es=new EventSource(`${SERVER}/stream?ip=${encodeURIComponent(m.ip)}`);
   m.ws=es;
   es.onmessage=ev=>{
+    m._lastStreamMsgTs=Date.now();
     const line=stripAnsi((ev.data||'').trim()); if(!line) return;
     if(line==='CONNECTED'){ m.status='Live'; m.connectedAt=m.connectedAt||Date.now(); setDot(m.id,'live'); updateCardStats(m); addLog('ok','Connected to '+m.ip,m.color); pollAxeOSBests(m); markDirty(); return; }
     if(line.startsWith('ERROR:')){ m.status='Error'; setDot(m.id,'err'); updateCardStats(m); addLog('er',m.ip+' — '+line); markDirty(); return; }
@@ -862,7 +1043,7 @@ function connectMiner(m){
     // Detect pool-set difficulty changes
     const pdm=POOLDIFF_RE.exec(line);
     if(pdm){
-      const newTarget=parseFloat(pdm[1]);
+      const newTarget=parseDiffToken(pdm[1]);
       if(newTarget>0 && newTarget!==m.poolDifficulty){
         m.poolDifficulty=newTarget;
         m.lastTarget=newTarget;
@@ -884,6 +1065,7 @@ function connectMiner(m){
     m.series.push({ts:nowTs,found,target,accepted});
     // topSeries - keep top 500 by difficulty (matches max display cap)
     m.topSeries.push({ts:nowTs,found,target,accepted});
+    m._sessionCleared = false; // new shares = live session again, allow future restore
     if(m.topSeries.length > 600){
       m.topSeries.sort(function(a,b){return b.found-a.found;});
       m.topSeries = m.topSeries.slice(0,500);
@@ -999,7 +1181,7 @@ function buildPanels(){
   panels=[];
   hitTargets=[];
 
-  const minerList=Object.values(miners);
+  const minerList=orderedMiners();
   const defs=[];
 
   if(layout==='combined'||layout==='both'){
@@ -1026,10 +1208,13 @@ function buildPanels(){
         <span style="color:${def.color};margin-right:4px">▸</span>
         <span style="color:var(--txt)">${def.label}</span>
         <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          ${chartMode==='hash' ? `
           <button data-hrmtoggle="1" onclick="toggleHrModeMenu(event,'${def.id}')" style="background:transparent;border:1px solid var(--bdr);color:var(--muted);font-size:.7rem;padding:2px 8px;border-radius:4px;cursor:pointer">&#9660; HR</button>
           <button data-hmtoggle="1" onclick="toggleHashMenu('${def.id}')" style="background:transparent;border:1px solid var(--bdr);color:var(--muted);font-size:.7rem;padding:2px 8px;border-radius:4px;cursor:pointer">&#9660; View</button>
           <span class="tlbl">Y:</span>
-          <span class="vslider-val" id="vval-${def.id}">${panelVScale[def.id]}%</span>
+          <input type="range" min="0" max="100" value="${(typeof hashVScale==='object'&&hashVScale[def.id])||0}" class="vzoom-slider" id="vzoom-${def.id}" title="Zoom in the hashrate axis (fill the chart with the line's variation)" oninput="setHashVScale('${def.id}',this.value)" style="width:70px;vertical-align:middle;cursor:pointer">
+          <span class="vslider-val" id="vval-${def.id}">${(typeof hashVScale==='object'&&hashVScale[def.id])||0}%</span>
+          ` : ''}
         </span>
         <div id="hmenu-${def.id}" style="display:none;position:absolute;top:100%;right:60px;background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;padding:8px 12px;z-index:200;min-width:140px;box-shadow:0 4px 12px rgba(0,0,0,0.5)">
           <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="hcb-hr-${def.id}" checked onchange="setHashVis('${def.id}','hr',this.checked);redrawHash()"> Hashrate</label>
@@ -1173,9 +1358,11 @@ function getPanelPts(panel, miner){
   const winMs=getZoomedViewMs(panel);
   const r=globalTsRange();
   const fullEnd=r.max;
-  const winEnd=panel.paused ? r.min+(panel.scrollPos/10000)*(fullEnd-r.min) : fullEnd;
+  // Live view: anchor right edge to wall-clock so the time axis keeps advancing
+  // even if a miner goes offline and stops contributing fresh timestamps to r.max.
+  const winEnd=panel.paused ? r.min+(panel.scrollPos/10000)*(fullEnd-r.min) : Date.now();
   const winStart=winEnd-winMs;
-  return miner.series.filter(p=>p.ts>=winStart&&p.ts<=winEnd);
+  return miner.series.filter(p=>p.ts>=winStart&&p.ts<=winEnd&&(!diffFilterMin||p.found>=diffFilterMin));
 }
 
 function applyLogScale(v, yMin, yMax){
@@ -1208,8 +1395,9 @@ function drawPanel(panel){
   const CW=W-PL-PR, CH=H-PT-PB;
 
   // Y range
-  const vals=allPanelPts.flatMap(p=>[p.found,p.target]).filter(v=>v>0);
+  const vals=allPanelPts.flatMap(p=>[p.found,p.target]).filter(v=>v>0&&(!diffFilterMin||v>=diffFilterMin));
   let yMin=Math.min(...vals), yMax=Math.max(...vals);
+  if(diffFilterMin&&isFinite(yMin)) yMin=Math.max(yMin,diffFilterMin);
   // padding
   if(logScale){
     yMin=yMin*0.7; yMax=yMax*1.5;
@@ -1218,6 +1406,7 @@ function drawPanel(panel){
   }
   if(yMin<=0) yMin=0.1;
   if(yMin===yMax){ yMin*=0.9; yMax*=1.1; }
+  if(diffFilterMin&&isFinite(yMin)) yMin=Math.max(diffFilterMin, 0.1); // filter = hard chart floor
 
   // Apply vscale (cut top %)
   if(vscale<1.0){
@@ -1288,7 +1477,7 @@ function drawPanel(panel){
     pts.forEach((p,i)=>{ const x=xOf(p.ts),y=yOf(p.found); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
     ctx.lineTo(xOf(pts[pts.length-1].ts),PT+CH);
     ctx.lineTo(xOf(pts[0].ts),PT+CH);
-    ctx.closePath(); ctx.fillStyle=hexRgba(col,.09); ctx.fill();
+    ctx.closePath(); // fill removed: ctx.fillStyle=hexRgba(col,.09); ctx.fill();
 
     // Line
     ctx.beginPath(); ctx.lineWidth=1.8*dpr; ctx.strokeStyle=col;
@@ -1301,15 +1490,17 @@ function drawPanel(panel){
       hitTargets.push({ sx:xOf(p.ts)/dpr, sy:yOf(p.found)/dpr, canvasRect:rect, pt:p, miner:m });
     });
 
-    // Accepted dots
-    pts.filter(p=>p.accepted).forEach(p=>{
+    // Accepted dots (optionally gated by Min Dot threshold; markers only)
+    pts.filter(p=>p.accepted && (!dotFilterMin || p.found>=dotFilterMin)).forEach(p=>{
       const x=xOf(p.ts), y=yOf(p.found);
-      const dotColor=p.found>=1e8?'#ef4444':p.found>=1e6?'#facc15':'#22d37a';
-      const dotGlow=p.found>=1e8?'rgba(239,68,68,.20)':p.found>=1e6?'rgba(250,204,21,.20)':'rgba(34,211,122,.16)';
-      ctx.beginPath(); ctx.arc(x,y,4*dpr,0,Math.PI*2);
+      const isT=p.found>=1e12, isG=!isT&&p.found>=1e9;
+      const dotColor=isT?'#ff1a1a':isG?'#ffffff':p.found>=1e8?'#ef4444':p.found>=1e6?'#facc15':'#22d37a';
+      const dotGlow=isT?'rgba(255,26,26,.35)':isG?'rgba(255,255,255,.30)':p.found>=1e8?'rgba(239,68,68,.20)':p.found>=1e6?'rgba(250,204,21,.20)':'rgba(34,211,122,.16)';
+      const dotR=isT?10:isG?6:4, glowR=isT?18:isG?12:8;
+      ctx.beginPath(); ctx.arc(x,y,dotR*dpr,0,Math.PI*2);
       ctx.fillStyle=dotColor; ctx.fill();
       ctx.strokeStyle='#07111f'; ctx.lineWidth=1.5*dpr; ctx.stroke();
-      ctx.beginPath(); ctx.arc(x,y,8*dpr,0,Math.PI*2);
+      ctx.beginPath(); ctx.arc(x,y,glowR*dpr,0,Math.PI*2);
       ctx.fillStyle=dotGlow; ctx.fill();
     });
   });
@@ -1319,8 +1510,6 @@ function drawPanel(panel){
 
   // Paused overlay line
   if(panel.paused){
-    ctx.fillStyle='rgba(244,80,96,.12)';
-    ctx.fillRect(PL,PT,CW,CH);
     ctx.strokeStyle='rgba(244,80,96,.4)'; ctx.lineWidth=1.5;
     ctx.strokeRect(PL,PT,CW,CH);
   }
@@ -1402,7 +1591,7 @@ function handleHashMouseMove(e, canvas){
       var hrStr=best.pt.hr>=1000?(best.pt.hr/1000).toFixed(3)+' TH/s':best.pt.hr.toFixed(2)+' GH/s';
       inner+='<div style="font-size:.82rem;margin:2px 0"><span style="color:'+best.miner.color+'">&#9632;</span> Hashrate: <b>'+hrStr+'</b></div>';
       best.pt.temps.forEach(function(t){
-        var tc = t.label==='VR'
+        var tc = (t.isVR||(t.label&&t.label.indexOf('VR')===0))
           ? (t.val>80?'var(--red)':t.val>70?'#f7931a':'var(--grn)')
           : (t.val>=70?'var(--red)':t.val>=65?'#f7931a':'var(--grn)');
         inner+='<div style="font-size:.78rem"><span style="color:rgba(255,255,255,0.7)">&#9473;</span> '+t.label+': <span style="color:'+tc+'"><b>'+t.val.toFixed(1)+'°C</b></span></div>';
@@ -1431,7 +1620,9 @@ function getPanelHashPts(panel, miner){
   const winMs=getZoomedViewMs(panel);
   const r=globalTsRange();
   const fullEnd=r.max;
-  const winEnd=panel.paused?r.min+(panel.scrollPos/10000)*(fullEnd-r.min):fullEnd;
+  // Live view: anchor right edge to wall-clock (see getPanelPts) so one offline
+  // miner can't freeze the shared time axis for every panel.
+  const winEnd=panel.paused?r.min+(panel.scrollPos/10000)*(fullEnd-r.min):Date.now();
   const winStart=winEnd-winMs;
   return (miner.hashSeries||[]).filter(p=>p.ts>=winStart&&p.ts<=winEnd);
 }
@@ -1461,6 +1652,16 @@ function drawHashPanel(panel){
   if(!hrVals.length) return;
   let hrMin=Math.min(...hrVals)*0.97, hrMax=Math.max(...hrVals)*1.03;
   if(hrMin===hrMax){hrMin*=0.95;hrMax*=1.05;}
+  // Per-panel vertical zoom-IN: 0 = auto (±3% padding), higher = tighter padding around
+  // the actual data range so a small, stable miner's variation fills the chart height
+  // (shows detail like the other miners instead of a flat line). Never clips the data.
+  var _hvs = (typeof hashVScale==='object' && hashVScale[panel.id]) ? hashVScale[panel.id] : 0;
+  if(_hvs>0){
+    var rawMin=Math.min(...hrVals), rawMax=Math.max(...hrVals);
+    var pad=0.03*(1-(_hvs/100)*0.98);    // ±3% at 0  ->  ±0.06% at 100
+    hrMin=rawMin*(1-pad); hrMax=rawMax*(1+pad);
+    if(hrMin===hrMax){ hrMin*=0.999; hrMax*=1.001; }
+  }
   const tempVals=allPts.flatMap(p=>p.temps.map(t=>t.val)).filter(v=>v>0);
   let tMin=tempVals.length?Math.min(...tempVals)-3:40, tMax=tempVals.length?Math.max(...tempVals)+3:100;
   var tsMin2=Infinity,tsMax2=-Infinity;allPts.forEach(function(p){if(p.ts<tsMin2)tsMin2=p.ts;if(p.ts>tsMax2)tsMax2=p.ts;});var tsMin=tsMin2===Infinity?Date.now()-60000:tsMin2,tsMax=tsMax2===-Infinity?Date.now():tsMax2,tsR=tsMax-tsMin||1;
@@ -1502,7 +1703,7 @@ function drawHashPanel(panel){
       ctx.beginPath();
       pts.forEach((p,i)=>{ const x=xOf(p.ts),y=yOfHr(getHr(p)); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
       ctx.lineTo(xOf(pts[pts.length-1].ts),PT+CH); ctx.lineTo(xOf(pts[0].ts),PT+CH);
-      ctx.closePath(); ctx.fillStyle=hexRgba(col,0.15); ctx.fill();
+      ctx.closePath(); // fill removed: ctx.fillStyle=hexRgba(col,0.15); ctx.fill();
       ctx.beginPath(); ctx.lineWidth=2*dpr; ctx.strokeStyle=col;
       pts.forEach((p,i)=>{ const x=xOf(p.ts),y=yOfHr(getHr(p)); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
       ctx.stroke();
@@ -1515,7 +1716,7 @@ function drawHashPanel(panel){
         ctx.lineWidth=2*dpr; ctx.setLineDash([]);
         for(var si=0; si<tempPts.length-1; si++){
           var tv=tempPts[si].temps[li].val;
-          var isVR=(tempPts[si].temps[li].label==='VR');
+          var isVR=(tempPts[si].temps[li].isVR||(tempPts[si].temps[li].label&&tempPts[si].temps[li].label.indexOf('VR')===0));
           var tc;
           if(isVR){ tc=tv>80?'#f45060':tv>70?'#f7931a':'#22d37a'; }
           else     { tc=tv>=70?'#f45060':tv>=65?'#f7931a':'#22d37a'; }
@@ -1588,6 +1789,39 @@ document.getElementById('range-select').onchange=function(){
   markDirty();
 };
 
+function parseDiffFilter(s){
+  if(!s) return 0;
+  s=String(s).trim().toLowerCase().replace(/,/g,'');
+  if(!s) return 0;
+  var mult=1;
+  var last=s.slice(-1);
+  if(last==='k'){mult=1e3;s=s.slice(0,-1);}
+  else if(last==='m'){mult=1e6;s=s.slice(0,-1);}
+  else if(last==='g'){mult=1e9;s=s.slice(0,-1);}
+  else if(last==='t'){mult=1e12;s=s.slice(0,-1);}
+  var n=parseFloat(s);
+  return isFinite(n)&&n>0 ? n*mult : 0;
+}
+(function(){
+  function updateMinDiffBtn(){
+    var b=document.getElementById('btn-mindiff'); if(!b) return;
+    if(diffFilterMin||dotFilterMin) b.classList.add('on'); else b.classList.remove('on');
+  }
+  var fi=document.getElementById('diff-filter');
+  if(fi){
+    fi.oninput=function(){ diffFilterMin=parseDiffFilter(this.value); updateMinDiffBtn(); markDirty(); };
+  }
+  var df=document.getElementById('dot-filter');
+  if(df){
+    df.oninput=function(){ dotFilterMin=parseDiffFilter(this.value); updateMinDiffBtn(); markDirty(); };
+  }
+  // Dropdown: toggle the popover, close on outside click
+  var btn=document.getElementById('btn-mindiff'), pop=document.getElementById('mindiff-pop'), dd=document.getElementById('mindiff-dd');
+  if(btn&&pop&&dd){
+    btn.onclick=function(e){ e.stopPropagation(); pop.style.display = pop.style.display==='none' ? 'block' : 'none'; };
+    document.addEventListener('click', function(e){ if(!dd.contains(e.target)) pop.style.display='none'; });
+  }
+})();
 document.getElementById('btn-log').onclick=()=>{
   logScale=true;
   document.getElementById('btn-log').classList.add('on');
@@ -1809,18 +2043,13 @@ async function pollAxeOSBests(m){
         var restartReason = ((d.resetReason || d.lastResetReason) && (d.resetReason || d.lastResetReason).trim()) ? (d.resetReason || d.lastResetReason).trim() : 'Restarted';
         updateReportReason(m.ip, restartReason);
         addLog('ok', m.ip+' — Restart detected: '+restartReason, m.color);
+        m.sharesFound = 0; m.sharesAccepted = 0; // reset avg share time on reboot
       }
       m._lastUptime = d.uptimeSeconds;
     if(d.stratumURL) m._lastStratumURL = d.stratumURL;
     }
     // Collect all temperature fields dynamically (temp, temp2, temp3... vrTemp)
-    const temps = [];
-    // ASIC temps: temp, temp2, temp3, temp4... support unlimited future chips
-    if(d.temp  != null && d.temp  > 0) temps.push({label:'ASIC 1', val:d.temp});
-    for(let i=2; i<=16; i++){
-      if(d['temp'+i] != null && d['temp'+i] > 0) temps.push({label:'ASIC '+i, val:d['temp'+i]});
-    }
-    if(d.vrTemp != null && d.vrTemp > 0) temps.push({label:'VR', val:d.vrTemp});
+    const temps = buildTempsArray(d);
     m.temps = temps;
     updateCardStats(m);
   }catch(e){}
@@ -1834,25 +2063,57 @@ function pollAllAxeOS(){
 // Poll immediately on connect and then every 30 seconds
 
 // ── Combined poll every 5 seconds: temps + hashrate + all stats ──────────────
+
+// Build labeled temps array: ASIC temps (temp,temp2..temp16) + VR temps (vrTemp,vrTemp2..,
+// or vrr/vrr2.. on some boards e.g. NerdQaxe). Single sensor -> plain label ('ASIC','VR');
+// multiple -> numbered ('ASIC 1','ASIC 2'). Only includes sensors the board actually reports.
+function buildTempsArray(d){
+  var asics=[], vrs=[];
+  if(d.temp != null && d.temp > 0) asics.push(d.temp);
+  for(var i=2;i<=16;i++){ if(d['temp'+i]!=null && d['temp'+i]>0) asics.push(d['temp'+i]); }
+  // VR: primary field, then numbered vrTemp2.. and vrr/vrr2.. candidates
+  if(d.vrTemp!=null && d.vrTemp>0) vrs.push(d.vrTemp);
+  for(var j=2;j<=16;j++){ if(d['vrTemp'+j]!=null && d['vrTemp'+j]>0) vrs.push(d['vrTemp'+j]); }
+  if(d.vrr!=null && d.vrr>0) vrs.push(d.vrr);
+  for(var k=2;k<=16;k++){ if(d['vrr'+k]!=null && d['vrr'+k]>0) vrs.push(d['vrr'+k]); }
+  var out=[];
+  asics.forEach(function(v,idx){ out.push({label: asics.length>1?('ASIC '+(idx+1)):'ASIC', val:v, isVR:false, kind:'asic', idx:idx}); });
+  vrs.forEach(function(v,idx){ out.push({label: vrs.length>1?('VR '+(idx+1)):'VR', val:v, isVR:true, kind:'vr', idx:idx}); });
+  return out;
+}
+
 async function pollTemps(m){
-  if(!m.ip || m.noAxeOS) return;
+  if(!m.ip) return;
+  // noAxeOS is not permanent — retry once a minute so a miner that had a transient
+  // API hiccup (slow board, brief reboot, WiFi blip) recovers on its own without an app restart
+  if(m.noAxeOS){
+    if(m._noAxeOSsince && (Date.now()-m._noAxeOSsince)<60000) return;
+    m._noAxeOSsince=Date.now();
+  }
+  // Unreachable miners (unplugged / 502 / timeout) back off to a slow retry so their
+  // request can't sit in the synchronous server's queue every 2s and starve healthy
+  // miners behind them (head-of-line blocking). They probe every 10s instead of 2s.
+  if(m._unreach){
+    if(m._unreachSince && (Date.now()-m._unreachSince)<10000) return;
+    m._unreachSince=Date.now();
+  }
   try{
     const res=await fetch(SERVER+'/api?ip='+encodeURIComponent(m.ip),{signal:AbortSignal.timeout(4000)});
     if(!res.ok){
-      if(res.status===404||res.status===400) m.noAxeOS=true;
+      if(res.status===404||res.status===400){ m.noAxeOS=true; m._noAxeOSsince=Date.now(); }
+      else { m._unreach=true; m._unreachSince=Date.now(); } // 502/5xx = can't reach miner
       // API failed - if we had good data before, save a report
       return;
     }
     const d=await res.json();
-    if(d.error){ m.noAxeOS=true; return; }
+    if(d.error){ m.noAxeOS=true; m._noAxeOSsince=Date.now(); return; }
     m._lastApiData=d;
-    m.noAxeOS=false;
+    m.noAxeOS=false; m._noAxeOSsince=null;
+    m._unreach=false; m._unreachSince=null;
+    m._lastApiOkTs=Date.now();
 
     // ── Temps ──
-    const temps=[];
-    if(d.temp   != null && d.temp   > 0) temps.push({label:'ASIC 1', val:d.temp});
-    for(let i=2;i<=16;i++){ if(d['temp'+i]!=null && d['temp'+i]>0) temps.push({label:'ASIC '+i, val:d['temp'+i]}); }
-    if(d.vrTemp != null && d.vrTemp > 0) temps.push({label:'VR', val:d.vrTemp});
+    const temps=buildTempsArray(d);
     m.temps=temps;
 
     // ── Uptime ──
@@ -1863,8 +2124,13 @@ async function pollTemps(m){
     const hr1m = d.hashRate_1m != null ? d.hashRate_1m : hrInst;
     const hr = hrInst != null ? hrInst : hr1m;
     // ── Single restart trigger: hashrate drops to 0 or null ──
+    // Fire ONE report per outage: require that we haven't already reported this
+    // outage. The flag clears only when the miner recovers (hr>0 again, below),
+    // so a miner that stays down no longer spawns a new report every few minutes.
     if((hr === null || hr === 0) && m.axeOSHashrate && m.axeOSHashrate > 0 &&
+        !m._reportedThisOutage &&
         (!m._lastReportTs || (Date.now() - m._lastReportTs) > 180000)){
+      m._reportedThisOutage = true;
       // Capture fault state immediately while miner is still online
       var faultState = null;
       if(d && d.power_fault && d.power_fault.trim()) faultState = d.power_fault.trim();
@@ -1906,13 +2172,44 @@ async function pollTemps(m){
       }
     }
     if(hr != null) m.axeOSHashrate = hr;
-    if(hr && hr > 0) hrRecord(m, hr, d.errorPercentage!=null?d.errorPercentage:null);
+    if(hr && hr > 0){ hrRecord(m, hr, d.errorPercentage!=null?d.errorPercentage:null); m._reportedThisOutage = false; }
 
     // ── Record hashSeries for hash chart ──
     if(hr != null){
       m.hashSeries = m.hashSeries || [];
       m.hashSeries.push({ts:Date.now(), hr:hr, hr1m:d.hashRate_1m||hr, hr10m:d.hashRate_10m||hr, hr1h:d.hashRate_1h||hr, temps:temps.slice(), pwr:m.axeOSPower||0, uptime:m.axeOSUptime||null});
       if(m.hashSeries.length > MAX_HASH_PTS) m.hashSeries.shift();
+    }
+
+    // ── Rolling 1-hour stats accumulator (one snapshot per poll, pruned to 60 min) ──
+    {
+      m.hourSnaps = m.hourSnaps || [];
+      var nowTs = Date.now();
+      // derive asic + vr temp extremes from the temps array
+      var asicHi=null, asicLo=null, vrHi=null, vrLo=null;
+      (temps||[]).forEach(function(t){
+        if(t.isVR||(t.label&&t.label.indexOf('VR')===0)){ if(vrHi===null||t.val>vrHi)vrHi=t.val; if(vrLo===null||t.val<vrLo)vrLo=t.val; }
+        else { if(asicHi===null||t.val>asicHi)asicHi=t.val; if(asicLo===null||t.val<asicLo)asicLo=t.val; }
+      });
+      var effNow = (m.axeOSPower && m.axeOSHashrate && m.axeOSHashrate>0) ? (m.axeOSPower/m.axeOSHashrate*1000) : null;
+      m.hourSnaps.push({
+        ts: nowTs,
+        hr: (hr!=null?hr:null),
+        asic: (asicHi!=null?asicHi:null), asicLo: (asicLo!=null?asicLo:null),
+        vr: (vrHi!=null?vrHi:null), vrLo: (vrLo!=null?vrLo:null),
+        amps: (m.axeOSCurrent!=null?m.axeOSCurrent:null),
+        fan: (d.fanspeed!=null?d.fanspeed:null),
+        eff: effNow,
+        err: (d.errorPercentage!=null?d.errorPercentage:null),
+        mv: (d.coreVoltage!=null?d.coreVoltage:null),
+        mhz: (d.frequency!=null?d.frequency:null),
+        shares: (m.axeOSShares!=null?m.axeOSShares:null),
+        rej: (m.axeOSRejected!=null?m.axeOSRejected:null),
+        bestSess: (m.axeOSSessionBest!=null?parseDiff(m.axeOSSessionBest):null)
+      });
+      // prune older than 60 min
+      var cutoff = nowTs - 3600000;
+      while(m.hourSnaps.length && m.hourSnaps[0].ts < cutoff) m.hourSnaps.shift();
     }
 
     // ── All stats (shares, rejected, best diff, session best) ──
@@ -1936,13 +2233,412 @@ async function pollTemps(m){
     if(d.errorPercentage != null) m.axeOSErrorRate   = d.errorPercentage;
 
     if(d.power           != null) m.axeOSPower       = d.power;
+    // current: prefer currentA (amps), else convert current (mA) to amps
+    if(d.currentA != null) m.axeOSCurrent = d.currentA;
+    else if(d.current != null) m.axeOSCurrent = d.current/1000;
     atRecordAxeOSBest(m);
     updateCardStats(m);
     markDirty();
-  }catch(e){}
+  }catch(e){
+    // network error / abort timeout = miner unreachable; back it off too
+    m._unreach=true; m._unreachSince=Date.now();}
 }
 function pollAllTemps(){ Object.values(miners).forEach(function(m){ pollTemps(m); }); }
 setInterval(pollAllTemps, 2000);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DYNAMIC GOVERNOR — per-miner thermal auto-tuning profiles
+// Each miner can have multiple non-overlapping time-window profiles. The active
+// profile (by current time + uptime gate) nudges MHz/mV to hold a temp band,
+// gated by fan speed, with dwell/settle timing and a reverse-direction lockout.
+// ═══════════════════════════════════════════════════════════════════════════════
+var GOV_KEY = 'bitaxe_governors_v1';
+// Structure: { [minerIp]: [ {id,name,enabled,startHHMM,endHHMM,uptimeMin,
+//   fanStepDownMin, fanStepUpMax, asicMax,asicMin, vrMax,vrMin, priority('asic'|'vr'),
+//   mhzStep, mvStep, mhzFloor,mhzCeil, mvFloor,mvCeil, dwellSec, settleSec, bothWays}... ] }
+var _governors = {};
+try{ var _gRaw=localStorage.getItem(GOV_KEY); if(_gRaw) _governors=JSON.parse(_gRaw); }catch(e){}
+function saveGovernors(){ try{ localStorage.setItem(GOV_KEY, JSON.stringify(_governors)); }catch(e){} if(typeof pushGovernors==='function') pushGovernors(); }
+// Master on/off for the whole governor system (persisted)
+var _govEnabled = (localStorage.getItem('bitaxe_gov_enabled')==='1');
+function setGovEnabled(on){ _govEnabled=!!on; try{ localStorage.setItem('bitaxe_gov_enabled', on?'1':'0'); }catch(e){} }
+// Push canonical governor config to server (Windows -> mobile read channel)
+function pushGovernors(){
+  try{ fetch(SERVER+'/governors',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({enabled:_govEnabled, data:_governors})}).catch(function(){}); }catch(e){}
+}
+// Poll for mobile-originated governor changes (mobile -> Windows write channel)
+function pollGovernorChanges(){
+  fetch(SERVER+'/getgovernors',{signal:AbortSignal.timeout(4000)}).then(function(r){return r.json();}).then(function(d){
+    if(!d || typeof d!=='object') return;
+    if(d.data){ _governors=d.data; saveGovernors(); }
+    if(typeof d.enabled==='boolean'){ setGovEnabled(d.enabled); }
+    var ov=document.getElementById('governor-overlay');
+    if(ov&&ov.style.display==='flex') renderGovernorPanel();
+  }).catch(function(){});
+}
+setInterval(pushGovernors, 5000);
+setInterval(pollGovernorChanges, 4000);
+function govList(ip){ return _governors[ip] || []; }
+
+// runtime state per miner (not persisted): last action time, last direction, dwell tracking
+var _govState = {}; // { ip: {lastActionTs, lastDir, outOfBandSince, dir} }
+
+function _nowHHMM(){ var d=new Date(); return d.getHours()*100+d.getMinutes(); }
+// window active check — handles windows that wrap midnight (e.g. 2200-0600)
+function _govWindowActive(p){
+  if(p.allDay) return true; // 24hr governance
+  var now=_nowHHMM(), s=p.startHHMM, e=p.endHHMM;
+  if(s==null||e==null) return false;
+  if(s===e) return false;
+  if(s < e) return now>=s && now<e;
+  return now>=s || now<e; // wraps midnight
+}
+// find the single active profile for a miner (first enabled whose window is active)
+function activeGovernor(ip){
+  var list=govList(ip);
+  for(var i=0;i<list.length;i++){ if(list[i].enabled && _govWindowActive(list[i])) return list[i]; }
+  return null;
+}
+
+// The control loop — called once per poll cycle per miner from pollAllTemps
+function runGovernor(m){
+  if(!_govEnabled) return;
+  if(!m || !m.ip) return;
+  var p=activeGovernor(m.ip);
+  if(!p){ return; } // no active profile
+  var d=m._lastApiData; if(!d) return;
+  // Uptime gate — don't act until miner has run long enough
+  if(m.axeOSUptime==null || m.axeOSUptime < (p.uptimeMin||0)*60) return;
+  // Per-sensor readings come from m.temps (kind:'asic'|'vr', idx)
+  var fan = d.fanspeed!=null ? d.fanspeed : null;
+  var curFreq = d.frequency!=null ? d.frequency : null;
+  var curVolt = d.coreVoltage!=null ? d.coreVoltage : null;
+  if(curFreq===null && curVolt===null && fan===null) return; // nothing to tune
+
+  var st=_govState[m.ip]||(_govState[m.ip]={lastActionTs:0,lastDir:0,outOfBandSince:0,dir:0});
+
+  // Settle: pause after any adjustment
+  if(st.lastActionTs && (Date.now()-st.lastActionTs) < (p.settleSec||0)*1000) return;
+
+  // Per-sensor evaluation: each ASIC/VR sensor checked against its own band.
+  // Any sensor too hot -> step down (protective, always wins). Any sensor too cool -> step up.
+  // Blank band on a sensor = that sensor ignored. A single sensor out of band fires regardless
+  // of the others, both directions.
+  function bandDir(val, band){
+    if(val==null || !band) return 0;
+    if(band.max!=null && val>band.max) return -1;
+    if(band.min!=null && val<band.min) return +1;
+    return 0;
+  }
+  var asicBands = p.asicBands||[];
+  var vrBands   = p.vrBands||[];
+  var anyHot=false, anyCool=false;
+  (m.temps||[]).forEach(function(t){
+    var band = (t.kind==='vr') ? vrBands[t.idx] : asicBands[t.idx];
+    var dd = bandDir(t.val, band);
+    if(dd<0) anyHot=true; else if(dd>0) anyCool=true;
+  });
+  // Amps band — total current draw (single scalar). Over max is protective and wins
+  // like a too-hot sensor; under min allows a step up (both-ways).
+  if(p.ampsBand && m.axeOSCurrent!=null){
+    var adir = bandDir(m.axeOSCurrent, p.ampsBand);
+    if(adir<0) anyHot=true; else if(adir>0) anyCool=true;
+  }
+  // too hot always wins over too cool for safety
+  var dir = anyHot ? -1 : (anyCool ? 1 : 0);
+  if(!p.bothWays && dir>0) dir=0; // one-sided (down only) if bothWays off
+
+  if(dir===0){ st.outOfBandSince=0; st.dir=0; return; }
+
+  // Fan gates
+  if(dir<0){ // stepping down (too hot) — fan must be at/above the step-down min
+    if(p.fanStepDownMin!=null && fan!=null && fan < p.fanStepDownMin) { st.outOfBandSince=0; return; }
+  } else { // stepping up (too cool) — fan must be at/below the step-up max
+    if(p.fanStepUpMax!=null && fan!=null && fan > p.fanStepUpMax) { st.outOfBandSince=0; return; }
+  }
+
+  // Reverse-direction lockout: if reversing vs last action, must wait dwell+settle since last action
+  if(st.lastDir!==0 && dir!==st.lastDir){
+    if(st.lastActionTs && (Date.now()-st.lastActionTs) < (p.dwellSec||0)*1000) return;
+  }
+
+  // Dwell: temps must be sustained out of band (same dir) for dwellSec before acting
+  if(st.dir!==dir){ st.dir=dir; st.outOfBandSince=Date.now(); }
+  if(!st.outOfBandSince) st.outOfBandSince=Date.now();
+  if((Date.now()-st.outOfBandSince) < (p.dwellSec||0)*1000) return;
+
+  // Compute new freq/volt within floor/ceiling
+  var newFreq=curFreq, newVolt=curVolt, changed=false;
+  if(p.mhzStep && curFreq!=null){
+    var nf=curFreq + dir*p.mhzStep;
+    if(p.mhzFloor!=null) nf=Math.max(nf, p.mhzFloor);
+    if(p.mhzCeil!=null)  nf=Math.min(nf, p.mhzCeil);
+    if(nf!==curFreq){ newFreq=nf; changed=true; }
+  }
+  if(p.mvStep && curVolt!=null){
+    var nv=curVolt + dir*p.mvStep;
+    if(p.mvFloor!=null) nv=Math.max(nv, p.mvFloor);
+    if(p.mvCeil!=null)  nv=Math.min(nv, p.mvCeil);
+    if(nv!==curVolt){ newVolt=nv; changed=true; }
+  }
+  // Manual fan % target — steps the OPPOSITE way to freq/volt: too hot (dir<0) -> fan UP,
+  // too cool (dir>0) -> fan DOWN. Enabling this puts the fan in manual mode (autofanspeed off).
+  var curFan = (fan!=null) ? Math.round(fan) : null;
+  var fanGoverned = (p.fanStep!=null && p.fanStep!=='' && curFan!=null);
+  var newFan = curFan;
+  if(fanGoverned){
+    var nfan = curFan + (-dir)*p.fanStep;
+    var fFlo = (p.fanFloor!=null)?p.fanFloor:0, fCei=(p.fanCeil!=null)?p.fanCeil:100;
+    nfan = Math.max(fFlo, Math.min(fCei, nfan));
+    if(nfan!==curFan){ newFan=nfan; changed=true; }
+  }
+  if(!changed) return; // hit floor/ceiling, nothing to do
+
+  // Apply via the patch endpoint (same machinery scripts use)
+  var body={frequency:newFreq, coreVoltage:newVolt, overclockEnabled:1,
+    autofanspeed: fanGoverned ? 0 : (d.autofanspeed?1:0),
+    manualFanSpeed: fanGoverned ? newFan : (d.fanspeed||100),
+    temptarget:d.tempTarget||d.temptarget||60, minfanspeed:d.minFanSpeed!=null?d.minFanSpeed:0};
+  fetch(SERVER+'/patch?ip='+encodeURIComponent(m.ip),{signal:AbortSignal.timeout(5000),
+    headers:{'Content-Type':'application/json','X-Body':JSON.stringify(body)}}).then(function(){
+      if(p.restartAfter){ setTimeout(function(){ fetch(SERVER+'/restart?ip='+encodeURIComponent(m.ip),{method:'POST',signal:AbortSignal.timeout(6000)}).catch(function(){}); }, 1500); }
+    }).catch(function(){});
+  st.lastActionTs=Date.now(); st.lastDir=dir; st.outOfBandSince=0; st.dir=0;
+  showToast('⚙ Governor', (m.name||m.ip)+': '+(dir<0?'▼':'▲')+' '+
+    (p.mhzStep?newFreq+'MHz ':'')+(p.mvStep?newVolt+'mV ':'')+(fanGoverned?('fan '+newFan+'%'):''), dir<0?'warn':'ok');
+}
+function runAllGovernors(){ Object.values(miners).forEach(function(m){ try{ runGovernor(m); }catch(e){} }); }
+setInterval(runAllGovernors, 5000);
+
+// ── Governor UI ──────────────────────────────────────────────────────────────
+var GOV_DEFS = {
+  allday: "Run this profile around the clock, no time window. Use this when you want one set of governor rules active all day. A 24hr profile can\u2019t coexist with other enabled profiles on the same miner.",
+  window: "The hours this profile is active (24h HHMM, e.g. 2200 to 0600). Windows may wrap past midnight. No two profiles on the same miner may overlap.",
+  uptime: "How many minutes the miner must have been running before this profile will make any change. Prevents adjustments during warm-up right after a (re)start.",
+  fanDown: "Step DOWN (lower MHz/mV) only when the fan is at or above this %. If the fan still has room to ramp, the miner has cooling headroom and the fan should handle the heat first.",
+  fanUp: "Step UP (raise MHz/mV) only when the fan is at or below this %. If the fan is working hard, there is no real thermal headroom to spend on more performance.",
+  asicMax: "If ASIC temp goes above this, the governor steps DOWN. Leave blank to disable the hot side for ASIC.",
+  asicMin: "If ASIC temp drops below this, the governor steps UP (when both-ways is on). Leave blank to disable the cool side for ASIC.",
+  vrMax: "If VR temp goes above this, the governor steps DOWN. Leave blank to disable the hot side for VR.",
+  vrMin: "If VR temp drops below this, the governor steps UP (when both-ways is on). Leave blank to disable the cool side for VR.",
+  ampsMax: "If total current draw (A) goes above this, the governor steps DOWN \u2014 protective, like a too-hot sensor (guards the PSU/connector). Leave blank to disable the high side.",
+  ampsMin: "If total current draw (A) drops below this, the governor steps UP (when both-ways is on). Leave blank to disable the low side.",
+  priority: "When ASIC and VR disagree on direction, which sensor wins. (A 'too hot' from either always wins for safety.)",
+  mhzStep: "How many MHz to change per adjustment. Leave blank to leave frequency alone and only adjust voltage.",
+  mvStep: "How many mV to change per adjustment. Leave blank to leave voltage alone and only adjust frequency.",
+  mhzFloor: "The governor will never set frequency below this. Your minimum to keep the miner hashing.",
+  mhzCeil: "The governor will never set frequency above this. Your performance/safety ceiling.",
+  mvFloor: "The governor will never set voltage below this.",
+  mvCeil: "The governor will never set voltage above this. Keep this within your safe limit.",
+  fanStep: "How many % to change the manual fan speed per adjustment. Fan moves OPPOSITE to MHz/mV: too hot raises the fan, too cool lowers it. Leave blank to not control the fan. Setting this puts the fan into manual mode (turns the miner's auto/PID fan off).",
+  fanFloor: "The governor will never set the fan below this %. Your minimum airflow so it never gets too quiet/hot.",
+  fanCeil: "The governor will never set the fan above this %. Usually 100.",
+  dwell: "Temps must stay out of band continuously for this many seconds before the governor acts. Filters out momentary spikes.",
+  settle: "After any adjustment, wait this many seconds before evaluating again \u2014 a frequency/voltage change takes a moment to show up in the temperature.",
+  restart: "Restart the miner automatically after each adjustment. Some boards apply a new frequency or voltage more reliably after a restart. Leave off unless adjustments do not seem to take effect.",
+  both: "ON = adjust both ways (down when hot, up when cool). OFF = only step DOWN when hot (protective only). Note: same-direction steps repeat freely once out of band, but reversing direction waits out the dwell time so it can't oscillate."
+};
+
+function _govField(label, defKey, inputHtml){
+  var fid='gdef-'+defKey+'-'+(_govFieldCtr++);
+  return '<div style="margin-bottom:8px">'+
+    '<div style="display:flex;align-items:center;gap:6px">'+
+      '<span onclick="var e=document.getElementById(\''+fid+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\';this.textContent=e.style.display===\'none\'?\'\u25b8\':\'\u25be\';" style="cursor:pointer;color:var(--muted);font-size:.7rem;width:12px">\u25b8</span>'+
+      '<label style="font-size:.74rem;color:var(--txt);min-width:130px">'+label+'</label>'+
+      inputHtml+
+    '</div>'+
+    '<div id="'+fid+'" style="display:none;font-size:.68rem;color:var(--muted);margin:3px 0 0 18px;line-height:1.4">'+GOV_DEFS[defKey]+'</div>'+
+  '</div>';
+}
+var _govFieldCtr=0;
+
+function _inp(ip, pid, key, val, ph, w){
+  w=w||70;
+  return '<input type="text" value="'+(val!=null?val:'')+'" placeholder="'+(ph||'')+'" '+
+    'onchange="govSetField(\''+ip+'\',\''+pid+'\',\''+key+'\',this.value)" '+
+    'style="width:'+w+'px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;padding:3px 6px;font-size:.74rem;font-family:inherit">';
+}
+
+function openGovernorPanel(){
+  var ov=document.getElementById('governor-overlay');
+  renderGovernorPanel();
+  ov.style.display='flex';
+}
+function renderGovernorPanel(){
+  _govFieldCtr=0;
+  var c=document.getElementById('governor-content');
+  c.innerHTML='';
+  // Master on/off toggle for the whole governor system
+  var mt=document.createElement('div');
+  mt.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:16px;background:var(--surf);border:1px solid '+(_govEnabled?'var(--orange)':'var(--bdr)')+';border-radius:10px';
+  mt.innerHTML='<span style="font-size:.85rem;font-weight:700;color:var(--txt)">Governor system '+(_govEnabled?'ON':'OFF')+'</span>'+
+    '<span style="font-size:.7rem;color:var(--muted);margin-left:14px;flex:1">master switch — when off, no profile runs on any miner</span>'+
+    '<button class="sc-tog '+(_govEnabled?'on':'off')+'" onclick="setGovEnabled(!_govEnabled);pushGovernors();renderGovernorPanel();"></button>';
+  c.appendChild(mt);
+  var list=Object.values(miners).filter(function(m){return m.ip;});
+  if(!list.length){ var nm=document.createElement('div'); nm.style.cssText='color:var(--muted);text-align:center;padding:40px'; nm.textContent='No miners configured.'; c.appendChild(nm); return; }
+  list.forEach(function(m){
+    var mc=document.createElement('div');
+    mc.style.cssText='background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;padding:14px 16px';
+    var profs=govList(m.ip);
+    var html='<div style="font-size:.95rem;font-weight:700;color:'+m.color+';margin-bottom:10px;display:flex;align-items:center;gap:10px">'+
+      '<span>'+(m.name&&m.name.trim()?m.name.trim():m.ip)+'</span>'+
+      '<button onclick="govAddProfile(\''+m.ip+'\')" style="margin-left:auto;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);font-size:.72rem;padding:3px 10px;border-radius:6px;cursor:pointer">+ Add Profile</button>'+
+    '</div>';
+    if(!profs.length){ html+='<div style="color:var(--muted);font-size:.78rem">No profiles. Add one to start auto-tuning during a time window.</div>'; }
+    mc.innerHTML=html;
+    profs.forEach(function(p){ mc.appendChild(_govProfileCard(m.ip, p)); });
+    c.appendChild(mc);
+  });
+}
+
+function _govSensors(ip){
+  var m=Object.values(miners).find(function(x){return x.ip===ip;});
+  var temps = (m&&m.temps&&m.temps.length)?m.temps:null;
+  if(!temps){
+    // offline / no data: fall back to last-seen count, else assume 1 ASIC
+    var last=_govLastSensors[ip];
+    if(last) return last;
+    return [{kind:'asic',idx:0,label:'ASIC'}];
+  }
+  var sens=temps.map(function(t){ return {kind:(t.kind|| (t.isVR?'vr':'asic')), idx:(t.idx!=null?t.idx:0), label:t.label}; });
+  _govLastSensors[ip]=sens;
+  return sens;
+}
+var _govLastSensors={};
+
+function _govProfileCard(ip, p){
+  var card=document.createElement('div');
+  card.style.cssText='border:1px solid var(--bdr);border-radius:8px;margin-bottom:10px;overflow:hidden';
+  var open=!!p._open;
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--surf2);cursor:pointer';
+  hdr.innerHTML='<span style="color:var(--muted);font-size:.8rem">'+(open?'\u25be':'\u25b8')+'</span>'+
+    '<button class="sc-tog '+(p.enabled?'on':'off')+'" onclick="event.stopPropagation();govSetField(\''+ip+'\',\''+p.id+'\',\'enabled\',!'+(p.enabled?'true':'false')+');renderGovernorPanel();"></button>'+
+    '<input type="text" value="'+(p.name||'')+'" placeholder="Profile name" onclick="event.stopPropagation()" onchange="govSetField(\''+ip+'\',\''+p.id+'\',\'name\',this.value)" style="background:transparent;border:none;color:var(--txt);font-size:.82rem;font-weight:600;flex:1;font-family:inherit">'+
+    '<span style="font-size:.7rem;color:var(--muted)">'+(p.allDay?'24hr':((p.startHHMM!=null?String(p.startHHMM).padStart(4,'0'):'----')+'\u2013'+(p.endHHMM!=null?String(p.endHHMM).padStart(4,'0'):'----')))+'</span>'+
+    '<button onclick="event.stopPropagation();govDeleteProfile(\''+ip+'\',\''+p.id+'\')" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.85rem">\uD83D\uDDD1</button>';
+  var body=document.createElement('div');
+  body.style.cssText='padding:12px 14px;display:'+(open?'block':'none');
+  hdr.onclick=function(){ var o=body.style.display!=='none'; body.style.display=o?'none':'block'; hdr.firstChild.textContent=o?'\u25b8':'\u25be'; p._open=!o; };
+
+  var h='';
+  h+='<div style="font-size:.7rem;color:var(--muted);background:var(--surf2);border-left:3px solid var(--muted);border-radius:4px;padding:7px 9px;margin-bottom:12px;line-height:1.45">Tip: leave any field blank to skip it \u2014 only the values you fill in factor into governing.</div>';
+  h+=_govField('24hr governance', 'allday',
+    '<button class="sc-tog '+(p.allDay?'on':'off')+'" onclick="govSetField(\''+ip+'\',\''+p.id+'\',\'allDay\','+(p.allDay?'false':'true')+');renderGovernorPanel();"></button>');
+  if(!p.allDay){
+    h+=_govField('Time window', 'window',
+      _inp(ip,p.id,'startHHMM',p.startHHMM,'e.g. 2200',78)+'<span style="color:var(--muted);margin:0 4px">to</span>'+_inp(ip,p.id,'endHHMM',p.endHHMM,'e.g. 0600',78));
+  }
+  h+=_govField('Uptime gate (min)', 'uptime', _inp(ip,p.id,'uptimeMin',p.uptimeMin,'e.g. 10'));
+  h+=_govField('Step-down fan min (%)', 'fanDown', _inp(ip,p.id,'fanStepDownMin',p.fanStepDownMin,'e.g. 100'));
+  h+=_govField('Step-up fan max (%)', 'fanUp', _inp(ip,p.id,'fanStepUpMax',p.fanStepUpMax,'e.g. 15'));
+  // Dynamic per-sensor temp bands — one max/min pair per ASIC/VR the board reports
+  p.asicBands=p.asicBands||[]; p.vrBands=p.vrBands||[];
+  _govSensors(ip).forEach(function(sn){
+    var bands = sn.kind==='vr' ? p.vrBands : p.asicBands;
+    var b = bands[sn.idx]||(bands[sn.idx]={max:null,min:null});
+    var bkey = sn.kind+':'+sn.idx;
+    h+=_govField(sn.label+' max \u00b0C (hot)', sn.kind==='vr'?'vrMax':'asicMax',
+      '<input type="text" value="'+(b.max!=null?b.max:'')+'" placeholder="e.g. 70" onchange="govSetBand(\''+ip+'\',\''+p.id+'\',\''+bkey+'\',\'max\',this.value)" style="width:70px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;padding:3px 6px;font-size:.74rem;font-family:inherit">');
+    h+=_govField(sn.label+' min \u00b0C (cool)', sn.kind==='vr'?'vrMin':'asicMin',
+      '<input type="text" value="'+(b.min!=null?b.min:'')+'" placeholder="e.g. 60" onchange="govSetBand(\''+ip+'\',\''+p.id+'\',\''+bkey+'\',\'min\',this.value)" style="width:70px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;padding:3px 6px;font-size:.74rem;font-family:inherit">');
+  });
+  // Amps band (single scalar — total current draw in A; protective like temps)
+  p.ampsBand = p.ampsBand || {max:null,min:null};
+  h+=_govField('Amps max (high)', 'ampsMax',
+    '<input type="text" value="'+(p.ampsBand.max!=null?p.ampsBand.max:'')+'" placeholder="e.g. 30" onchange="govSetBand(\''+ip+'\',\''+p.id+'\',\'amps:0\',\'max\',this.value)" style="width:70px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;padding:3px 6px;font-size:.74rem;font-family:inherit">');
+  h+=_govField('Amps min (low)', 'ampsMin',
+    '<input type="text" value="'+(p.ampsBand.min!=null?p.ampsBand.min:'')+'" placeholder="e.g. 25" onchange="govSetBand(\''+ip+'\',\''+p.id+'\',\'amps:0\',\'min\',this.value)" style="width:70px;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;padding:3px 6px;font-size:.74rem;font-family:inherit">');
+  h+=_govField('MHz step', 'mhzStep', _inp(ip,p.id,'mhzStep',p.mhzStep,'e.g. 10'));
+  h+=_govField('mV step', 'mvStep', _inp(ip,p.id,'mvStep',p.mvStep,'e.g. 10'));
+  h+=_govField('MHz floor', 'mhzFloor', _inp(ip,p.id,'mhzFloor',p.mhzFloor,'e.g. 400'));
+  h+=_govField('MHz ceiling', 'mhzCeil', _inp(ip,p.id,'mhzCeil',p.mhzCeil,'e.g. 650'));
+  h+=_govField('mV floor', 'mvFloor', _inp(ip,p.id,'mvFloor',p.mvFloor,'e.g. 1000'));
+  h+=_govField('mV ceiling', 'mvCeil', _inp(ip,p.id,'mvCeil',p.mvCeil,'e.g. 1300'));
+  h+=_govField('Fan step (%)', 'fanStep', _inp(ip,p.id,'fanStep',p.fanStep,'e.g. 5'));
+  h+=_govField('Fan floor (%)', 'fanFloor', _inp(ip,p.id,'fanFloor',p.fanFloor,'e.g. 35'));
+  h+=_govField('Fan ceiling (%)', 'fanCeil', _inp(ip,p.id,'fanCeil',p.fanCeil,'e.g. 100'));
+  h+=_govField('Dwell time (sec)', 'dwell', _inp(ip,p.id,'dwellSec',p.dwellSec,'e.g. 120'));
+  h+=_govField('Settle time (sec)', 'settle', _inp(ip,p.id,'settleSec',p.settleSec,'e.g. 30'));
+  h+=_govField('Both directions', 'both',
+    '<button class="sc-tog '+(p.bothWays?'on':'off')+'" onclick="govSetField(\''+ip+'\',\''+p.id+'\',\'bothWays\',!'+(p.bothWays?'true':'false')+');this.className=\'sc-tog \'+((_governors[\''+ip+'\']||[]).find(function(x){return x.id===\''+p.id+'\';})||{}).bothWays?\'on\':\'off\';"></button>');
+  h+=_govField('Restart after adjust', 'restart',
+    '<button class="sc-tog '+(p.restartAfter?'on':'off')+'" onclick="govSetField(\''+ip+'\',\''+p.id+'\',\'restartAfter\',!'+(p.restartAfter?'true':'false')+');this.className=\'sc-tog \'+((_governors[\''+ip+'\']||[]).find(function(x){return x.id===\''+p.id+'\';})||{}).restartAfter?\'on\':\'off\';"></button>');
+  body.innerHTML=h;
+  card.appendChild(hdr); card.appendChild(body);
+  return card;
+}
+
+function govAddProfile(ip){
+  _governors[ip]=_governors[ip]||[];
+  _governors[ip].push({ id:'g'+Date.now()+Math.floor(Math.random()*1000), name:'New Profile',
+    enabled:false, startHHMM:null, endHHMM:null, uptimeMin:null,
+    fanStepDownMin:null, fanStepUpMax:null, asicBands:[], vrBands:[], ampsBand:{max:null,min:null},
+    priority:'asic', mhzStep:null, mvStep:null, mhzFloor:null, mhzCeil:null, mvFloor:null, mvCeil:null,
+    fanStep:null, fanFloor:null, fanCeil:null,
+    dwellSec:null, settleSec:null, bothWays:false, restartAfter:false, _open:true });
+  saveGovernors(); renderGovernorPanel();
+}
+function govDeleteProfile(ip, pid){
+  if(!_governors[ip]) return;
+  _governors[ip]=_governors[ip].filter(function(p){return p.id!==pid;});
+  saveGovernors(); renderGovernorPanel();
+}
+var GOV_NUM_FIELDS={startHHMM:1,endHHMM:1,uptimeMin:1,fanStepDownMin:1,fanStepUpMax:1,mhzStep:1,mvStep:1,mhzFloor:1,mhzCeil:1,mvFloor:1,mvCeil:1,fanStep:1,fanFloor:1,fanCeil:1,dwellSec:1,settleSec:1};
+function govSetBand(ip, pid, bkey, which, val){
+  var list=_governors[ip]; if(!list) return;
+  var p=list.find(function(x){return x.id===pid;}); if(!p) return;
+  var parts=bkey.split(':'); var kind=parts[0], idx=parseInt(parts[1],10);
+  var v = (val===''||val==null)?null:parseFloat(val);
+  if(kind==='amps'){ p.ampsBand=p.ampsBand||{max:null,min:null}; p.ampsBand[which]=v; saveGovernors(); return; }
+  var bands = kind==='vr' ? (p.vrBands=p.vrBands||[]) : (p.asicBands=p.asicBands||[]);
+  if(!bands[idx]) bands[idx]={max:null,min:null};
+  bands[idx][which] = v;
+  saveGovernors();
+}
+function govSetField(ip, pid, key, val){
+  var list=_governors[ip]; if(!list) return;
+  var p=list.find(function(x){return x.id===pid;}); if(!p) return;
+  if(key==='enabled'||key==='bothWays'||key==='restartAfter'||key==='allDay'){ p[key]=!!val; }
+  else if(GOV_NUM_FIELDS[key]){ p[key] = (val==='' || val==null) ? null : parseInt(val,10); }
+  else { p[key]=val; }
+  // Validate no overlap when a window changes (and when enabling)
+  if(key==='startHHMM'||key==='endHHMM'||key==='enabled'){
+    var conflict=_govOverlapCheck(ip, p);
+    if(conflict){
+      showToast('\u26a0 Overlap', 'Window overlaps "'+conflict+'". Profiles on a miner can\u2019t overlap.', 'err');
+      if(key==='enabled') p.enabled=false;
+    }
+  }
+  saveGovernors();
+  // re-render header time label only on window change
+  if(key==='startHHMM'||key==='endHHMM') renderGovernorPanel();
+}
+function _hhmmToMin(v){ if(v==null) return null; var s=Math.floor(v/100), m=v%100; return s*60+m; }
+function _govOverlapCheck(ip, p){
+  if(!p.enabled) return null;
+  if(!p.allDay && (p.startHHMM==null||p.endHHMM==null)) return null;
+  function ranges(pp){ // returns list of [start,end) minute ranges, splitting midnight wrap
+    if(pp.allDay) return [[0,1440]];
+    var a=_hhmmToMin(pp.startHHMM), b=_hhmmToMin(pp.endHHMM);
+    if(a===b) return [];
+    if(a<b) return [[a,b]];
+    return [[a,1440],[0,b]];
+  }
+  var mine=ranges(p);
+  var others=(_governors[ip]||[]).filter(function(x){return x.id!==p.id && x.enabled && (x.allDay || (x.startHHMM!=null && x.endHHMM!=null));});
+  for(var i=0;i<others.length;i++){
+    var orr=ranges(others[i]);
+    for(var a=0;a<mine.length;a++) for(var b=0;b<orr.length;b++){
+      if(mine[a][0]<orr[b][1] && orr[b][0]<mine[a][1]) return others[i].name||'(unnamed)';
+    }
+  }
+  return null;
+}
+
+
 
 
 
@@ -2005,6 +2701,9 @@ document.getElementById('btn-reset-miners').onclick=()=>{
 
 // ── Shutdown on main window close (full Edge X) ───────────────────────────────
 window.addEventListener('beforeunload', () => {
+  // Only the local app window should kill the server — remote viewers (Tailscale/LAN) must not
+  var hn = location.hostname;
+  if(hn !== 'localhost' && hn !== '127.0.0.1') return;
   // sendBeacon is the only reliable way to send a request on window close
   try { navigator.sendBeacon(`${SERVER}/shutdown`); } catch(e) {}
   // Fallback for older browsers
@@ -2042,11 +2741,31 @@ function renderHrList(el, entries, miners_ref, topN){
     body.style.cssText='padding:10px 14px;display:block';
     entries[m.ip].slice(0,topN).forEach(function(p,i){
       var row=document.createElement('div');
-      row.style.cssText='display:flex;gap:8px;font-size:.78rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)';
+      row.style.cssText='display:flex;gap:8px;align-items:center;font-size:.78rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)';
       var d=new Date(p.ts);
       var ts=d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
       var errStr=p.err!=null?'<span style="color:'+(p.err>2?'var(--red)':p.err>0.5?'#f7931a':'var(--grn)')+'"> '+p.err.toFixed(2)+'%</span>':'';
       row.innerHTML='<span style="color:var(--muted);min-width:24px">'+(i+1)+'.</span><span style="color:'+color+';font-weight:600;min-width:100px">'+fmtHr(p.hr)+'</span>'+errStr+'<span style="color:var(--muted);font-size:.72rem;margin-left:auto">'+ts+'</span>';
+      if(!isSession){
+        var delBtn=document.createElement('button');
+        delBtn.textContent='×';
+        delBtn.title='Delete this entry';
+        delBtn.style.cssText='background:transparent;border:none;cursor:pointer;color:var(--muted);font-size:.9rem;padding:0 2px;line-height:1;flex-shrink:0';
+        delBtn.onmouseenter=function(){this.style.color='var(--red)';};
+        delBtn.onmouseleave=function(){this.style.color='var(--muted)';};
+        (function(mip,pts){
+          delBtn.addEventListener('click',function(ev){
+            ev.stopPropagation();
+            var d2=hrLoad();
+            if(d2[mip]){
+              d2[mip]=d2[mip].filter(function(x){return x.ts!==pts;});
+              hrSave(d2);
+            }
+            updateHrPanelContent();
+          });
+        })(m.ip, p.ts);
+        row.appendChild(delBtn);
+      }
       body.appendChild(row);
     });
     hdr.onclick=function(){
@@ -2096,17 +2815,50 @@ function renderHrListInPlace(el, entries, miners_ref, topN, isSession){
         if(mn){mn.topHrSeries=[];updateHrPanelContent();}
       });})(m.ip);
       hdr.appendChild(ttl); hdr.appendChild(trashH); hdr.appendChild(caret);
-    } else { hdr.appendChild(ttl); hdr.appendChild(caret); }
+    } else {
+      var trashHAT=document.createElement('button');
+      trashHAT.textContent='🗑';
+      trashHAT.title='Clear ALL-TIME HR scores for this miner';
+      trashHAT.style.cssText='background:transparent;border:none;cursor:pointer;font-size:.9rem;padding:0 6px;color:var(--muted)';
+      (function(mip){trashHAT.addEventListener('mousedown',function(ev){
+        ev.stopPropagation();
+        if(!confirm('Clear all-time HR scores for '+mip+'?')) return;
+        try{ var d2=hrLoad(); if(d2[mip]!==undefined){ delete d2[mip]; hrSave(d2); } }catch(e){}
+        try{ fetch(SERVER+'/deletehrentry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip:mip,ts:'all'})}).catch(function(){}); }catch(e){}
+        updateHrPanelContent();
+      });})(m.ip);
+      hdr.appendChild(ttl); hdr.appendChild(trashHAT); hdr.appendChild(caret);
+    }
     var body=document.createElement('div');
     body.className='hr-body';
     body.style.cssText='padding:10px 14px;display:'+(isCollapsed?'none':'block');
     entries[m.ip].slice(0,topN).forEach(function(p,i){
       var row=document.createElement('div');
-      row.style.cssText='display:flex;gap:8px;font-size:.78rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)';
+      row.style.cssText='display:flex;gap:8px;align-items:center;font-size:.78rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)';
       var d=new Date(p.ts);
       var ts=d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
       var errStr=p.err!=null?'<span style="color:'+(p.err>2?'var(--red)':p.err>0.5?'#f7931a':'var(--grn)')+'"> '+p.err.toFixed(2)+'%</span>':'';
       row.innerHTML='<span style="color:var(--muted);min-width:24px">'+(i+1)+'.</span><span style="color:'+color+';font-weight:600;min-width:100px">'+fmtHr(p.hr)+'</span>'+errStr+'<span style="color:var(--muted);font-size:.72rem;margin-left:auto">'+ts+'</span>';
+      if(!isSession){
+        var delBtn=document.createElement('button');
+        delBtn.textContent='×';
+        delBtn.title='Delete this entry';
+        delBtn.style.cssText='background:transparent;border:none;cursor:pointer;color:var(--muted);font-size:.9rem;padding:0 2px;line-height:1;flex-shrink:0';
+        delBtn.onmouseenter=function(){this.style.color='var(--red)';};
+        delBtn.onmouseleave=function(){this.style.color='var(--muted)';};
+        (function(mip,pts){
+          delBtn.addEventListener('click',function(ev){
+            ev.stopPropagation();
+            var d2=hrLoad();
+            if(d2[mip]){
+              d2[mip]=d2[mip].filter(function(x){return x.ts!==pts;});
+              hrSave(d2);
+            }
+            updateHrPanelContent();
+          });
+        })(m.ip, p.ts);
+        row.appendChild(delBtn);
+      }
       body.appendChild(row);
     });
     hdr.onclick=function(){
@@ -2141,6 +2893,32 @@ function updateHrPanelContent(){
 }
 
 document.getElementById('btn-hr-scores').onclick=function(){ openHrPanel(); };
+
+// ── Startup checkbox (Windows scheduled task) ──
+async function checkStartupState(){
+  try{
+    const r=await fetch(SERVER+'/startup',{signal:AbortSignal.timeout(3000)});
+    if(r.ok){ const d=await r.json(); var c=document.getElementById('chk-startup'); if(c) c.checked=!!d.enabled; }
+  }catch(e){}
+}
+(function(){
+  var c=document.getElementById('chk-startup');
+  if(c){
+    c.onchange=async function(){
+      const enable=this.checked;
+      try{
+        const r=await fetch(SERVER+'/startup',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({enable:enable}),signal:AbortSignal.timeout(30000)});
+        if(!r.ok) throw new Error('status '+r.status);
+        showToast(enable?'✓ Added to Windows Startup':'✓ Removed from Windows Startup','Approve the UAC prompt if it appears','ok');
+      }catch(e){
+        this.checked=!enable;
+        showToast('Failed to update startup setting','You may need to approve the admin prompt','err');
+      }
+    };
+  }
+})();
+setTimeout(checkStartupState, 2000);
 
 document.getElementById('btn-shutdown').onclick = async () => {
   try {
@@ -2183,6 +2961,19 @@ function saveColWidth(){
 // Save whenever page is hidden or closed
 window.addEventListener('pagehide', ()=>{ saveColWidth(); saveMiners(); });
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ saveColWidth(); saveMiners(); } });
+
+// ── Stream watchdog: stream silent but API healthy = stale WS, force stream reconnect ──
+setInterval(function(){
+  var now=Date.now();
+  Object.values(miners).forEach(function(m){
+    if(!m.ip||!m.ws||m.status!=='Live'||m.retry) return;
+    if(!m._lastStreamMsgTs||now-m._lastStreamMsgTs<60000) return;       // stream not silent long enough
+    if(!m._lastApiOkTs||now-m._lastApiOkTs>15000) return;               // API also down = real outage, normal path handles it
+    addLog('er','⟳ '+m.ip+' — log stream silent 60s while API healthy. Reconnecting stream.',m.color);
+    m._lastStreamMsgTs=now; // avoid instant re-trigger while reconnecting
+    connectMiner(m);
+  });
+},15000);
 
 // ── Auto-restart watchdog ────────────────────────────────────────────────────
 const STALL_MS=5*60*1000,MAX_RESTARTS=3,RESTART_WINDOW=60*60*1000;
@@ -2257,7 +3048,7 @@ document.getElementById('btn-mode-hash').onclick=function(){
 
 // ── Stats visibility dropdown ─────────────────────────────────────────────────
 var _mobNotifQueue=[];
-var statsVis = {best:true, status:true, stats:true, temps:true, top10:true, log:true, disco:false};
+var statsVis = {best:true, status:true, stats:true, temps:true, top10:true, log:true, disco:false, power:true, amps:true, volt:true, freq:true, asics:true};
 
 function loadStatsVis(){
   try{
@@ -2349,8 +3140,21 @@ async function renderSettingsPanel(){
     var volt=info&&info.coreVoltage!=null?info.coreVoltage:'';
     var autoFan=info&&info.autofanspeed!=null?info.autofanspeed:1;
     var fanspd=info&&info.manualFanSpeed!=null?info.manualFanSpeed:(info&&info.fanspeed!=null?Math.round(info.fanspeed):100);
-    var minFan=info&&info.minFanSpeed!=null?info.minFanSpeed:35;
-    var tempTgt=info&&info.temptarget!=null?info.temptarget:60;
+    // target temp: AxeOS uses temptarget; Nexus uses pidTargetTemp / fans[0].pid.targetTemp
+    var _tt=(info&&info.temptarget!=null)?info.temptarget
+           :(info&&info.pidTargetTemp!=null)?info.pidTargetTemp
+           :(fansArr&&fansArr[0]&&fansArr[0].pid&&fansArr[0].pid.targetTemp!=null)?fansArr[0].pid.targetTemp:60;
+    var tempTgt=_tt;
+    // min fan: AxeOS reports minFanSpeed; Nexus has no min-fan field
+    var minFan=info&&info.minFanSpeed!=null?info.minFanSpeed:(info&&info.minfanspeed!=null?info.minfanspeed:0);
+    var hasMinFan=info&&(info.minFanSpeed!=null||info.minfanspeed!=null);
+    // VR (2nd) fan — only present on multi-fan miners like the Nexus (fanCount>1 / fans[1])
+    var fansArr=(info&&Array.isArray(info.fans))?info.fans:null;
+    var hasFan2=(info&&info.fanCount>1)||(fansArr&&fansArr.length>1);
+    var vrFan=(fansArr&&fansArr.length>1)?fansArr[1]:null;
+    var vrMode=vrFan&&vrFan.mode!=null?vrFan.mode:3;
+    var vrSpeed=vrFan&&vrFan.manualSpeed!=null?vrFan.manualSpeed:100;
+    if(fansArr) _vrFansCache[m.ip]=fansArr;
     var hr=info?(info.hashRate_1m||info.hashRate||0):0;
     var up=info?(info.uptimeSeconds||0):0;
     var upStr=up?(Math.floor(up/86400)+'d '+Math.floor((up%86400)/3600)+'h '+Math.floor((up%3600)/60)+'m'):'---';
@@ -2373,16 +3177,37 @@ async function renderSettingsPanel(){
     var afChk=document.createElement('input');afChk.type='checkbox';afChk.id='autofan-'+key;afChk.checked=!!autoFan;afChk.style.cssText='width:18px;height:18px;cursor:pointer;accent-color:var(--grn)';
     afRow.appendChild(afLbl);afRow.appendChild(afChk);frm.appendChild(afRow);
     var ttDiv=document.createElement('div');ttDiv.id='ttdiv-'+key;ttDiv.style.display=autoFan?'block':'none';
-    var ttl=document.createElement('label');ttl.style.cssText=lS;ttl.textContent='Target Temp (°C, 35-66)';ttDiv.appendChild(ttl);
-    var tti=document.createElement('input');tti.type='number';tti.id='temptgt-'+key;tti.value=tempTgt;tti.min=35;tti.max=66;tti.style.cssText=iS;ttDiv.appendChild(tti);
-    var mfl=document.createElement('label');mfl.style.cssText=lS;mfl.textContent='Min Fan Speed (%, 0-99)';ttDiv.appendChild(mfl);
-    var mfi=document.createElement('input');mfi.type='number';mfi.id='minfan-'+key;mfi.value=minFan;mfi.min=0;mfi.max=99;mfi.style.cssText=iS;ttDiv.appendChild(mfi);
+    var ttl=document.createElement('label');ttl.style.cssText=lS;ttl.textContent='Target Temp (°C)';ttDiv.appendChild(ttl);
+    var tti=document.createElement('input');tti.type='number';tti.id='temptgt-'+key;tti.value=tempTgt;tti.min=20;tti.max=90;tti.style.cssText=iS;ttDiv.appendChild(tti);
+    if(hasMinFan){
+      var mfl=document.createElement('label');mfl.style.cssText=lS;mfl.textContent='Min Fan Speed (%, 0-99)';ttDiv.appendChild(mfl);
+      var mfi=document.createElement('input');mfi.type='number';mfi.id='minfan-'+key;mfi.value=minFan;mfi.min=0;mfi.max=99;mfi.style.cssText=iS;ttDiv.appendChild(mfi);
+    }
     frm.appendChild(ttDiv);
     var mfDiv=document.createElement('div');mfDiv.id='mfdiv-'+key;mfDiv.style.display=autoFan?'none':'block';
     var msl=document.createElement('label');msl.style.cssText=lS;msl.textContent='Manual Fan Speed (%, 0-100)';mfDiv.appendChild(msl);
     var msi=document.createElement('input');msi.type='number';msi.id='fanspd-'+key;msi.value=fanspd;msi.min=0;msi.max=100;msi.style.cssText=iS;mfDiv.appendChild(msi);
     frm.appendChild(mfDiv);
     afChk.onchange=function(){var k=this.id.replace('autofan-','');document.getElementById('ttdiv-'+k).style.display=this.checked?'block':'none';document.getElementById('mfdiv-'+k).style.display=this.checked?'none':'block';};
+    // ── VR (2nd) fan — only for miners that report it ──
+    if(hasFan2){
+      var vfHdr=document.createElement('div');vfHdr.style.cssText=secS;vfHdr.textContent='VR Fan Control';frm.appendChild(vfHdr);
+      var vml=document.createElement('label');vml.style.cssText=lS;vml.textContent='VR Fan Mode';frm.appendChild(vml);
+      var vsel=document.createElement('select');vsel.id='vrmode-'+key;vsel.style.cssText=iS;
+      [['Linked',3],['Manual',0],['Auto (PID)',2]].forEach(function(o){var op=document.createElement('option');op.value=o[1];op.textContent=o[0];if(o[1]===vrMode)op.selected=true;vsel.appendChild(op);});
+      frm.appendChild(vsel);
+      var vmfDiv=document.createElement('div');vmfDiv.id='vrmfdiv-'+key;vmfDiv.style.display=(vrMode===0)?'block':'none';
+      var vsl=document.createElement('label');vsl.style.cssText=lS;vsl.textContent='VR Manual Fan Speed (%, 0-100)';vmfDiv.appendChild(vsl);
+      var vsi=document.createElement('input');vsi.type='number';vsi.id='vrfanspd-'+key;vsi.value=vrSpeed;vsi.min=0;vsi.max=100;vsi.style.cssText=iS;vmfDiv.appendChild(vsi);
+      frm.appendChild(vmfDiv);
+      // VR PID target temp — shown when mode is Auto (PID)
+      var vrTgt=(vrFan&&vrFan.pid&&vrFan.pid.targetTemp!=null)?vrFan.pid.targetTemp:65;
+      var vpDiv=document.createElement('div');vpDiv.id='vrpiddiv-'+key;vpDiv.style.display=(vrMode===2)?'block':'none';
+      var vpl=document.createElement('label');vpl.style.cssText=lS;vpl.textContent='VR Target Temp (°C)';vpDiv.appendChild(vpl);
+      var vpi=document.createElement('input');vpi.type='number';vpi.id='vrpidtgt-'+key;vpi.value=vrTgt;vpi.min=20;vpi.max=90;vpi.style.cssText=iS;vpDiv.appendChild(vpi);
+      frm.appendChild(vpDiv);
+      vsel.onchange=function(){var k=this.id.replace('vrmode-','');var m=parseInt(this.value);document.getElementById('vrmfdiv-'+k).style.display=(m===0)?'block':'none';var pd=document.getElementById('vrpiddiv-'+k);if(pd)pd.style.display=(m===2)?'block':'none';};
+    }
     var rw=document.createElement('div');rw.style.cssText='display:flex;gap:10px;margin-top:4px;margin-bottom:8px';
     var sb=document.createElement('button');sb.style.cssText='flex:1;background:var(--grn);border:none;color:#000;font-family:inherit;font-size:.75rem;font-weight:bold;padding:9px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase';sb.textContent='✓ Save';sb.dataset.ip=m.ip;sb.onclick=function(){settingsSave(this.dataset.ip);};rw.appendChild(sb);
     var rb=document.createElement('button');rb.style.cssText='flex:1;background:transparent;border:1px solid var(--red);color:var(--red);font-family:inherit;font-size:.75rem;padding:9px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase';rb.textContent='↻ Restart';rb.dataset.ip=m.ip;rb.onclick=function(){settingsRestart(this.dataset.ip);};rw.appendChild(rb);
@@ -2391,6 +3216,7 @@ async function renderSettingsPanel(){
     col.appendChild(frm);body.appendChild(col);
   }
 }
+var _vrFansCache={};
 async function settingsSave(ip){
   var key=ip.replace(/[.]/g,'_');
   var f=document.getElementById('freq-'+key),v=document.getElementById('volt-'+key);
@@ -2404,6 +3230,25 @@ async function settingsSave(ip){
   var body={frequency:freq,coreVoltage:volt,overclockEnabled:1,autofanspeed:autoFan};
   if(autoFan){if(tt&&!isNaN(parseInt(tt.value)))body.temptarget=parseInt(tt.value);if(mf&&!isNaN(parseInt(mf.value)))body.minfanspeed=parseInt(mf.value);}
   else{if(ms&&!isNaN(parseInt(ms.value)))body.manualFanSpeed=parseInt(ms.value);}
+  // VR (2nd) fan: send the fans[] array (write-shape), preserving each fan's pid/overheat.
+  // fan[0] mirrors the ASIC form so the array never disturbs the working ASIC fan.
+  var vrSel=document.getElementById('vrmode-'+key);
+  if(vrSel && _vrFansCache[ip] && _vrFansCache[ip].length>1){
+    var cur=_vrFansCache[ip];
+    var wf=function(o){ return {mode:o.mode, manualSpeed:o.manualSpeed,
+      overheatTemp:(o.overheatTemp!=null?o.overheatTemp:90),
+      pid:o.pid?{targetTemp:o.pid.targetTemp,p:o.pid.p,i:o.pid.i,d:o.pid.d}:{targetTemp:60,p:6,i:0.1,d:10}}; };
+    var f0=wf(cur[0]), f1=wf(cur[1]);
+    f0.mode=autoFan?2:0;
+    if(!autoFan && ms && !isNaN(parseInt(ms.value))) f0.manualSpeed=parseInt(ms.value);
+    if(autoFan && tt && !isNaN(parseInt(tt.value))) f0.pid.targetTemp=parseInt(tt.value);
+    f1.mode=parseInt(vrSel.value);
+    var vspd=document.getElementById('vrfanspd-'+key);
+    if(f1.mode===0 && vspd && !isNaN(parseInt(vspd.value))) f1.manualSpeed=parseInt(vspd.value);
+    var vpt=document.getElementById('vrpidtgt-'+key);
+    if(f1.mode===2 && vpt && !isNaN(parseInt(vpt.value)) && f1.pid) f1.pid.targetTemp=parseInt(vpt.value);
+    body.fans=[f0,f1];
+  }
   if(msg){msg.style.color='var(--muted)';msg.textContent='Saving...';}
   try{
     var res=await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(body)}});
@@ -2466,6 +3311,8 @@ function pushSessionData(){
         lastTarget:m.lastTarget,
         errorRate:m.axeOSErrorRate,
         power:m.axeOSPower,
+        current:m.axeOSCurrent,
+        hourStats:(typeof computeHourStats==='function'?computeHourStats(m):null),
         status:m.status,
         stalled:!!(m.status==='Live'&&(
           (m.lastFoundTs&&(Date.now()-m.lastFoundTs>30000))||
@@ -2489,6 +3336,31 @@ setTimeout(function(){ var d2=hrLoad(); if(Object.keys(d2).length) hrSave(d2); }
 setInterval(function(){if(!_mobNotifQueue.length)return;var n=_mobNotifQueue.splice(0);fetch(SERVER+'/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(n)}).catch(function(){});},2000);
 
 // Poll for autoRestart changes from Safari
+setInterval(function(){
+  fetch(SERVER+'/getdiffclear').then(function(r){return r.json();}).then(function(d){
+    if(!d||!d.ip) return;
+    var at=atLoad();
+    if(at[d.ip]!==undefined){ delete at[d.ip]; atSave(at); if(document.getElementById('alltime-overlay')&&document.getElementById('alltime-overlay').style.display!=='none') updateDiffPanelContent(); }
+  }).catch(function(){});
+},5000);
+
+setInterval(function(){
+  fetch(SERVER+'/gethrdelete').then(function(r){return r.json();}).then(function(d){
+    if(!d||!d.ip) return;
+    var d2=hrLoad();
+    if(d.ts==='all'){                       // clear this miner's entire HR history
+      if(d2[d.ip]!==undefined){ delete d2[d.ip]; hrSave(d2); updateHrPanelContent(); }
+      return;
+    }
+    if(!d.ts) return;
+    if(d2[d.ip]){
+      d2[d.ip]=d2[d.ip].filter(function(x){return x.ts!==d.ts;});
+      hrSave(d2);
+      updateHrPanelContent();
+    }
+  }).catch(function(){});
+},5000);
+
 setInterval(function(){
   fetch(SERVER+'/getclearsession').then(function(r){return r.json();}).then(function(d){
     if(!d||!d.ip) return;
@@ -2779,6 +3651,37 @@ function atSave(data){
   }catch(e){}
 }
 
+// Completely remove a miner (by IP) from every local + server store. Fixes ghost
+// IPs that reappear because the server rebuilds its miner list from all-time keys.
+function purgeMinerData(){
+  var ip = prompt('Purge ALL stored data for which miner IP?\n(removes it from history, all-time, reports, and the server so it stops reappearing)', '10.0.0.168');
+  if(ip===null) return;
+  ip = (ip||'').trim();
+  if(!ip) return;
+  if(!confirm('Permanently remove all stored data for '+ip+'?\nThis cannot be undone.')) return;
+  // 1) remove the live miner object if present (stops the 2s session push re-adding it)
+  try{ Object.keys(miners).forEach(function(id){ if(miners[id] && miners[id].ip===ip){ try{disconnectMiner(miners[id]);}catch(e){} delete miners[id]; } }); }catch(e){}
+  // 2) all-time diff history (bitaxe_alltime_v1) — the key the SERVER rebuilds minerIPs from
+  try{ var at=atLoad(); if(at && at[ip]!==undefined){ delete at[ip]; atSave(at); } }catch(e){}
+  // 3) hashrate high-scores (bitaxe_hashrate_ht_v1)
+  try{ var hr=hrLoad(); if(hr && hr[ip]!==undefined){ delete hr[ip]; hrSave(hr); } }catch(e){}
+  // 4) session reports (bitaxe_session_reports_v1)
+  try{ var rk='bitaxe_session_reports_v1'; var rep=JSON.parse(localStorage.getItem(rk)||'{}'); if(rep && rep[ip]!==undefined){ delete rep[ip]; localStorage.setItem(rk, JSON.stringify(rep)); } }catch(e){}
+  // 5) governor + its runtime state (keyed by ip)
+  try{ if(typeof _governors==='object' && _governors[ip]){ delete _governors[ip]; if(typeof saveGovernors==='function') saveGovernors(); } }catch(e){}
+  try{ if(typeof _govState==='object') delete _govState[ip]; if(typeof _govLastSensors==='object') delete _govLastSensors[ip]; }catch(e){}
+  // 6) miner order list
+  try{ var ok='bitaxe_miner_order'; var o=JSON.parse(localStorage.getItem(ok)||'[]'); if(Array.isArray(o)){ var j=o.indexOf(ip); if(j>=0){ o.splice(j,1); localStorage.setItem(ok, JSON.stringify(o)); } } }catch(e){}
+  // 7) tell the server to drop it from its miner list + rebuild session/all-time WITHOUT it
+  try{
+    var liveIps = Object.values(miners).map(function(m){return m.ip;}).filter(Boolean);
+    fetch(SERVER+'/setminers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ips:liveIps})}).catch(function(){});
+  }catch(e){}
+  try{ saveMiners(); }catch(e){}
+  try{ renderMinerList(); renderCards(); buildPanels(); updateHeader(); }catch(e){}
+  showToast('🧹 Purged', ip+' removed from all stores. If it still shows on mobile, restart the server once to clear its memory.', 'ok');
+}
+
 // Called every time a new share comes in
 function atRecord(m, found, target, accepted){
   const data = atLoad();
@@ -2845,10 +3748,23 @@ function renderAtList(){
   if(document.getElementById("alltime-overlay").style.display!=="none") updateDiffPanelContent();
 }
 
+function _toastSync(){
+  var list=document.getElementById('toast-list'), bar=document.getElementById('toast-deckbar'), cnt=document.getElementById('toast-count');
+  if(!list) return;
+  var n=list.children.length;
+  if(cnt) cnt.textContent=n;
+  if(bar) bar.classList.toggle('show', n>0);
+  if(n===0) list.classList.add('deck'); // empty -> reset to collapsed for next time
+}
+function _toastToggle(){
+  var list=document.getElementById('toast-list'); if(!list) return;
+  list.classList.toggle('deck');
+  if(!list.classList.contains('deck')) list.scrollTop=list.scrollHeight;
+}
 function showToast(title, msg, type){
   _mobNotifQueue.push({title:String(title||''),msg:String(msg||'').replace(/<[^>]+>/g,' '),type:String(type||'warn'),ts:Date.now()});
   if(_mobNotifQueue.length>20) _mobNotifQueue.shift();
-  const container = document.getElementById('toast-container');
+  const list = document.getElementById('toast-list');
   const t = document.createElement('div');
   t.className = 'toast ' + (type||'warn');
   var now=new Date(); var hh=now.getHours()%12||12; var mm=String(now.getMinutes()).padStart(2,'0'); var ampm=now.getHours()>=12?'PM':'AM';
@@ -2859,10 +3775,28 @@ function showToast(title, msg, type){
       '<div>' + msg + '</div>' +
     '</div>' +
     '<button class="toast-close" title="Dismiss">✕</button>';
-  t.querySelector('.toast-close').onclick = () => t.remove();
-  container.appendChild(t);
-  // Scroll into view if many stacked
-  t.scrollIntoView({behavior:'smooth', block:'end'});
+  t.querySelector('.toast-close').onclick = (e) => { e.stopPropagation(); t.remove(); _toastSync(); };
+  // tapping a card toggles the deck: collapsed -> expand, expanded -> restack
+  t.addEventListener('click', function(){ _toastToggle(); });
+  list.appendChild(t);              // newest at bottom (front of the deck)
+  list.classList.add('deck');       // new notifications keep the deck collapsed
+  _wireToastDeck();
+  _toastSync();
+}
+// wire deck controls once, lazily (element exists by the time a toast fires)
+function _wireToastDeck(){
+  var c=document.getElementById('toast-container');
+  if(!c || c._deckWired) return; c._deckWired=true;
+  c.addEventListener('click', function(e){
+    var el=e.target;
+    if(el && el.id==='toast-clearall'){
+      e.stopPropagation();
+      var list=document.getElementById('toast-list'); if(list) list.innerHTML='';
+      _toastSync();
+    } else if(el && el.id==='toast-count'){
+      e.stopPropagation(); _toastToggle();
+    }
+  });
 }
 
 function renderDiffListInPlace(el,entries_by_ip,topN,isSession){
@@ -2897,7 +3831,20 @@ function renderDiffListInPlace(el,entries_by_ip,topN,isSession){
         if(mn){mn.topSeries=[];markSessionCleared(mn);markDirty();updateCardStats(mn);updateDiffPanelContent();}
       });})(m.ip);
       hdr.appendChild(ttl); hdr.appendChild(trashD); hdr.appendChild(caret);
-    } else { hdr.appendChild(ttl); hdr.appendChild(caret); }
+    } else {
+      var trashAT=document.createElement("button");
+      trashAT.textContent="🗑";
+      trashAT.title="Clear ALL-TIME best diffs for this miner";
+      trashAT.style.cssText="background:transparent;border:none;cursor:pointer;font-size:.9rem;padding:0 6px;color:var(--muted)";
+      (function(mip){trashAT.addEventListener("mousedown",function(ev){
+        ev.stopPropagation();
+        if(!confirm("Clear all-time best difficulties for "+mip+"?")) return;
+        try{ var at=atLoad(); if(at[mip]!==undefined){ delete at[mip]; atSave(at); } }catch(e){}
+        try{ fetch(SERVER+'/setdiffclear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip:mip})}).catch(function(){}); }catch(e){}
+        updateDiffPanelContent();
+      });})(m.ip);
+      hdr.appendChild(ttl); hdr.appendChild(trashAT); hdr.appendChild(caret);
+    }
     var body=document.createElement("div"); body.className="diff-body";
     body.style.cssText="padding:10px 14px;display:"+(isCollapsed?"none":"block");
     entries.slice(0,topN).forEach(function(e,i){
@@ -2967,6 +3914,7 @@ if(!loadMiners()){
   addMiner('10.0.0.140');
   addMiner('10.0.0.20');
 }
+applyMinerOrder();
 loadStatsVis();
 applyStatsVis();
 buildPanels();
@@ -3002,6 +3950,17 @@ try{
   var bootNames={};bootMiners.forEach(function(m){if(m.name&&m.name.trim())bootNames[m.ip]=m.name.trim();});
   fetch(SERVER+'/setminers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ips:bootIps,names:bootNames})}).catch(function(){});
 }catch(e){}
+// Push the current miner list to the server. Must be called whenever miners are
+// added or removed, because the server now takes its active-miner list ONLY from
+// /setminers (it no longer derives it from history keys).
+function pushMinerList(){
+  try{
+    var mm=Object.values(miners).filter(function(m){return m.ip;});
+    var ips=mm.map(function(m){return m.ip;});
+    var names={}; mm.forEach(function(m){ if(m.name&&m.name.trim()) names[m.ip]=m.name.trim(); });
+    fetch(SERVER+'/setminers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ips:ips,names:names})}).catch(function(){});
+  }catch(e){}
+}
 
 // ============================================================
 // SCRIPTS ENGINE
@@ -3025,7 +3984,7 @@ if(_sc.length) setTimeout(function(){ try{ fetch(SERVER+'/scripts',{method:'POST
 var SC_FIELDS = ['hashrate','hashrate_1m','hashrate_10m','hashrate_1h','bestDiff','bestSessionDiff',
   'efficiency','asic1Temp','asic2Temp','asic3Temp','asic4Temp','asic5Temp','asic6Temp','asic7Temp','asic8Temp','vrTemp','fanRpm','fanMode','tempTarget','power','voltage','current',
   'poolConnected','rejectRate','staleRate','poolTarget','uptime','online','frequency',
-  'hourOfDay','minuteOfDay','autoRestarts'];
+  'timeOfDay','autoRestarts'];
 var SC_OPS = ['>','>=','<','<=','==','!=','between','outside','is_true','is_false'];
 var SC_ACTIONS = ['restart','setFrequency','setCoreVoltage','setFanSpeed','setAutoFan',
   'setTargetTemp','setOverclock','setPrimaryPool','switchFallbackPool',
@@ -3061,6 +4020,7 @@ function _scVal(m, field){
     case 'uptime': return d.uptimeSeconds || 0;
     case 'frequency': return d.frequency || 0;
     case 'online': return m.status === 'Live' ? 1 : 0;
+    case 'timeOfDay': { var _t=new Date(); return _t.getHours()*100+_t.getMinutes(); }
     case 'hourOfDay': return new Date().getHours();
     case 'minuteOfDay': return new Date().getHours()*60 + new Date().getMinutes();
     case 'autoRestarts': return (m.restartLog||[]).filter(function(t){return Date.now()-t<3600000;}).length;
@@ -3423,6 +4383,88 @@ function updateReportReason(ip, resetReason){
   try{ fetch(SERVER+'/reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(all)}).catch(function(){}); }catch(e){}
 }
 
+
+// ── Last Hour Report (rolling 60 min, computed on open) ──────────────────────
+function computeHourStats(m){
+  var snaps=(m.hourSnaps||[]).filter(function(s){return s.ts>=Date.now()-3600000;});
+  if(!snaps.length) return null;
+  function mn(key){var v=null;snaps.forEach(function(s){if(s[key]!=null&&(v===null||s[key]<v))v=s[key];});return v;}
+  function mx(key){var v=null;snaps.forEach(function(s){if(s[key]!=null&&(v===null||s[key]>v))v=s[key];});return v;}
+  function avg(key){var sum=0,n=0;snaps.forEach(function(s){if(s[key]!=null){sum+=s[key];n++;}});return n?sum/n:null;}
+  function last(key){for(var i=snaps.length-1;i>=0;i--){if(snaps[i][key]!=null)return snaps[i][key];}return null;}
+  function first(key){for(var i=0;i<snaps.length;i++){if(snaps[i][key]!=null)return snaps[i][key];}return null;}
+  // shares this hour = latest cumulative - earliest cumulative in window (handle reboot reset)
+  var shFirst=first('shares'), shLast=last('shares');
+  var rjFirst=first('rej'),   rjLast=last('rej');
+  var sharesHr=(shFirst!=null&&shLast!=null&&shLast>=shFirst)?(shLast-shFirst):(shLast!=null?shLast:null);
+  var rejHr=(rjFirst!=null&&rjLast!=null&&rjLast>=rjFirst)?(rjLast-rjFirst):(rjLast!=null?rjLast:null);
+  var spanMs=snaps[snaps.length-1].ts - snaps[0].ts;
+  var avgShareSec=(sharesHr&&sharesHr>0&&spanMs>0)?(spanMs/1000/sharesHr):null;
+  return {
+    asicHi:mx('asic'), asicLo:mn('asicLo'),
+    vrHi:mx('vr'), vrLo:mn('vrLo'),
+    avgHr:avg('hr'),
+    mv:last('mv'), mhz:last('mhz'),
+    ampsHi:mx('amps'), ampsLo:mn('amps'),
+    avgEff:avg('eff'),
+    fanHi:mx('fan'), fanLo:mn('fan'),
+    avgErr:avg('err'),
+    shares:sharesHr, rej:rejHr,
+    avgShareSec:avgShareSec,
+    bestDiff:mx('bestSess'),
+    samples:snaps.length
+  };
+}
+function fmtHrShort(v){ if(v==null)return '—'; return v>=1000?(v/1000).toFixed(2)+' TH/s':v.toFixed(1)+' GH/s'; }
+function fmtSecShort(s){ if(s==null)return '—'; if(s<60)return s.toFixed(1)+'s'; if(s<3600)return (s/60).toFixed(1)+'m'; return (s/3600).toFixed(1)+'h'; }
+var _hourCollapsed={};
+try{ var _hcRaw=localStorage.getItem('bitaxe_hour_collapsed'); if(_hcRaw) _hourCollapsed=JSON.parse(_hcRaw); }catch(e){}
+function toggleHourCard(id){
+  _hourCollapsed[id]=!_hourCollapsed[id];
+  var b=document.getElementById('hbody-'+id);
+  var c=document.getElementById('hcar-'+id);
+  if(b) b.style.display=_hourCollapsed[id]?'none':'block';
+  if(c) c.textContent=_hourCollapsed[id]?'›':'˅';
+  try{ localStorage.setItem('bitaxe_hour_collapsed',JSON.stringify(_hourCollapsed)); }catch(e){}
+}
+function openHourReport(){
+  var ov=document.getElementById('hour-overlay');
+  var content=document.getElementById('hour-content');
+  content.innerHTML='';
+  var list=Object.values(miners).filter(function(m){return m.ip;});
+  if(!list.length){ content.innerHTML='<div style="color:var(--muted);text-align:center;padding:40px">No miners configured.</div>'; ov.style.display='flex'; return; }
+  var any=false;
+  list.forEach(function(m){
+    var st=computeHourStats(m);
+    var card=document.createElement('div');
+    card.style.cssText='background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:14px;padding:14px 16px';
+    var collapsed=!!_hourCollapsed[m.id];
+    var hdr='<div onclick="toggleHourCard(\''+m.id+'\')" style="font-size:.95rem;font-weight:700;color:'+m.color+';margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bdr);cursor:pointer;display:flex;align-items:center;gap:6px"><span id="hcar-'+m.id+'" style="font-size:.8em;color:var(--muted)">'+(collapsed?'›':'˅')+'</span><span>'+(m.name&&m.name.trim()?m.name.trim():m.ip)+'</span></div>';
+    if(!st){ card.innerHTML=hdr+'<div id="hbody-'+m.id+'" style="display:'+(collapsed?'none':'block')+';color:var(--muted);font-size:.82rem">No data collected in the last hour yet.</div>'; content.appendChild(card); return; }
+    any=true;
+    function row(label,val){ return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:.82rem"><span style="color:var(--muted)">'+label+'</span><span style="color:var(--txt);font-weight:600">'+val+'</span></div>'; }
+    var g='<div id="hbody-'+m.id+'" style="display:'+(collapsed?'none':'block')+'"><div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">';
+    g+=row('ASIC temp (hi/lo)', (st.asicHi!=null?st.asicHi.toFixed(1):'—')+' / '+(st.asicLo!=null?st.asicLo.toFixed(1):'—')+' °C');
+    g+=row('VR temp (hi/lo)', (st.vrHi!=null?st.vrHi.toFixed(1):'—')+' / '+(st.vrLo!=null?st.vrLo.toFixed(1):'—')+' °C');
+    g+=row('Avg hashrate', fmtHrShort(st.avgHr));
+    g+=row('Best diff', st.bestDiff!=null?fmtD(st.bestDiff):'—');
+    g+=row('Amps (hi/lo)', (st.ampsHi!=null?st.ampsHi.toFixed(2):'—')+' / '+(st.ampsLo!=null?st.ampsLo.toFixed(2):'—')+' A');
+    g+=row('Avg efficiency', st.avgEff!=null?st.avgEff.toFixed(1)+' W/TH':'—');
+    g+=row('Voltage', st.mv!=null?st.mv+' mV':'—');
+    g+=row('Frequency', st.mhz!=null?st.mhz+' MHz':'—');
+    g+=row('Fan (hi/lo)', (st.fanHi!=null?Math.round(st.fanHi):'—')+' / '+(st.fanLo!=null?Math.round(st.fanLo):'—')+' %');
+    g+=row('Avg error rate', st.avgErr!=null?st.avgErr.toFixed(2)+' %':'—');
+    g+=row('Shares / rej', (st.shares!=null?st.shares:'—')+' / '+(st.rej!=null?st.rej:'—'));
+    g+=row('Avg share time', fmtSecShort(st.avgShareSec));
+    g+='</div>';
+    g+='<div style="font-size:.66rem;color:var(--muted);margin-top:8px">'+st.samples+' samples</div></div>';
+    card.innerHTML=hdr+g;
+    content.appendChild(card);
+  });
+  if(!any){ content.innerHTML='<div style="color:var(--muted);text-align:center;padding:40px">No data collected in the last hour yet. Let miners run a few minutes.</div>'; }
+  ov.style.display='flex';
+}
+
 function openReportsPanel(){
   var overlay = document.getElementById('reports-overlay');
   overlay.style.display = 'flex';
@@ -3449,7 +4491,7 @@ function openReportsPanel(){
       var hrStr = r.lastHashrate ? (r.lastHashrate>=1000?(r.lastHashrate/1000).toFixed(2)+' TH/s':r.lastHashrate.toFixed(2)+' GH/s') : '—';
       var effStr = r.lastEfficiency ? r.lastEfficiency+' W/TH' : '—';
       var tempStr = (r.lastTemps&&r.lastTemps.length) ? r.lastTemps.map(function(t){
-        var tc=t.label==='VR'?(t.val>80?'var(--red)':t.val>70?'#f7931a':'var(--grn)'):(t.val>=70?'var(--red)':t.val>=65?'#f7931a':'var(--grn)');
+        var tc=(t.isVR||(t.label&&t.label.indexOf('VR')===0))?(t.val>80?'var(--red)':t.val>70?'#f7931a':'var(--grn)'):(t.val>=70?'var(--red)':t.val>=65?'#f7931a':'var(--grn)');
         return '<span style="color:'+tc+'">'+t.label+': '+t.val.toFixed(1)+'°</span>';
       }).join(' &nbsp; ') : '—';
       var rejPct = r.sharesFound>0 ? ' ('+((r.sharesRejected/r.sharesFound)*100).toFixed(2)+'%)' : '';
@@ -3759,12 +4801,12 @@ function mkCrow(c,ci){
   SC_OPS.forEach(function(op){var o=document.createElement('option');o.value=op;o.textContent=op;if(op===c.op)o.selected=true;os.appendChild(o);});
   os.onchange=function(){c.op=this.value;buildEditorBody();};
   // Time hint label
-  if(c.field==='hourOfDay'||c.field==='minuteOfDay'){
+  if(c.field==='hourOfDay'||c.field==='minuteOfDay'||c.field==='timeOfDay'){
     var now=new Date();
     var hh2=now.getHours()%12||12; var mm2=String(now.getMinutes()).padStart(2,'0'); var ap=now.getHours()>=12?'PM':'AM';
     var hint=document.createElement('span');
     hint.style.cssText='font-size:.7rem;color:var(--muted);white-space:nowrap';
-    hint.textContent=c.field==='hourOfDay'?'now='+now.getHours()+'  ('+hh2+ap+')':'now='+String(now.getHours()*60+now.getMinutes())+'  ('+hh2+':'+mm2+' '+ap+')';
+    hint.textContent=c.field==='timeOfDay'?('now='+String(now.getHours()*100+now.getMinutes()).padStart(4,'0')+' ('+hh2+':'+mm2+ap+')'):c.field==='hourOfDay'?'now='+now.getHours()+'  ('+hh2+ap+')':'now='+String(now.getHours()*60+now.getMinutes())+'  ('+hh2+':'+mm2+' '+ap+')';
     row.appendChild(hint);
   }
   row.appendChild(fs); row.appendChild(os);
@@ -3854,7 +4896,10 @@ function saveScript(){
     <div id="sc-ed-body" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px"></div>
   </div>
 </div>
-<div id="toast-container"></div>
+<div id="toast-container">
+  <div id="toast-deckbar"><span id="toast-count">0</span><button id="toast-clearall">Clear all</button></div>
+  <div id="toast-list" class="deck"></div>
+</div>
 
 </body>
 </html>

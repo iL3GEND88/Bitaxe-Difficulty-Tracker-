@@ -77,10 +77,97 @@ $ps2.Runspace = $rs
 [void]$ps2.AddArgument($listener)
 [void]$ps2.BeginInvoke()
 
+# ── Nexus per-share difficulty library ───────────────────────────────────────
+# Some firmwares (NexusOS / BM1373) never log "asic_result ... diff X of Y", so the
+# chart has nothing to plot. They DO log the raw stratum exchange. This library
+# reconstructs each share's difficulty from the stratum job + submit, using a byte
+# order verified against real captured shares (all computed to >= pool difficulty),
+# the device's own network difficulty, and the Bitcoin genesis block hash.
+$nexusDiffLib = @'
+function NX-Hex2Bytes([string]$h){
+  if([string]::IsNullOrEmpty($h) -or ($h.Length % 2 -ne 0)){ return ,(New-Object byte[] 0) }
+  $n=$h.Length/2; $b=New-Object byte[] $n
+  for($i=0;$i -lt $n;$i++){ $b[$i]=[Convert]::ToByte($h.Substring($i*2,2),16) }
+  return ,$b
+}
+function NX-Sha256([byte[]]$b){ $s=[System.Security.Cryptography.SHA256]::Create(); try{ return $s.ComputeHash($b) } finally { $s.Dispose() } }
+function NX-Sha256d([byte[]]$b){ return (NX-Sha256 (NX-Sha256 $b)) }
+function NX-Swap32([byte[]]$b){
+  $o=New-Object byte[] $b.Length
+  for($i=0;$i -lt $b.Length;$i+=4){ $o[$i]=$b[$i+3];$o[$i+1]=$b[$i+2];$o[$i+2]=$b[$i+1];$o[$i+3]=$b[$i] }
+  return ,$o
+}
+function NX-U32LE($v){
+  $u=[uint32]$v; $b=New-Object byte[] 4
+  $b[0]=[byte]($u -band 0xFF); $b[1]=[byte](($u -shr 8) -band 0xFF)
+  $b[2]=[byte](($u -shr 16) -band 0xFF); $b[3]=[byte](($u -shr 24) -band 0xFF)
+  return ,$b
+}
+# Locked byte order: prevhash word-swapped; version-rolling applied; ver/ntime/nbits/nonce LE;
+# merkle branches as-is; final double-SHA reversed; difficulty = DIFF1 / hash.
+function NX-ShareDiff($en1,$job,$en2,$ntimeHex,$nonceHex,$vbitsHex,$mask){
+  $cb = NX-Hex2Bytes ([string]$job.coinb1 + [string]$en1 + [string]$en2 + [string]$job.coinb2)
+  $mr = NX-Sha256d $cb
+  foreach($br in $job.merkle){ $mr = NX-Sha256d ([byte[]]($mr + (NX-Hex2Bytes ([string]$br)))) }
+  $jv=[long][Convert]::ToUInt32([string]$job.version,16)
+  $vb=[long][Convert]::ToUInt32([string]$vbitsHex,16)
+  $nm=[long]4294967295 -bxor [long]$mask
+  $hver=[uint32](($jv -band $nm) -bor ($vb -band [long]$mask))
+  $ver = NX-U32LE $hver
+  $ph  = NX-Swap32 (NX-Hex2Bytes ([string]$job.prevhash))
+  $nt  = NX-U32LE ([Convert]::ToUInt32([string]$ntimeHex,16))
+  $nb  = NX-U32LE ([Convert]::ToUInt32([string]$job.nbits,16))
+  $nn  = NX-U32LE ([Convert]::ToUInt32([string]$nonceHex,16))
+  $header = [byte[]]($ver + $ph + $mr + $nt + $nb + $nn)
+  $h = NX-Sha256d $header
+  [array]::Reverse($h)
+  $hexBE = -join ($h | ForEach-Object { $_.ToString('x2') })
+  $H = [System.Numerics.BigInteger]::Parse('0'+$hexBE,[System.Globalization.NumberStyles]::HexNumber)
+  if($H -le 0){ return 0.0 }
+  $DIFF1 = [System.Numerics.BigInteger]::Parse('00000000ffff0000000000000000000000000000000000000000000000000000',[System.Globalization.NumberStyles]::HexNumber)
+  return [double](($DIFF1 * 1000000) / $H) / 1000000.0
+}
+function NX-LoadEnonce($store,$ip){
+  try { if(Test-Path $store){ $o=Get-Content $store -Raw | ConvertFrom-Json; if($o.$ip){ return [string]$o.$ip } } } catch {}
+  return $null
+}
+function NX-SaveEnonce($store,$ip,$en1){
+  try {
+    $m=@{}; if(Test-Path $store){ (Get-Content $store -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $m[$_.Name]=$_.Value } }
+    $m[$ip]=$en1; ($m | ConvertTo-Json -Compress) | Set-Content $store
+  } catch {}
+}
+'@
+
+# Startup self-test: a known captured share (job cfd1, extranonce 1530006e) must equal 36259.7.
+& {
+  . ([scriptblock]::Create($nexusDiffLib))
+  $tj = @{
+    prevhash='fe72308297be046a61f88df49f6d05aadb54c748000101b40000000000000000'
+    coinb1='01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff3503a2940e00040ee23e6a04c1c8e6010c'
+    coinb2='0a636b706f6f6c112f736f6c6f2e636b706f6f6c2e6f72672ffffffffe035256511200000000160014f61ad5d9ffca353f06e1c9f2385d26a733ab41aa64b35f000000000016001451ed61d2f6aa260cc72cdf743e4e436a82c010270000000000000000266a24aa21a9ed62fbd4ad3fa26fb5e963580646202ea432d7276724615d187432ad366c81b199a1940e00'
+    merkle=@('a011a0b5fcff49de052d20be0debbfe12867b146c0ae68b70b4c81f7ea71e953','4e86c8f5825a6eb34bfd86d9cc9cbceb5fc5181bde91bc80c2493565554aa9f4','fa24777ea979352bbe62b7607164bc6fe254bdf01f4f4a8f81c92722ad738e5a','3b397e363caa5495fc1905c8a199638c3b82e3c70dab4d128b3d3270c927a65e','8a8abd597908419024de9f79b88fd582bec523a915b61c5ad37e6c0300e60d6d','e19f724e57ad8dd256907db942ae8da7f8250f03a304ff0cad6ac50da87a5713','7d38664bd818d9f8ec62448140fb834bdf198cc26539dbd03dc8a5b35685cdef','538f8cadbbfd7e92fec92876ec3ce62e10e989b9eb73ebaecdca3efb6d01c176','3449942a915b51def656b661147677c06f32a3bd52ac860d26e5996511a2fdda','647e55757718b64f4544351c4dced9901ed7a57b0ba2d25c3fc00cc2003cd1fb','70beb6fdf6dddc5d9a12e8698d91effd50800ada97b3ece3025791f88625462e')
+    version='20000000'; nbits='170240c3'
+  }
+  try {
+    $td = NX-ShareDiff '1530006e' $tj '0000000000000006' '6a3ee20e' 'f686016e' '05310000' 0x1fffe000
+    if([Math]::Abs($td - 36259.7) -lt 2.0){ Write-Host "  [Nexus] share-diff self-test PASSED (computed $([string]::Format('{0:0.0}',$td)))" -ForegroundColor Green }
+    else { Write-Host "  [Nexus] share-diff self-test FAILED (got $td, expected 36259.7) - Nexus plotting may be wrong" -ForegroundColor Red }
+  } catch { Write-Host "  [Nexus] share-diff self-test ERROR: $_" -ForegroundColor Red }
+}
+
 $sseScript = {
-    param($resp, $minerIP)
+    param($resp, $minerIP, $nexusLib)
     $tok = [System.Threading.CancellationToken]::None
     $enc = [System.Text.Encoding]::UTF8
+    # Nexus per-share difficulty: load the proven library + per-connection stratum state.
+    # State is local to this runspace, which is correct: extranonce1 is per pool connection.
+    try { . ([scriptblock]::Create($nexusLib)) } catch {}
+    $nxMask=0x1fffe000; $nxPoolDiff=10000; $nxSub=0
+    $nxJobs=@{}; $nxOrder=New-Object System.Collections.ArrayList
+    $nxStore = Join-Path $env:TEMP 'bitaxe_nexus_enonce.json'
+    $nxEn1 = NX-LoadEnonce $nxStore $minerIP
+    if ($nxEn1) { Write-Host "  [Nexus] using saved extranonce1 $nxEn1 for $minerIP" -ForegroundColor DarkCyan }
     try {
         $resp.ContentType = "text/event-stream"
         $resp.Headers.Add("Cache-Control","no-cache")
@@ -116,6 +203,45 @@ $sseScript = {
                     $safe = $line -replace "`e\[[0-9;]*[mGKHFJA-Za-z]","" -replace "`n"," " -replace "`r","" -replace "[\x00-\x08\x0E-\x1F]",""
                     $msg  = $enc.GetBytes("data: $safe`n`n")
                     $stream.Write($msg, 0, $msg.Length); $stream.Flush()
+
+                    # ── Nexus per-share difficulty ──────────────────────────
+                    # NexusOS never logs "diff X of Y", so compute it from the stratum
+                    # exchange and inject a line the chart parser already understands.
+                    if ($line -match 'mining\.|extranonce_str|version mask') {
+                        try {
+                            if ($line -match 'extranonce_str:\s*([0-9a-fA-F]+)') {
+                                if ($nxEn1 -ne $matches[1]) { $nxEn1=$matches[1]; NX-SaveEnonce $nxStore $minerIP $nxEn1; Write-Host "  [Nexus] extranonce1 captured $nxEn1 for $minerIP (saved)" -ForegroundColor Green }
+                            }
+                            elseif ($line -match 'version mask:\s*([0-9a-fA-F]+)') { $nxMask=[Convert]::ToInt64($matches[1],16) }
+                            elseif ($line -match '"method":\s*"mining\.(notify|submit|set_difficulty)"' -or $line -match '"result":\[\[\["mining\.notify"') {
+                                $js=$line.Substring($line.IndexOf('{')); $j=$js | ConvertFrom-Json
+                                if ($j.result -and $j.result.Count -ge 2) {
+                                    if ($nxEn1 -ne [string]$j.result[1]) { $nxEn1=[string]$j.result[1]; NX-SaveEnonce $nxStore $minerIP $nxEn1; Write-Host "  [Nexus] extranonce1 captured $nxEn1 for $minerIP (saved)" -ForegroundColor Green }
+                                }
+                                elseif ($j.method -eq 'mining.set_difficulty') { $nxPoolDiff=[int]$j.params[0] }
+                                elseif ($j.method -eq 'mining.notify') {
+                                    $job=@{ prevhash=[string]$j.params[1]; coinb1=[string]$j.params[2]; coinb2=[string]$j.params[3]; merkle=$j.params[4]; version=[string]$j.params[5]; nbits=[string]$j.params[6] }
+                                    $jid=[string]$j.params[0]; $nxJobs[$jid]=$job; [void]$nxOrder.Add($jid)
+                                    while($nxOrder.Count -gt 12){ $old=[string]$nxOrder[0]; $nxOrder.RemoveAt(0); $nxJobs.Remove($old) }
+                                }
+                                elseif ($j.method -eq 'mining.submit') {
+                                    $nxSub++
+                                    $jid=[string]$j.params[1]; $job=$nxJobs[$jid]
+                                    if ($job -and $nxEn1) {
+                                        $d = NX-ShareDiff $nxEn1 $job ([string]$j.params[2]) ([string]$j.params[3]) ([string]$j.params[4]) ([string]$j.params[5]) $nxMask
+                                        if ($d -gt 0) {
+                                            $ds=[string]::Format([System.Globalization.CultureInfo]::InvariantCulture,'{0:0.0}',$d)
+                                            $dl=$enc.GetBytes("data: Nexus share  diff $ds of $nxPoolDiff`n`n")
+                                            $stream.Write($dl,0,$dl.Length); $stream.Flush()
+                                            Write-Host "  [Nexus] share diff $ds of $nxPoolDiff (plotted)" -ForegroundColor DarkGreen
+                                        }
+                                    } elseif ($nxSub -le 3 -or ($nxSub % 25 -eq 0)) {
+                                        Write-Host "  [Nexus] submit seen, cannot compute yet (en1=$([bool]$nxEn1) jobCached=$([bool]$job)) - if en1 is False, reboot the Nexus once while the tracker is running" -ForegroundColor DarkYellow
+                                    }
+                                }
+                            }
+                        } catch { if ($nxSub -le 5) { Write-Host "  [Nexus] parse note: $_" -ForegroundColor DarkYellow } }
+                    }
                 }
             }
         }
@@ -195,7 +321,7 @@ while ($running -and $listener.IsListening) {
             $rs2.Open()
             $ps3 = [System.Management.Automation.PowerShell]::Create()
             $ps3.Runspace = $rs2
-            [void]$ps3.AddScript($sseScript).AddArgument($respCopy).AddArgument($ipCopy)
+            [void]$ps3.AddScript($sseScript).AddArgument($respCopy).AddArgument($ipCopy).AddArgument($nexusDiffLib)
             [void]$ps3.BeginInvoke()
             continue
         }
@@ -279,6 +405,52 @@ while ($running -and $listener.IsListening) {
             $resp.Close(); continue
         }
 
+        if ($path -eq "/governors") {
+            # Windows pushes canonical governor config here; mobile polls it (read channel)
+            if ($req.HttpMethod -eq "POST") {
+                try {
+                    $grd = New-Object System.IO.StreamReader($req.InputStream)
+                    $gjd = $grd.ReadToEnd(); $grd.Dispose()
+                    if ($gjd -and $gjd.Length -gt 1) { $script:governorsCache = $gjd }
+                } catch {}
+                $gb=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+                $resp.ContentType="application/json"; $resp.ContentLength64=$gb.Length
+                $resp.OutputStream.Write($gb,0,$gb.Length)
+            } else {
+                $gout = if ($script:governorsCache) { $script:governorsCache } else { 'null' }
+                $gb=[System.Text.Encoding]::UTF8.GetBytes($gout)
+                $resp.ContentType="application/json"; $resp.ContentLength64=$gb.Length
+                $resp.OutputStream.Write($gb,0,$gb.Length)
+            }
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/setgovernors") {
+            # Mobile writes governor changes here; Windows polls /getgovernors (write channel)
+            try {
+                $grs = New-Object System.IO.StreamReader($req.InputStream)
+                $gjs = $grs.ReadToEnd(); $grs.Dispose()
+                if ($gjs -and $gjs.Length -gt 1) {
+                    $script:governorsCache = $gjs
+                    $script:pendingGovernors = $gjs
+                }
+            } catch {}
+            $gb=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+            $resp.ContentType="application/json"; $resp.ContentLength64=$gb.Length
+            $resp.OutputStream.Write($gb,0,$gb.Length)
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/getgovernors") {
+            # Windows polls for mobile-originated changes; returns pending once then clears
+            $gout = if ($script:pendingGovernors) { $script:pendingGovernors } else { 'null' }
+            $script:pendingGovernors = $null
+            $gb=[System.Text.Encoding]::UTF8.GetBytes($gout)
+            $resp.ContentType="application/json"; $resp.ContentLength64=$gb.Length
+            $resp.OutputStream.Write($gb,0,$gb.Length)
+            $resp.Close(); continue
+        }
+
         if ($path -eq "/reports") {
             try {
                 if ($req.HttpMethod -eq "POST") {
@@ -302,6 +474,43 @@ while ($running -and $listener.IsListening) {
             $resp.Close(); continue
         }
 
+        if ($path -eq "/startup") {
+            if ($req.HttpMethod -eq "GET") {
+                $taskExists = $false
+                try {
+                    $task = Get-ScheduledTask -TaskName "BitaxeDifficultyTracker" -ErrorAction SilentlyContinue
+                    $taskExists = ($null -ne $task)
+                } catch {}
+                $data = if ($taskExists) { '{"enabled":true}' } else { '{"enabled":false}' }
+                $resp.StatusCode = 200; $resp.ContentType = "application/json"
+                $resp.Headers.Add("Access-Control-Allow-Origin","*")
+                $b=[System.Text.Encoding]::UTF8.GetBytes($data); $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            } else {
+                try {
+                    $sr6 = New-Object System.IO.StreamReader($req.InputStream)
+                    $sj6 = $sr6.ReadToEnd(); $sr6.Dispose()
+                    $req6 = ConvertFrom-Json $sj6
+                    $helperPath = Join-Path $PSScriptRoot "startup-helper.ps1"
+                    $batPath = Join-Path $PSScriptRoot "Launch Bitaxe Difficulty Tracker.bat"
+                    if ($req6.enable) {
+                        $args6 = "-NoProfile -ExecutionPolicy Bypass -File `"$helperPath`" -Action add -BatPath `"$batPath`" -Username `"$env:USERNAME`""
+                        Start-Process "powershell.exe" -ArgumentList $args6 -Verb RunAs -Wait
+                        Write-Host "  [Startup] Task created (elevated)" -ForegroundColor Green
+                    } else {
+                        $args6 = "-NoProfile -ExecutionPolicy Bypass -File `"$helperPath`" -Action remove -Username `"$env:USERNAME`""
+                        Start-Process "powershell.exe" -ArgumentList $args6 -Verb RunAs -Wait
+                        Write-Host "  [Startup] Task removed (elevated)" -ForegroundColor Yellow
+                    }
+                    $resp.StatusCode = 200
+                } catch {
+                    Write-Host "  [Startup] Error: $_" -ForegroundColor Red
+                    $resp.StatusCode = 500
+                }
+                $resp.Headers.Add("Access-Control-Allow-Origin","*")
+                $b=[System.Text.Encoding]::UTF8.GetBytes("ok"); $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            }
+            $resp.Close(); continue
+        }
         if ($path -eq "/scripts") {
             try {
                 if ($req.HttpMethod -eq "POST") {
@@ -568,14 +777,93 @@ $script:pendingScripts = $null
             $resp.ContentLength64 = 0; $resp.OutputStream.Close(); continue
         }
 
+        # /deletehrentry POST - delete a specific HR entry by ip+ts
+        if ($path -eq "/deletehrentry" -and $req.HttpMethod -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($req.InputStream)
+            $json = $reader.ReadToEnd(); $reader.Close()
+            if ($script:hrAllTimeCache) {
+                try {
+                    $d = ConvertFrom-Json $script:hrAllTimeCache
+                    $del = ConvertFrom-Json $json
+                    if ($del.ts -eq "all") {
+                        if ($d.PSObject.Properties.Name -contains $del.ip) {
+                            $d.PSObject.Properties.Remove($del.ip)
+                            $script:hrAllTimeCache = ConvertTo-Json $d -Compress -Depth 5
+                            $script:pendingHrDelete = $json
+                        }
+                    }
+                    elseif ($d.($del.ip)) {
+                        $d.($del.ip) = @($d.($del.ip) | Where-Object { $_.ts -ne $del.ts })
+                        $script:hrAllTimeCache = ConvertTo-Json $d -Compress -Depth 5
+                        $script:pendingHrDelete = $json
+                    }
+                } catch {}
+            }
+            $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64 = 0; $resp.OutputStream.Close(); continue
+        }
+
+        # /gethrdelete GET - Windows polls for pending HR deletes
+        if ($path -eq "/gethrdelete") {
+            if ($script:pendingHrDelete) {
+                $json2 = $script:pendingHrDelete
+                $script:pendingHrDelete = $null
+                $resp.StatusCode = 200; $resp.ContentType = "application/json"
+                $buf = [System.Text.Encoding]::UTF8.GetBytes($json2)
+                $resp.ContentLength64 = $buf.Length; $resp.OutputStream.Write($buf,0,$buf.Length)
+                $resp.OutputStream.Close(); continue
+            }
+            $resp.StatusCode = 200; $resp.ContentType = "application/json"
+            $buf = [System.Text.Encoding]::UTF8.GetBytes("{}")
+            $resp.ContentLength64 = $buf.Length; $resp.OutputStream.Write($buf,0,$buf.Length)
+            $resp.OutputStream.Close(); continue
+        }
+
+        # /setdiffclear POST - mobile requests clearing one miner's all-time diffs
+        if ($path -eq "/setdiffclear" -and $req.HttpMethod -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($req.InputStream)
+            $json = $reader.ReadToEnd(); $reader.Close()
+            try {
+                $del = ConvertFrom-Json $json
+                if ($script:allTimeCache) {
+                    $d = ConvertFrom-Json $script:allTimeCache
+                    # all-time may be flat {ip:[...]} (atSave) or wrapped {alltime:{ip:[...]}}
+                    $target = if ($d.PSObject.Properties.Name -contains "alltime") { $d.alltime } else { $d }
+                    if ($target -and ($target.PSObject.Properties.Name -contains $del.ip)) {
+                        $target.PSObject.Properties.Remove($del.ip)
+                        $script:allTimeCache = ConvertTo-Json $d -Compress -Depth 6
+                    }
+                }
+                $script:pendingDiffClear = $json
+            } catch {}
+            $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64 = 0; $resp.OutputStream.Close(); continue
+        }
+
+        # /getdiffclear GET - Windows polls for pending all-time diff clears
+        if ($path -eq "/getdiffclear") {
+            if ($script:pendingDiffClear) {
+                $json3 = $script:pendingDiffClear
+                $script:pendingDiffClear = $null
+                $resp.StatusCode = 200; $resp.ContentType = "application/json"
+                $buf = [System.Text.Encoding]::UTF8.GetBytes($json3)
+                $resp.ContentLength64 = $buf.Length; $resp.OutputStream.Write($buf,0,$buf.Length)
+                $resp.OutputStream.Close(); continue
+            }
+            $resp.StatusCode = 200; $resp.ContentType = "application/json"
+            $buf = [System.Text.Encoding]::UTF8.GetBytes("{}")
+            $resp.ContentLength64 = $buf.Length; $resp.OutputStream.Write($buf,0,$buf.Length)
+            $resp.OutputStream.Close(); continue
+        }
+
         # /alltime POST - desktop posts localStorage data for mobile to read
         if ($path -eq "/alltime" -and $req.HttpMethod -eq "POST") {
             $reader = New-Object System.IO.StreamReader($req.InputStream)
             $script:allTimeCache = $reader.ReadToEnd(); $reader.Close()
-            try {
-                $obj = $script:allTimeCache | ConvertFrom-Json
-                $script:minerIPs = @($obj.PSObject.Properties.Name)
-            } catch {}
+            # NOTE: intentionally do NOT rebuild $script:minerIPs from all-time keys.
+            # The active-miner list comes ONLY from /setminers (explicitly added miners).
+            # This keeps a removed miner's history intact without resurrecting it into
+            # the poll/connect list. Re-adding the miner later reattaches its history.
             $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin", "*")
             $b = [System.Text.Encoding]::UTF8.GetBytes("ok")
             $resp.ContentLength64 = $b.Length; $resp.OutputStream.Write($b, 0, $b.Length)
