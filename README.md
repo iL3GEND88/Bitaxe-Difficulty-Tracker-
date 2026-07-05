@@ -8,26 +8,28 @@ No cloud. No accounts. No installs beyond the files in this zip. Runs entirely o
 
 ## What's New (Recent Updates)
 
-**Miner management & data integrity**
-- **Remove a miner without losing its history.** The active-miner list is now owned solely by the explicit miner list — it's no longer rebuilt from stored history. Remove a miner and its all-time/session history stays intact; re-add the same IP later and it reconnects to its existing history. (Fixes "ghost miners" that used to reappear after removal.)
-- **🧹 Purge Miner** — a deliberate, complete wipe when you *do* want a miner gone for good. Removes it from every local and server store (history, all-time, reports, governor, scripts, names, colors, ordering) so it can't reappear. Available as a global button on Windows and as a per-miner 🧹 button on mobile.
-
 **Charts**
-- **Working per-panel Y-axis zoom slider** on the Hashrate/Temp chart — zoom in so a big, rock-steady miner's line fills the chart and shows its real variation instead of looking flat. Setting persists per panel.
-- Hashrate-specific controls (**HR**, **View**, **Y**) now appear only on the Hashrate/Temp chart, not on the Difficulty chart.
+- **Per-chart 1m / 10m / 1h hashrate averages** shown in the header of each hashrate chart. Calculated by the app itself, so they work for miners that don't report firmware averages (e.g. Nexus-class) as well as AxeOS boards.
+- **Working per-panel Y-axis zoom slider** — tighten the axis around the line so a big, rock-steady miner's variation fills the chart instead of looking flat; persists per panel.
+- Hashrate-only controls (averages, HR, View, Y) appear on the Hashrate/Temp chart only, not on the Difficulty chart.
 
-**Per-miner all-time clears**
-- Clear a single miner's **all-time Best Diffs** or **all-time HR Scores** with a 🗑 on its card — on both Windows and mobile. These clears are durable (they propagate to the server and to the other platform, so they don't silently come back).
+**Miner management & data integrity**
+- **Remove a miner without losing its history.** The active-miner list is owned solely by your explicit miner list — removing a miner keeps its history, and re-adding the same IP later reconnects it. (Fixes "ghost miners" that used to reappear after removal.)
+- **🧹 Purge Miner** — deliberately wipe a miner from every local and server store when you want it gone for good (global button on Windows, per-miner on mobile).
+- **Per-miner all-time clear** — 🗑 on a miner's card clears its all-time Best Diffs or HR Scores, on Windows and mobile (durable; syncs to server and the other platform).
 
 **Fan & temperature control**
-- **VR fan control** — for boards with a second (VR) fan, set its mode (Linked / Manual / Auto-PID), manual speed, or PID target temperature, without disturbing the ASIC fan.
-- **Correct target-temp & min-fan reading across firmwares** — boards that report target temp under `pidTargetTemp` / per-fan PID (e.g. Nexus-class) are now read correctly instead of snapping back to a default. The Min-Fan field only appears for boards that actually support it. Target-temp range widened.
+- **VR fan control** for boards with a second (VR) fan — mode (Linked / Manual / Auto-PID), manual speed, and PID target temperature, set independently of the ASIC fan.
+- **Correct target-temp & min-fan reading across firmwares** — boards reporting target temp via `pidTargetTemp` / per-fan PID (e.g. Nexus-class) no longer snap back to a default; the Min-Fan field only shows for boards that support it.
+
+**Dynamic Governor**
+- Auto-adjusts frequency/voltage/fan to hold miners inside temperature, VR-temp, and **current (amps)** bands, with dwell/settle timers, per-profile 24hr scheduling, and restart-after-adjust.
 
 **Reliability fixes**
-- **Crash reports fire once per outage.** Previously a miner that stayed down could spawn a new report every few minutes; now a single report is generated per outage and re-arms only after the miner recovers.
-- **Notification deck** — toast notifications stack into a tidy, tappable deck instead of piling up.
+- **Crash reports fire once per outage** — a miner that stays down no longer spawns a new report every few minutes; it re-arms only after the miner recovers.
+- **Notification deck** — toast notifications stack into a tidy, tappable deck.
 
-> Windows launch-on-startup is configured via the included `startup-helper.ps1` if you want it; the in-app toggle has been removed from this public build.
+> Launch-on-startup is available via the included `startup-helper.ps1` if you want the app to start with Windows; the in-app toggle is not shown in this build.
 
 ---
 
@@ -96,7 +98,6 @@ To access your app from anywhere (not just home WiFi):
 - Toggle between Difficulty and Hashrate/Temp charts
 - **▼ View dropdown** per panel — toggle Hashrate, Temps, Efficiency layers
 - **▼ HR dropdown** per panel — select hashrate averaging mode
-- **Y-axis zoom slider** per panel — tighten the axis around the line so a large, stable miner shows its variation instead of a flat line; persists per panel. (HR / View / Y controls appear on the Hashrate/Temp chart only)
 
 ### Chart Layouts
 - **Combined** — all miners on one chart
@@ -124,14 +125,12 @@ Show or hide individual elements per miner card — including the per-stat toggl
 - Collapsible per miner — state preserved when changing Top N
 - Live updates every 2 seconds while open
 - Per-miner trash icon to clear session diffs individually
-- **Per-miner all-time clear** — 🗑 to wipe a single miner's all-time best diffs (durable; syncs to server and mobile)
 - Selectable Top 10 / 25 / 50 / 100 / 250 / 500
 
 ### ⚡ HR High Scores (Fullscreen)
 - Session and all-time hashrate peak records with error rate
 - Collapsible per miner with live updates
 - Per-miner trash icon to clear session HR scores individually
-- **Per-miner all-time clear** — 🗑 to wipe a single miner's all-time HR scores (durable; syncs to server and mobile)
 - Shows hashrate in GH/s or TH/s with timestamp and error rate (color-coded)
 - Selectable Top 10 / 25 / 50 / 100
 
@@ -142,7 +141,6 @@ Show or hide individual elements per miner card — including the per-stat toggl
 
 ### 📋 Crash/Restart Reports
 - Automatically saves a session snapshot whenever a miner's hashrate drops to zero
-- **One report per outage** — a miner that stays down no longer spawns repeated reports; it re-arms only after the miner recovers
 - Captures pre-crash hashrate and temps (60-second lookback for accurate data)
 - Detects: crashes, power faults, overheat, pool switches, manual restarts, auto-restarts
 - Collapsible cards — compact by default, expand to see full stats
@@ -179,9 +177,7 @@ Automatic per-miner thermal tuning — holds a temperature band by nudging frequ
 - **🗑 Clear Sessions** button — clears session best lists for all miners
 
 ### ⚙ Settings Panel
-Full-screen overlay per miner — frequency, voltage, and fan control with save and restart.
-- **VR fan control** for boards with a second (VR) fan — mode (Linked / Manual / Auto-PID), manual speed, and PID target temperature, set independently of the ASIC fan
-- **Target temp & min-fan** read correctly across firmwares — boards reporting target temp via `pidTargetTemp` / per-fan PID (e.g. Nexus-class) no longer snap back to a default; the Min-Fan field only shows for boards that support it
+Full-screen overlay per miner — frequency, voltage, fan control with save and restart.
 
 ### ⛁ Pool Settings Panel
 Full-screen overlay per miner — primary and fallback stratum with advanced options.
@@ -194,8 +190,6 @@ Full-screen overlay per miner — primary and fallback stratum with advanced opt
 
 ### Other
 - Block Found full-screen alert — fires immediately via API polling (not on dismiss)
-- **Remove a miner keeps its history** — the active list comes only from your explicit miners, so removing one and re-adding it later restores its history
-- **🧹 Purge Miner** — deliberately wipe a miner from every store (local + server) when you want it gone for good
 - NerdQaxe++ and NerdOCTAXE Gamma compatibility
 - Total Hashrate chip in header (combined all miners)
 - Unlimited miners, custom colors, nameable, add/remove with ✕
@@ -217,7 +211,6 @@ Opening the server address in iPhone Safari or Android Chrome automatically load
 - Auto-restart toggle per miner, syncs to Windows
 - Temperature bars with color coding, collapsible per miner
 - Color picker per miner, rename by tapping the miner name
-- **🧹 Purge** per miner — completely remove a miner and its history from every store (local + server)
 - Total bar — watts on the left, total hashrate on the right
 - Difficulty and Hashrate/Temp charts per miner
 - Per-miner stat rows including Power (W), Amps (A), Voltage (mV), Frequency (MHz), multi-sensor ASIC/VR temps, and Per-ASIC HR/Err
@@ -234,7 +227,6 @@ Opening the server address in iPhone Safari or Android Chrome automatically load
 ### ⭐ All-Time Tab
 - Top N all-time best difficulties per miner, collapsible
 - ⚡ All-time HR scores per miner, collapsible
-- **Per-miner 🗑 clear** for all-time Best Diffs and all-time HR Scores (durable; syncs to Windows/server)
 - Same data as Windows hall of fame
 
 ### ⛁ Pool Tab

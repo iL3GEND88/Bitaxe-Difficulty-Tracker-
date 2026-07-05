@@ -1207,6 +1207,11 @@ function buildPanels(){
       <div class="panel-hdr" style="position:relative">
         <span style="color:${def.color};margin-right:4px">▸</span>
         <span style="color:var(--txt)">${def.label}</span>
+        ${chartMode==='hash' ? `<span id="hravg-${def.id}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;gap:14px;align-items:center;font-size:.72rem;color:var(--muted);white-space:nowrap;pointer-events:none">
+          <span>1m <b id="hravg1m-${def.id}" style="color:var(--txt);font-weight:600">—</b></span>
+          <span>10m <b id="hravg10m-${def.id}" style="color:var(--txt);font-weight:600">—</b></span>
+          <span>1h <b id="hravg1h-${def.id}" style="color:var(--txt);font-weight:600">—</b></span>
+        </span>` : ''}
         <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
           ${chartMode==='hash' ? `
           <button data-hrmtoggle="1" onclick="toggleHrModeMenu(event,'${def.id}')" style="background:transparent;border:1px solid var(--bdr);color:var(--muted);font-size:.7rem;padding:2px 8px;border-radius:4px;cursor:pointer">&#9660; HR</button>
@@ -1627,8 +1632,42 @@ function getPanelHashPts(panel, miner){
   return (miner.hashSeries||[]).filter(p=>p.ts>=winStart&&p.ts<=winEnd);
 }
 
+// Compute rolling 1m / 10m / 1h hashrate averages for a panel from its miners'
+// timestamped hashSeries points, and write them into the header display.
+// We calculate these ourselves (works for AxeOS AND the Nexus, which doesn't
+// report firmware averages). For multi-miner panels the windows are summed
+// per-miner then added, so the panel total reflects all its miners.
+function updateHashAverages(panel){
+  var el1=document.getElementById('hravg1m-'+panel.id);
+  if(!el1) return; // header not present (e.g. difficulty mode)
+  var el10=document.getElementById('hravg10m-'+panel.id);
+  var el1h=document.getElementById('hravg1h-'+panel.id);
+  var now=Date.now();
+  var ids=(panel.minerIds||[]).filter(function(id){return miners[id];});
+  function avgFor(winMs){
+    var total=0, any=false;
+    ids.forEach(function(id){
+      var m=miners[id]; if(!m||!m.hashSeries||!m.hashSeries.length) return;
+      var cutoff=now-winMs;
+      var sum=0, n=0;
+      for(var i=m.hashSeries.length-1;i>=0;i--){
+        var p=m.hashSeries[i];
+        if(p.ts<cutoff) break;              // series is chronological; stop once past window
+        var v=(p.hr!=null?p.hr:0);
+        if(v>0){ sum+=v; n++; }
+      }
+      if(n>0){ total+=sum/n; any=true; }
+    });
+    return any?total:null;
+  }
+  var a1=avgFor(60000), a10=avgFor(600000), a1h=avgFor(3600000);
+  if(el1) el1.textContent  = a1!=null ? fmtHr(a1) : '—';
+  if(el10) el10.textContent = a10!=null ? fmtHr(a10) : '—';
+  if(el1h) el1h.textContent = a1h!=null ? fmtHr(a1h) : '—';
+}
 function drawHashPanel(panel){
   const {canvas,ctx,minerIds} = panel;
+  try{ updateHashAverages(panel); }catch(e){}
   const W=canvas.width, H=canvas.height, dpr=Math.min(devicePixelRatio,2);
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#0b1929'; ctx.fillRect(0,0,W,H);
@@ -4059,13 +4098,12 @@ async function _scExecActions(m, actions){
     var d=m._lastApiData||{};
     var f=freq!==null?freq:(d.frequency||500);
     var v=volt!==null?volt:(d.coreVoltage||1200);
-    // Include current fan settings so PATCH doesn't reset them
-    var body={frequency:f,coreVoltage:v,overclockEnabled:1,
-      autofanspeed:d.autofanspeed?1:0,
-      manualFanSpeed:d.fanspeed||100,
-      temptarget:d.tempTarget||d.temptarget||60,
-      minfanspeed:d.minFanSpeed!=null?d.minFanSpeed:0
-    };
+    // Send ONLY frequency + voltage, plus the miner's ACTUAL fan state preserved
+    // via its fans[] array (matches the settings page, which works). The old code
+    // sent flat autofanspeed/manualFanSpeed which the Nexus misreads — it put the
+    // fan into a "connect ASIC fan to connector 1" state stuck at 90%.
+    var body={frequency:f,coreVoltage:v,overclockEnabled:1};
+    _scKeepFans(body,d);
     try{
       await fetch(SERVER+'/patch?ip='+encodeURIComponent(m.ip),{signal:AbortSignal.timeout(5000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(body)}});
       var msg='📜 Script: '+m.ip+' freq->'+f+'MHz volt->'+v+'mV';
@@ -4075,6 +4113,23 @@ async function _scExecActions(m, actions){
   for(var i=0;i<others.length;i++) await _scExec(m,others[i]);
 }
 
+// Echo the miner's CURRENT fan configuration back into a patch body unchanged, so
+// a frequency/voltage change doesn't disturb the fan. Mirrors the settings page:
+// multi-fan boards (Nexus) use the fans[] array; single-fan boards use the flat
+// fields. Reading the real state (not assuming) is what keeps the fan put.
+function _scKeepFans(body, d){
+  try{
+    if(d && Array.isArray(d.fans) && d.fans.length){
+      // Send the miner's fans[] back VERBATIM — reconstructing/omitting fields can
+      // put the Nexus into a "connect ASIC fan to connector 1" state stuck at 90%.
+      // Echoing exactly what it reported keeps the fan in its current (auto) mode.
+      body.fans = JSON.parse(JSON.stringify(d.fans));
+    } else {
+      body.autofanspeed = d.autofanspeed?1:0;
+      if(!d.autofanspeed && d.fanspeed!=null) body.manualFanSpeed = Math.round(d.fanspeed);
+    }
+  }catch(e){}
+}
 async function _scExec(m, action){
   var ip = m.ip;
   if(!ip){ return; } // safety check
@@ -4087,14 +4142,18 @@ async function _scExec(m, action){
         showToast('📜 Script','Restarted '+ip,'warn');
         break;
       case 'setFrequency':
-        body = {frequency:parseInt(action.value), coreVoltage:d.coreVoltage||1200, overclockEnabled:1,
-          autofanspeed:d.autofanspeed?1:0, manualFanSpeed:d.fanspeed||100, temptarget:d.tempTarget||d.temptarget||60, minfanspeed:d.minFanSpeed!=null?d.minFanSpeed:0};
+        // Preserve the miner's ACTUAL fan state by echoing back its fans[] array
+        // unchanged (same approach as the settings page). Sending the flat
+        // autofanspeed/fanspeed fields misread on Nexus-class boards and flipped
+        // the fan to manual/90; omitting fans entirely can reset it to a default.
+        body = {frequency:parseInt(action.value), coreVoltage:d.coreVoltage||1200, overclockEnabled:1};
+        _scKeepFans(body, d);
         await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(body)}});
         showToast('📜 Script',ip+' freq -> '+action.value+' MHz','ok');
         break;
       case 'setCoreVoltage':
-        body = {frequency:d.frequency||500, coreVoltage:parseInt(action.value), overclockEnabled:1,
-          autofanspeed:d.autofanspeed?1:0, manualFanSpeed:d.fanspeed||100, temptarget:d.tempTarget||d.temptarget||60, minfanspeed:d.minFanSpeed!=null?d.minFanSpeed:0};
+        body = {frequency:d.frequency||500, coreVoltage:parseInt(action.value), overclockEnabled:1};
+        _scKeepFans(body, d);
         await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(body)}});
         showToast('📜 Script',ip+' voltage -> '+action.value+' mV','ok');
         break;
@@ -4109,13 +4168,20 @@ async function _scExec(m, action){
         showToast('📜 Script',ip+' auto fan '+(body.autofanspeed?'ON':'OFF'),'ok');
         break;
       case 'setTargetTemp':
-        body = {temptarget:parseInt(action.value), autofanspeed:d.autofanspeed?1:0, minfanspeed:d.minFanSpeed!=null?d.minFanSpeed:0};
+        // Only change the target temp. Don't resend autofanspeed (reads wrong on
+        // Nexus-class boards and would flip the fan to manual).
+        body = {temptarget:parseInt(action.value)};
         await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(body)}});
         showToast('📜 Script',ip+' target temp -> '+action.value,'ok');
         break;
       case 'setOverclock':
         var pts=(action.value||'').split('/');
-        body = {frequency:parseInt(pts[0]||500), coreVoltage:parseInt(pts[1]||1200), overclockEnabled:1, autofanspeed:d.autofanspeed?1:0, manualFanSpeed:d.fanspeed||100, temptarget:d.tempTarget||d.temptarget||60, minfanspeed:d.minFanSpeed!=null?d.minFanSpeed:0};
+        // Only change frequency + voltage. Do NOT send fan fields — the miner keeps
+        // its current fan config. (Sending autofanspeed/manualFanSpeed here clobbered
+        // the fan to manual/90 on boards like the Nexus that report fan state via the
+        // fans[] array rather than the flat autofanspeed field.)
+        body = {frequency:parseInt(pts[0]||500), coreVoltage:parseInt(pts[1]||1200), overclockEnabled:1};
+        _scKeepFans(body, d);
         await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(body)}});
         showToast('📜 Script',ip+' overclock applied','ok');
         break;
