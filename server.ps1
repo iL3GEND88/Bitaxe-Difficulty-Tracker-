@@ -137,6 +137,21 @@ function NX-SaveEnonce($store,$ip,$en1){
     $m[$ip]=$en1; ($m | ConvertTo-Json -Compress) | Set-Content $store
   } catch {}
 }
+# Pool difficulty persistence. The pool only sends mining.set_difficulty when the
+# value CHANGES, so a relay that attaches mid-session never sees one and would sit
+# on a hardcoded default forever - making every synthesized share line read
+# "of <default>" and skewing luck. Persist the last known value per IP so a relay
+# restart resumes from the real difficulty instead of a guess.
+function NX-LoadDiff($store,$ip){
+  try { if(Test-Path $store){ $o=Get-Content $store -Raw | ConvertFrom-Json; if($o.$ip){ return [int]$o.$ip } } } catch {}
+  return 0
+}
+function NX-SaveDiff($store,$ip,$d){
+  try {
+    $m=@{}; if(Test-Path $store){ (Get-Content $store -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $m[$_.Name]=$_.Value } }
+    $m[$ip]=$d; ($m | ConvertTo-Json -Compress) | Set-Content $store
+  } catch {}
+}
 '@
 
 # Startup self-test: a known captured share (job cfd1, extranonce 1530006e) must equal 36259.7.
@@ -163,11 +178,21 @@ $sseScript = {
     # Nexus per-share difficulty: load the proven library + per-connection stratum state.
     # State is local to this runspace, which is correct: extranonce1 is per pool connection.
     try { . ([scriptblock]::Create($nexusLib)) } catch {}
-    $nxMask=0x1fffe000; $nxPoolDiff=10000; $nxSub=0
+    $nxMask=0x1fffe000; $nxSub=0
     $nxJobs=@{}; $nxOrder=New-Object System.Collections.ArrayList
     $nxStore = Join-Path $env:TEMP 'bitaxe_nexus_enonce.json'
+    $nxDiffStore = Join-Path $env:TEMP 'bitaxe_nexus_pooldiff.json'
     $nxEn1 = NX-LoadEnonce $nxStore $minerIP
     if ($nxEn1) { Write-Host "  [Nexus] using saved extranonce1 $nxEn1 for $minerIP" -ForegroundColor DarkCyan }
+    # Resume from the last known pool difficulty; 10000 only as a first-run seed.
+    $nxPoolDiff = NX-LoadDiff $nxDiffStore $minerIP
+    $nxDiffKnown = ($nxPoolDiff -gt 0)
+    if (-not $nxDiffKnown) { $nxPoolDiff = 10000 }
+    else { Write-Host "  [Nexus] using saved pool difficulty $nxPoolDiff for $minerIP" -ForegroundColor DarkCyan }
+    # Self-correcting estimate: the miner only submits shares at/above the pool
+    # target, so the MINIMUM observed share difficulty converges on the true target
+    # from above. Used only until a real set_difficulty is seen this session.
+    $nxMinSeen = [double]0; $nxMinCount = 0
     try {
         $resp.ContentType = "text/event-stream"
         $resp.Headers.Add("Cache-Control","no-cache")
@@ -218,7 +243,14 @@ $sseScript = {
                                 if ($j.result -and $j.result.Count -ge 2) {
                                     if ($nxEn1 -ne [string]$j.result[1]) { $nxEn1=[string]$j.result[1]; NX-SaveEnonce $nxStore $minerIP $nxEn1; Write-Host "  [Nexus] extranonce1 captured $nxEn1 for $minerIP (saved)" -ForegroundColor Green }
                                 }
-                                elseif ($j.method -eq 'mining.set_difficulty') { $nxPoolDiff=[int]$j.params[0] }
+                                elseif ($j.method -eq 'mining.set_difficulty') {
+                                    $nd=[int]$j.params[0]
+                                    if ($nd -gt 0) {
+                                        if ($nd -ne $nxPoolDiff) { Write-Host "  [Nexus] pool difficulty $nxPoolDiff -> $nd for $minerIP (saved)" -ForegroundColor Green }
+                                        $nxPoolDiff=$nd; NX-SaveDiff $nxDiffStore $minerIP $nd
+                                    }
+                                    $nxDiffKnown=$true; $nxMinSeen=[double]0; $nxMinCount=0
+                                }
                                 elseif ($j.method -eq 'mining.notify') {
                                     $job=@{ prevhash=[string]$j.params[1]; coinb1=[string]$j.params[2]; coinb2=[string]$j.params[3]; merkle=$j.params[4]; version=[string]$j.params[5]; nbits=[string]$j.params[6] }
                                     $jid=[string]$j.params[0]; $nxJobs[$jid]=$job; [void]$nxOrder.Add($jid)
@@ -230,6 +262,20 @@ $sseScript = {
                                     if ($job -and $nxEn1) {
                                         $d = NX-ShareDiff $nxEn1 $job ([string]$j.params[2]) ([string]$j.params[3]) ([string]$j.params[4]) ([string]$j.params[5]) $nxMask
                                         if ($d -gt 0) {
+                                            # No set_difficulty seen yet this session: infer the target from the
+                                            # smallest share the miner has submitted (it never submits below target).
+                                            if (-not $nxDiffKnown) {
+                                                if ($nxMinSeen -le 0 -or $d -lt $nxMinSeen) { $nxMinSeen=$d }
+                                                $nxMinCount++
+                                                if ($nxMinCount -ge 20 -and $nxMinSeen -gt 0) {
+                                                    $est=[int][math]::Round($nxMinSeen)
+                                                    if ($est -gt 0 -and ([math]::Abs($est-$nxPoolDiff)/[double]$nxPoolDiff) -gt 0.15) {
+                                                        Write-Host "  [Nexus] no set_difficulty yet; estimated pool difficulty $est from $nxMinCount shares (was $nxPoolDiff)" -ForegroundColor Yellow
+                                                        $nxPoolDiff=$est; NX-SaveDiff $nxDiffStore $minerIP $est
+                                                    }
+                                                    $nxMinCount=0; $nxMinSeen=[double]0
+                                                }
+                                            }
                                             $ds=[string]::Format([System.Globalization.CultureInfo]::InvariantCulture,'{0:0.0}',$d)
                                             $dl=$enc.GetBytes("data: Nexus share  diff $ds of $nxPoolDiff`n`n")
                                             $stream.Write($dl,0,$dl.Length); $stream.Flush()
@@ -256,30 +302,204 @@ $sseScript = {
     }
 }
 
+# -- Unified data store -------------------------------------------------------
+# One file instead of three, so moving to a new folder only has to carry
+# bitaxe-data.json. Every section is held as a RAW JSON string and the file is
+# built by concatenation, so nothing is ever serialized or parsed on write --
+# a 600KB degradation log costs essentially no CPU to persist. Reads pull each
+# section back out by brace matching, again without parsing.
+$script:dataFile     = Join-Path $PSScriptRoot 'bitaxe-data.json'
+$script:storeDirty   = $false
+$script:lastFlush    = 0
+$script:STORE_MIN_MS = 5000
+
+function Now-Ms { return [int64]([datetime]::UtcNow - [datetime]'1970-01-01').TotalMilliseconds }
+
+# Pull one section's raw JSON out of the combined file without ConvertFrom-Json.
+# Walks TOP-LEVEL pairs only. A plain IndexOf is not safe here: section names
+# also occur as nested keys -- per-miner session objects each carry their own
+# "runlog", so a naive search finds one of those and the fragment then gets
+# written back over the real section on the next save.
+function Skip-JsonValue($raw, $i) {
+    while ($i -lt $raw.Length -and [char]::IsWhiteSpace($raw[$i])) { $i++ }
+    if ($i -ge $raw.Length) { return $i }
+    $c = $raw[$i]
+    if ($c -eq '"') {
+        $i++
+        while ($i -lt $raw.Length) {
+            if ($raw[$i] -eq '\') { $i += 2; continue }
+            if ($raw[$i] -eq '"') { return $i + 1 }
+            $i++
+        }
+        return $i
+    }
+    if ($c -eq '{' -or $c -eq '[') {
+        $open = $c
+        $close = if ($open -eq '{') { '}' } else { ']' }
+        $depth = 0; $inStr = $false; $esc = $false
+        while ($i -lt $raw.Length) {
+            $ch = $raw[$i]
+            if ($inStr) {
+                if ($esc) { $esc = $false }
+                elseif ($ch -eq '\') { $esc = $true }
+                elseif ($ch -eq '"') { $inStr = $false }
+            } else {
+                if ($ch -eq '"') { $inStr = $true }
+                elseif ($ch -eq $open) { $depth++ }
+                elseif ($ch -eq $close) { $depth--; if ($depth -eq 0) { return $i + 1 } }
+            }
+            $i++
+        }
+        return $i
+    }
+    while ($i -lt $raw.Length -and $raw[$i] -ne ',' -and $raw[$i] -ne '}') { $i++ }
+    return $i
+}
+
+# Count TOP-LEVEL entries only. The previous version counted every brace or
+# quoted key anywhere inside the section, so 10 scripts reported as 54 and a
+# 3-miner session as 15806.
+function Count-JsonTop($val) {
+    if (-not $val) { return 0 }
+    $val = $val.Trim()
+    if ($val.Length -lt 2) { return 0 }
+    $isArr = ($val[0] -eq '[')
+    if ((-not $isArr) -and ($val[0] -ne '{')) { return 0 }
+    $i = 1
+    $n = 0
+    while ($i -lt $val.Length) {
+        while ($i -lt $val.Length -and ($val[$i] -eq ',' -or [char]::IsWhiteSpace($val[$i]))) { $i++ }
+        if ($i -ge $val.Length) { break }
+        if ($val[$i] -eq ']' -or $val[$i] -eq '}') { break }
+        if (-not $isArr) {
+            $i = Skip-JsonValue $val $i
+            while ($i -lt $val.Length -and [char]::IsWhiteSpace($val[$i])) { $i++ }
+            if ($i -lt $val.Length -and $val[$i] -eq ':') { $i++ }
+        }
+        $i = Skip-JsonValue $val $i
+        $n++
+    }
+    return $n
+}
+
+function Get-StoreSection($raw, $name) {
+    if (-not $raw) { return $null }
+    $i = 0
+    while ($i -lt $raw.Length -and $raw[$i] -ne '{') { $i++ }
+    $i++
+    while ($i -lt $raw.Length) {
+        while ($i -lt $raw.Length -and ($raw[$i] -eq ',' -or [char]::IsWhiteSpace($raw[$i]))) { $i++ }
+        if ($i -ge $raw.Length -or $raw[$i] -eq '}') { return $null }
+        if ($raw[$i] -ne '"') { return $null }
+        $ks = $i + 1; $i++
+        while ($i -lt $raw.Length) {
+            if ($raw[$i] -eq '\') { $i += 2; continue }
+            if ($raw[$i] -eq '"') { break }
+            $i++
+        }
+        $key = $raw.Substring($ks, $i - $ks)
+        $i++
+        while ($i -lt $raw.Length -and [char]::IsWhiteSpace($raw[$i])) { $i++ }
+        if ($i -ge $raw.Length -or $raw[$i] -ne ':') { return $null }
+        $i++
+        while ($i -lt $raw.Length -and [char]::IsWhiteSpace($raw[$i])) { $i++ }
+        $vs = $i
+        $ve = Skip-JsonValue $raw $i
+        if ($key -eq $name) {
+            $val = $raw.Substring($vs, $ve - $vs).Trim()
+            if ($val -eq 'null') { return $null }
+            return $val
+        }
+        $i = $ve
+    }
+    return $null
+}
+
+function Save-Store {
+    param([switch]$Force)
+    $now = Now-Ms
+    if (-not $Force) {
+        if (-not $script:storeDirty) { return }
+        if (($now - $script:lastFlush) -lt $script:STORE_MIN_MS) { return }
+    }
+    try {
+        $sb = New-Object System.Text.StringBuilder
+        [void]$sb.Append('{"v":1')
+        $sections = @(
+            @('session',     $script:sessionCache),
+            @('scripts',     $script:scriptsCache),
+            @('reports',     $script:reportsCache),
+            @('degradation', $script:degCache),
+            @('runlog',      $script:runlogCache),
+            @('governors',   $script:govCache),
+            @('alltime',     $script:allTimeCache),
+            @('ambientlog',  $script:ambLogCache)
+        )
+        foreach ($sec in $sections) {
+            [void]$sb.Append(',"'); [void]$sb.Append($sec[0]); [void]$sb.Append('":')
+            if ($sec[1]) { [void]$sb.Append($sec[1]) } else { [void]$sb.Append('null') }
+        }
+        [void]$sb.Append('}')
+        # UTF8Encoding($false) = no BOM. [System.Text.Encoding]::UTF8 emits one,
+        # which makes the file fail any strict JSON parser that opens it.
+        [System.IO.File]::WriteAllText($script:dataFile, $sb.ToString(), (New-Object System.Text.UTF8Encoding($false)))
+        $script:storeDirty = $false
+        $script:lastFlush  = $now
+    } catch {}
+}
+
 # ── Shared state initialization ──────────────────────────────────────────────
 if (-not $script:netHashCache)   { $script:netHashCache   = @{btc='{}';bch='{}';dgb='{}';xec='{}';fb='{}'} }
 if (-not $script:netHashLastFetch){ $script:netHashLastFetch = @{btc=0;bch=0;dgb=0;xec=0;fb=0} }
-if (-not $script:sessionCache) {
-    try {
-        $sp = Join-Path $PSScriptRoot "session-data.json"
-        if (Test-Path $sp) { $script:sessionCache = [System.IO.File]::ReadAllText($sp, [System.Text.Encoding]::UTF8) }
-        else { $script:sessionCache = $null }
-    } catch { $script:sessionCache = $null }
+if (-not $script:storeLoaded) {
+    $script:storeLoaded = $true
+    $script:degCache    = $null
+    $script:runlogCache = $null
+    $script:govCache    = $null
+    $script:ambLogCache = $null
+    if (Test-Path $script:dataFile) {
+        try {
+            $raw = [System.IO.File]::ReadAllText($script:dataFile, [System.Text.Encoding]::UTF8)
+            $script:sessionCache = Get-StoreSection $raw 'session'
+            $script:scriptsCache = Get-StoreSection $raw 'scripts'
+            $script:reportsCache = Get-StoreSection $raw 'reports'
+            $script:degCache     = Get-StoreSection $raw 'degradation'
+            $script:runlogCache  = Get-StoreSection $raw 'runlog'
+            $script:govCache     = Get-StoreSection $raw 'governors'
+            $script:allTimeCache = Get-StoreSection $raw 'alltime'
+            $script:ambLogCache  = Get-StoreSection $raw 'ambientlog'
+        } catch {}
+    } else {
+        # First run on the new format: fold the three legacy files in, then write
+        # the combined one. The originals are left alone as a fallback.
+        try {
+            $lp = Join-Path $PSScriptRoot "session-data.json"
+            if (Test-Path $lp) { $script:sessionCache = [System.IO.File]::ReadAllText($lp, [System.Text.Encoding]::UTF8) }
+        } catch {}
+        try {
+            $lp = Join-Path $PSScriptRoot "scripts-data.json"
+            if (Test-Path $lp) { $script:scriptsCache = [System.IO.File]::ReadAllText($lp, [System.Text.Encoding]::UTF8) }
+        } catch {}
+        try {
+            $lp = Join-Path $PSScriptRoot "reports-data.json"
+            if (Test-Path $lp) { $script:reportsCache = [System.IO.File]::ReadAllText($lp, [System.Text.Encoding]::UTF8) }
+        } catch {}
+        Save-Store -Force
+    }
 }
+# Left alone when the unified store already supplied it -- this is the one
+# dataset that can never be regenerated from the miners.
 if (-not $script:allTimeCache)   { $script:allTimeCache   = $null }
+# In-memory only: the desktop republishes this every couple of seconds, so
+# there's nothing worth persisting across restarts.
+if (-not $script:fleetCache)     { $script:fleetCache     = $null }
 if (-not $script:pendingNotifs)  { $script:pendingNotifs  = $null }
-if (-not $script:scriptsCache)   { $script:scriptsCache   = $null }
+# (loaded from bitaxe-data.json above)
 if (-not $script:pendingScripts) { $script:pendingScripts = $null }
 if (-not $script:arStateCache)   { $script:arStateCache   = $null }
 if (-not $script:minersCache)    { $script:minersCache    = $null }
 if (-not $script:pendingReports)  { $script:pendingReports  = $null }
-if (-not $script:reportsCache) {
-    try {
-        $rpath = "$PSScriptRoot\reports-data.json"
-        if (Test-Path $rpath) { $script:reportsCache = [System.IO.File]::ReadAllText($rpath, [System.Text.Encoding]::UTF8) }
-        else { $script:reportsCache = $null }
-    } catch { $script:reportsCache = $null }
-}
+# (loaded from bitaxe-data.json above)
 if (-not $script:minerIPs)       { $script:minerIPs       = @() }
 if (-not $script:setAutoRestart) { $script:setAutoRestart = $null }
 
@@ -388,6 +608,7 @@ while ($running -and $listener.IsListening) {
                 if ($sj4 -and $sj4.Length -gt 2) {
                     $script:scriptsCache = $sj4
                     $script:pendingScripts = $sj4
+                    $script:storeDirty = $true; Save-Store -Force
                 }
             } catch {}
             $rb4=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
@@ -451,6 +672,141 @@ while ($running -and $listener.IsListening) {
             $resp.Close(); continue
         }
 
+        # Degradation log and run-log. These are the only long-horizon datasets
+        # (120 days), so they get a disk home rather than living only in the
+        # browser's localStorage where clearing site data would wipe them.
+        # Governor profiles. /setgovernors is the mobile change channel and is
+        # consumed on read; this is the durable copy.
+        # Storage audit: what is actually on disk, section by section. Reports
+        # the real file, not the in-memory caches, so it can confirm a section
+        # genuinely persisted rather than merely existing in the browser.
+        if ($path -eq "/storeinfo") {
+            $fileBytes = 0; $fileTime = ''
+            try {
+                if (Test-Path $script:dataFile) {
+                    $fi = Get-Item $script:dataFile
+                    $fileBytes = $fi.Length
+                    $fileTime  = $fi.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
+                }
+            } catch {}
+            $onDisk = ''
+            try { if (Test-Path $script:dataFile) { $onDisk = [System.IO.File]::ReadAllText($script:dataFile, [System.Text.Encoding]::UTF8) } } catch {}
+            $secs = @()
+            foreach ($nm in @('session','scripts','reports','degradation','runlog','governors','alltime','ambientlog')) {
+                $raw = if ($onDisk) { Get-StoreSection $onDisk $nm } else { $null }
+                $len = if ($raw) { $raw.Length } else { 0 }
+                $cnt = Count-JsonTop $raw
+                $secs += ('"' + $nm + '":{"bytes":' + $len + ',"items":' + $cnt + '}')
+            }
+            $js = '{"file":' + (ConvertTo-Json $script:dataFile) + ',"bytes":' + $fileBytes +
+                  ',"modified":"' + $fileTime + '","sections":{' + ($secs -join ',') + '}}'
+            $b=[System.Text.Encoding]::UTF8.GetBytes($js)
+            $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/governorstore" -and $req.HttpMethod -eq "GET") {
+            $d = if ($script:govCache) { $script:govCache } else { 'null' }
+            $b=[System.Text.Encoding]::UTF8.GetBytes($d)
+            $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+        if ($path -eq "/governorstore" -and $req.HttpMethod -eq "POST") {
+            try {
+                $rd = New-Object System.IO.StreamReader($req.InputStream)
+                $gj2 = $rd.ReadToEnd(); $rd.Dispose()
+                if ($gj2 -and $gj2.Length -gt 1) { $script:govCache = $gj2; $script:storeDirty = $true; Save-Store -Force }
+            } catch {}
+            $b=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+            $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+
+        # Ambient history. Its own series rather than a replay of live telemetry,
+        # so the curve survives restarts the way the readings that built it do.
+        if ($path -eq "/ambientlog" -and $req.HttpMethod -eq "GET") {
+            $d = if ($script:ambLogCache) { $script:ambLogCache } else { 'null' }
+            $b=[System.Text.Encoding]::UTF8.GetBytes($d)
+            $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+        if ($path -eq "/ambientlog" -and $req.HttpMethod -eq "POST") {
+            try {
+                $rd = New-Object System.IO.StreamReader($req.InputStream)
+                $aj = $rd.ReadToEnd(); $rd.Dispose()
+                if ($aj -and $aj.Length -gt 1) { $script:ambLogCache = $aj; $script:storeDirty = $true; Save-Store }
+            } catch {}
+            $b=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+            $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/degradation" -and $req.HttpMethod -eq "GET") {
+            $d = if ($script:degCache) { $script:degCache } else { 'null' }
+            $b=[System.Text.Encoding]::UTF8.GetBytes($d)
+            $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+        if ($path -eq "/degradation" -and $req.HttpMethod -eq "POST") {
+            try {
+                $rd = New-Object System.IO.StreamReader($req.InputStream)
+                $dj = $rd.ReadToEnd(); $rd.Dispose()
+                if ($dj -and $dj.Length -gt 1) { $script:degCache = $dj; $script:storeDirty = $true; Save-Store }
+            } catch {}
+            $b=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+            $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+        if ($path -eq "/runlog" -and $req.HttpMethod -eq "GET") {
+            $d = if ($script:runlogCache) { $script:runlogCache } else { 'null' }
+            $b=[System.Text.Encoding]::UTF8.GetBytes($d)
+            $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+        if ($path -eq "/runlog" -and $req.HttpMethod -eq "POST") {
+            try {
+                $rd = New-Object System.IO.StreamReader($req.InputStream)
+                $rj2 = $rd.ReadToEnd(); $rd.Dispose()
+                if ($rj2 -and $rj2.Length -gt 1) { $script:runlogCache = $rj2; $script:storeDirty = $true; Save-Store }
+            } catch {}
+            $b=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+            $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/setuwcfg") {
+            # Mobile writes underperformance-watchdog changes here; Windows polls
+            # /getuwcfg. Its own channel, not the auto-restart slot -- that one is
+            # single-value and consumed on read, so the two would clobber each other.
+            try {
+                $urs = New-Object System.IO.StreamReader($req.InputStream)
+                $ujs = $urs.ReadToEnd(); $urs.Dispose()
+                if ($ujs -and $ujs.Length -gt 1) { $script:pendingUwCfg = $ujs }
+            } catch {}
+            $ub=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+            $resp.ContentType="application/json"; $resp.ContentLength64=$ub.Length
+            $resp.OutputStream.Write($ub,0,$ub.Length)
+            $resp.Close(); continue
+        }
+
+        if ($path -eq "/getuwcfg") {
+            $uout = if ($script:pendingUwCfg) { $script:pendingUwCfg } else { 'null' }
+            $script:pendingUwCfg = $null
+            $ub=[System.Text.Encoding]::UTF8.GetBytes($uout)
+            $resp.ContentType="application/json"; $resp.ContentLength64=$ub.Length
+            $resp.OutputStream.Write($ub,0,$ub.Length)
+            $resp.Close(); continue
+        }
+
         if ($path -eq "/reports") {
             try {
                 if ($req.HttpMethod -eq "POST") {
@@ -459,7 +815,7 @@ while ($running -and $listener.IsListening) {
                         $rj = $rr.ReadToEnd(); $rr.Dispose()
                         if ($rj -and $rj.Length -gt 2) {
                             $script:reportsCache = $rj
-                            try { [System.IO.File]::WriteAllText("$PSScriptRoot\reports-data.json", $rj, [System.Text.Encoding]::UTF8) } catch {}
+                            $script:storeDirty = $true; Save-Store -Force
                         }
                     } catch {}
                     $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
@@ -517,7 +873,10 @@ while ($running -and $listener.IsListening) {
                     try {
                         $sr3 = New-Object System.IO.StreamReader($req.InputStream)
                         $sj = $sr3.ReadToEnd(); $sr3.Dispose()
-                        if ($sj -and $sj.Length -gt 2) { $script:scriptsCache = $sj }
+                        if ($sj -and $sj.Length -gt 2) {
+                            $script:scriptsCache = $sj
+                            $script:storeDirty = $true; Save-Store -Force
+                        }
                     } catch {}
                     $rb=[System.Text.Encoding]::UTF8.GetBytes('{"ok":true}')
                     $resp.ContentType="application/json"; $resp.ContentLength64=$rb.Length
@@ -648,21 +1007,58 @@ while ($running -and $listener.IsListening) {
             $resp.Close(); continue
         }
 
+        # /fleet GET - flat combined rollup, for watch complications / widgets.
+        # Deliberately flat: JSON-path tools (Complicator, Scriptable, etc) use
+        # dot notation, and /session is keyed by miner IP - the dots in an IP are
+        # indistinguishable from path separators, so nothing can address it.
+        # Contains rollup numbers only: no pool, wallet or credential strings.
+        if ($path -eq "/fleet" -and $req.HttpMethod -eq "GET") {
+            $data = if ($script:fleetCache) { $script:fleetCache } else { '{}' }
+            $resp.StatusCode = 200; $resp.ContentType = "application/json"
+            $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $b = [System.Text.Encoding]::UTF8.GetBytes($data)
+            $resp.ContentLength64 = $b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+
+        # /fleet POST - desktop pushes the computed rollup. The server stays a
+        # dumb cache; fleetStats() on the desktop remains the single source of
+        # truth, so this can't drift from what the cards show.
+        if ($path -eq "/fleet" -and $req.HttpMethod -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($req.InputStream)
+            $script:fleetCache = $reader.ReadToEnd(); $reader.Close()
+            $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $b = [System.Text.Encoding]::UTF8.GetBytes("ok")
+            $resp.ContentLength64 = $b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+
         # /session POST - desktop pushes live session stats
         if ($path -eq "/session" -and $req.HttpMethod -eq "POST") {
             $reader = New-Object System.IO.StreamReader($req.InputStream)
             $script:sessionCache = $reader.ReadToEnd(); $reader.Close()
             # Persist to disk - but only if snapshot has data or is intentionally cleared
             try {
-                $sobj = ConvertFrom-Json $script:sessionCache
-                $hasData = $false
-                $isCleared = $false
-                foreach ($key in $sobj.PSObject.Properties.Name) {
-                    if ($sobj.$key.topSeriesSnapshot -and $sobj.$key.topSeriesSnapshot.Count -gt 0) { $hasData = $true }
-                    if ($sobj.$key.sessionCleared) { $isCleared = $true }
-                }
-                if ($hasData -or $isCleared) {
-                    [System.IO.File]::WriteAllText("$PSScriptRoot\session-data.json", $script:sessionCache, [System.Text.Encoding]::UTF8)
+                # Was a full ConvertFrom-Json of the entire session blob on every
+                # POST -- roughly every 2 seconds. A substring test answers the
+                # same question (is there anything worth keeping?) for a tiny
+                # fraction of the cost, and the write itself is now throttled.
+                # The desktop sends a signature covering only the unrecoverable
+                # parts (session bests, top-share lists, cleared flag). If it is
+                # unchanged there is nothing worth writing, so skip the disk
+                # entirely -- which is most posts, since a new top share lands
+                # minutes or hours apart, not every 2 seconds.
+                $psig = $req.Headers['X-Persist-Sig']
+                if ($psig -and $psig -eq $script:lastPsig) {
+                    # nothing persistable changed
+                } else {
+                    if ($psig) { $script:lastPsig = $psig }
+                    $hasData   = $script:sessionCache.Contains('"topSeriesSnapshot":[{')
+                    $isCleared = $script:sessionCache.Contains('"sessionCleared":true')
+                    if ($hasData -or $isCleared) {
+                        $script:storeDirty = $true
+                        Save-Store
+                    }
                 }
             } catch {}
             $resp.StatusCode = 200; $resp.Headers.Add("Access-Control-Allow-Origin","*")
@@ -737,10 +1133,10 @@ while ($running -and $listener.IsListening) {
         if ($path -eq "/getautorestart") {
             if ($script:pendingAutoRestart) {
                 $json = $script:pendingAutoRestart | ConvertTo-Json -Compress
+                # Consume ONLY the auto-restart flag. This used to also null
+                # scriptsCache, pendingNotifs and pendingScripts, which wiped
+                # every saved script the first time an auto-restart was polled.
                 $script:pendingAutoRestart = $null
-$script:pendingNotifs = $null
-$script:scriptsCache = $null
-$script:pendingScripts = $null
             } else {
                 $json = 'null'
             }
@@ -832,6 +1228,7 @@ $script:pendingScripts = $null
                     if ($target -and ($target.PSObject.Properties.Name -contains $del.ip)) {
                         $target.PSObject.Properties.Remove($del.ip)
                         $script:allTimeCache = ConvertTo-Json $d -Compress -Depth 6
+                        $script:storeDirty = $true; Save-Store -Force
                     }
                 }
                 $script:pendingDiffClear = $json
@@ -860,6 +1257,7 @@ $script:pendingScripts = $null
         if ($path -eq "/alltime" -and $req.HttpMethod -eq "POST") {
             $reader = New-Object System.IO.StreamReader($req.InputStream)
             $script:allTimeCache = $reader.ReadToEnd(); $reader.Close()
+            $script:storeDirty = $true; Save-Store -Force
             # NOTE: intentionally do NOT rebuild $script:minerIPs from all-time keys.
             # The active-miner list comes ONLY from /setminers (explicitly added miners).
             # This keeps a removed miner's history intact without resurrecting it into

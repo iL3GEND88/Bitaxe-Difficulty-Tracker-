@@ -38,7 +38,7 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :19248 ^| findstr LISTENING 2
 timeout /t 2 /nobreak >nul
 
 set OPENED=0
-set FLAGS=--app=http://localhost:19248 --disable-background-timer-throttling
+set FLAGS=--app=http://localhost:19248 --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding
 
 :: Microsoft Edge
 if %OPENED%==0 (
