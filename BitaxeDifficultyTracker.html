@@ -275,10 +275,10 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
     
     <div class="chip">TARGET: <b id="h-target">—</b></div>
     <span id="pause-badge">⏸ PAUSED</span>
-    <!-- Startup checkbox hidden for release: it writes a Windows scheduled task
-         and triggers a UAC prompt, which is easy to toggle by accident. The
-         wiring below (checkStartupState / the /startup endpoint) is intact --
-         restore this label to bring the control back. -->
+    <!-- Startup checkbox hidden for release: it creates a Windows scheduled task
+         and raises a UAC prompt, too easy to hit by accident. All the wiring
+         below (checkStartupState, the /startup endpoint, startup-helper.ps1) is
+         intact -- restore this label to bring the control back. -->
     <button id="btn-purgeminer" onclick="purgeMinerData()" style="background:transparent;border:1px solid var(--muted2);color:var(--muted);font-family:inherit;font-size:.65rem;padding:3px 12px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .18s" title="Completely remove a miner's stored data (history, ghost IPs) from app and server">🧹 Purge Miner</button>
     <button id="btn-shutdown" style="background:transparent;border:1px solid var(--red);color:var(--red);font-family:inherit;font-size:.65rem;padding:3px 12px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .18s" title="Shut down server and close">⏻ Close App</button>
   </div>
@@ -360,7 +360,7 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
   <button class="tbtn" onclick="openGovernorPanel()">⚙ Governor</button>
   <button class="tbtn" onclick="openReportsPanel()">📋 Reports</button>
   <button class="tbtn" onclick="openHourReport()">⏱ Last Hour</button>
-  <div id="stats-dropdown-wrap"><button class="tbtn on" id="btn-toggletemps">📊 Stats ▾</button><div id="stats-dropdown-menu"><div class="sdrop-item"><input type="checkbox" id="sdrop-best" checked><label for="sdrop-best">Best Difficulty</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-status" checked><label for="sdrop-status">Status / Uptime</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-stats" checked><label for="sdrop-stats">Shares / Rejected / Last</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-temps" checked><label for="sdrop-temps">Temperatures</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-power" checked onchange="statsVis.power=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-power">Power (W)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-amps" checked onchange="statsVis.amps=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-amps">Amps (A)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-volt" checked onchange="statsVis.volt=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-volt">Voltage (mV)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-freq" checked onchange="statsVis.freq=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-freq">Frequency (MHz)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-asics" checked onchange="statsVis.asics=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-asics">Per-ASIC HR/Err</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-luck" checked onchange="statsVis.luck=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-luck">Luck (per miner)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-pace" checked onchange="statsVis.pace=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-pace">Best-share pace</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-top10" checked><label for="sdrop-top10">Top Diffs List</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-fleet" onchange="statsVis.fleet=this.checked;saveStatsVis();renderCards();Object.values(miners).forEach(updateCardStats);updateFleetCard();"><label for="sdrop-fleet">Fleet stats card</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-fleetbest" onchange="statsVis.fleetBest=this.checked;saveStatsVis();try{updateDiffPanelContent();}catch(e){};try{updateHrPanelContent();}catch(e){};"><label for="sdrop-fleetbest">Fleet on best lists</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-log" checked onchange="statsVis.log=this.checked;saveStatsVis();var s=document.getElementById('slog');if(s)s.style.display=this.checked?'block':'none';" ><label for="sdrop-log">Live Log</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-disco" onchange="toggleDiscoMode(this.checked)"><label for="sdrop-disco">🪩 Disco Mode</label></div></div></div>
+  <div id="stats-dropdown-wrap"><button class="tbtn on" id="btn-toggletemps">📊 Stats ▾</button><div id="stats-dropdown-menu"><div class="sdrop-item"><input type="checkbox" id="sdrop-best" checked><label for="sdrop-best">Best Difficulty</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-status" checked><label for="sdrop-status">Status / Uptime</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-stats" checked><label for="sdrop-stats">Shares / Rejected / Last</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-temps" checked><label for="sdrop-temps">Temperatures</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-power" checked onchange="statsVis.power=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-power">Power (W)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-amps" checked onchange="statsVis.amps=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-amps">Amps (A)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-volt" checked onchange="statsVis.volt=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-volt">Voltage (mV)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-freq" checked onchange="statsVis.freq=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-freq">Frequency (MHz)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-asics" checked onchange="statsVis.asics=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-asics">Per-ASIC HR/Err</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-luck" checked onchange="statsVis.luck=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-luck">Luck (per miner)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-pace" checked onchange="statsVis.pace=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-pace">Best-share pace</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-top10" checked><label for="sdrop-top10">Top Diffs List</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-fleet" onchange="statsVis.fleet=this.checked;saveStatsVis();renderCards();Object.values(miners).forEach(updateCardStats);updateFleetCard();"><label for="sdrop-fleet">Fleet stats card</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-fleetbest" onchange="statsVis.fleetBest=this.checked;saveStatsVis();try{updateDiffPanelContent();}catch(e){};try{updateHrPanelContent();}catch(e){};"><label for="sdrop-fleetbest">Fleet on best lists</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-log" checked onchange="statsVis.log=this.checked;saveStatsVis();var s=document.getElementById('slog');if(s)s.style.display=this.checked?'block':'none';" ><label for="sdrop-log">Live Log</label></div><div class="sdrop-sep"></div><div class="sdrop-sep"></div><div style="padding:4px 14px 2px 14px;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Notifications</div><div class="sdrop-item"><input type="checkbox" id="sdrop-notif-all" onchange="setNotifAllOff(this.checked);paintNotifMenu();"><label for="sdrop-notif-all">Silence all popups</label></div><div id="notif-cat-list"></div><div style="padding:2px 14px 6px 14px;font-size:.6rem;color:var(--muted);line-height:1.4">Muted events still appear in the log. Block found is never muted.</div><div class="sdrop-item"><input type="checkbox" id="sdrop-disco" onchange="toggleDiscoMode(this.checked)"><label for="sdrop-disco">🪩 Disco Mode</label></div></div></div>
 </div>
 
 <div id="body">
@@ -1296,9 +1296,38 @@ function connectMiner(m){
     if(pdm){
       const newTarget=parseDiffToken(pdm[1]);
       if(newTarget>0 && newTarget!==m.poolDifficulty){
+        var _first = !m.poolDifficulty;
         m.poolDifficulty=newTarget;
         m.lastTarget=newTarget;
-        addLog('ok', m.ip+' — Pool difficulty set to '+fmtD(newTarget), m.color);
+        if(_first){
+          // First time we've ever seen it this session. Every share logged until
+          // now carries the miner's local target, which makes luck read far too
+          // low. Correct exactly those -- vardiff means later changes must NOT
+          // rewrite history, so only noPd shares are touched, once.
+          var _fixed=0;
+          [m.series, m.topSeries].forEach(function(arr){
+            for(var i=0;i<arr.length;i++){
+              if(arr[i] && arr[i].noPd){
+                arr[i].target=newTarget;
+                arr[i].accepted=(arr[i].found>=newTarget);
+                delete arr[i].noPd;
+                _fixed++;
+              }
+            }
+          });
+          // sharesAccepted was counted against the local target too
+          if(_fixed){
+            var _acc=0;
+            for(var k=0;k<m.series.length;k++) if(m.series[k].accepted) _acc++;
+            m.sharesAccepted=_acc;
+            addLog('ok', m.ip+' — Pool difficulty '+fmtD(newTarget)+' (corrected '+
+                   Math.round(_fixed/2)+' earlier shares)', m.color);
+          } else {
+            addLog('ok', m.ip+' — Pool difficulty set to '+fmtD(newTarget), m.color);
+          }
+        } else {
+          addLog('ok', m.ip+' — Pool difficulty set to '+fmtD(newTarget), m.color);
+        }
         updateCardStats(m);
       }
       return;
@@ -1313,9 +1342,18 @@ function connectMiner(m){
     if(found>m.sessionBest) m.sessionBest=found;
     const nowTs=Date.now();
     m.lastFoundTs=nowTs;
-    m.series.push({ts:nowTs,found,target,accepted});
+    // Store the target acceptance was judged against, not the miner's local one.
+    // Luck sums p.target, so storing the local value (~1000 vs a ~12000 pool
+    // target) undercounted actual work by roughly 90% until the pool difficulty
+    // was learned -- and those shares kept the wrong value forever, which is why
+    // the 1h figure recovered quickly but 24h took a full day to clear.
+    // noPd marks shares logged before any pool difficulty was known, so they can
+    // be corrected later. Shares logged under a KNOWN but different target are
+    // not marked: vardiff means that target was genuinely correct at the time.
+    var _noPd = !m.poolDifficulty;
+    m.series.push({ts:nowTs,found,target:effectiveTarget,accepted,noPd:_noPd});
     // topSeries - keep top 500 by difficulty (matches max display cap)
-    m.topSeries.push({ts:nowTs,found,target,accepted});
+    m.topSeries.push({ts:nowTs,found,target:effectiveTarget,accepted,noPd:_noPd});
     m._sessionCleared = false; // new shares = live session again, allow future restore
     if(m.topSeries.length > 600){
       m.topSeries.sort(function(a,b){return b.found-a.found;});
@@ -4255,8 +4293,7 @@ async function checkStartupState(){
     };
   }
 })();
-// Not polled while the control is hidden -- nothing can display the result.
-// checkStartupState() and the toggle handler remain callable if restored.
+// Not polled while the control is hidden -- nothing displays the result.
 // setTimeout(checkStartupState, 2000);
 
 document.getElementById('btn-shutdown').onclick = async () => {
@@ -5899,10 +5936,78 @@ function _toastToggle(){
   list.classList.toggle('deck');
   if(!list.classList.contains('deck')) list.scrollTop=list.scrollHeight;
 }
+// ── Notification categories ──────────────────────────────────────────────────
+// Classified from the title rather than by editing 29 call sites, so a new
+// toast is categorised automatically as long as it keeps the house prefixes.
+// Block found is deliberately not filterable -- that is the entire point of
+// running this.
+var NOTIF_CATS=[
+  ['governor', '\u2699 Governor',      'Governor frequency and voltage adjustments'],
+  ['script',   '\u{1F4DC} Scripts',    'Script triggers and actions'],
+  ['restart',  '\u27f3 Restarts',      'Miner restarts and auto-restart alerts'],
+  ['miner',    '\u{1F5A5} Miner state','Connection, stall and purge messages'],
+  ['app',      '\u{1F527} App',        'Settings, startup and housekeeping'],
+  ['other',    '\u2026 Other',         'Anything uncategorised']
+];
+var NOTIF_KEY='bitaxe_notif_mute_v1';
+var _notifMute=(function(){ try{ return JSON.parse(localStorage.getItem(NOTIF_KEY)||'{}'); }catch(e){ return {}; } })();
+var NOTIF_ALL_KEY='bitaxe_notif_all_off';
+var _notifAllOff=(function(){ try{ return localStorage.getItem(NOTIF_ALL_KEY)==='1'; }catch(e){ return false; } })();
+function notifCat(title, msg){
+  var t=String(title||'');
+  if(t.indexOf('BLOCK FOUND')>=0) return 'block';        // never muted
+  if(t.indexOf('Governor')>=0) return 'governor';
+  if(t.indexOf('Script')>=0 || t.indexOf('\u{1F4DC}')>=0) return 'script';
+  if(t.indexOf('Restart')>=0 || t.indexOf('Restarted')>=0) return 'restart';
+  if(t.indexOf('Purged')>=0 || t.indexOf('Stall')>=0 || t.indexOf('Connect')>=0 ||
+     t.indexOf('Overlap')>=0 || t.indexOf('Miner')>=0) return 'miner';
+  if(t.indexOf('Startup')>=0 || t.indexOf('Saved')>=0 || t.indexOf('Cleared')>=0 ||
+     t.indexOf('Storage')>=0 || t.indexOf('setting')>=0) return 'app';
+  return 'other';
+}
+function notifMuted(cat){
+  if(cat==='block') return false;                        // always gets through
+  if(_notifAllOff) return true;
+  return !!_notifMute[cat];
+}
+function setNotifMute(cat, muted){
+  _notifMute[cat]=!!muted;
+  try{ localStorage.setItem(NOTIF_KEY, JSON.stringify(_notifMute)); }catch(e){}
+}
+function paintNotifMenu(){
+  var host=document.getElementById('notif-cat-list'); if(!host) return;
+  var all=document.getElementById('sdrop-notif-all'); if(all) all.checked=_notifAllOff;
+  if(!host.dataset.built){
+    host.innerHTML=NOTIF_CATS.map(function(c){
+      return '<div class="sdrop-item" title="'+c[2]+'">'+
+             '<input type="checkbox" id="sdrop-notif-'+c[0]+'" onchange="setNotifMute(\'' + c[0] + '\', !this.checked);">'+
+             '<label for="sdrop-notif-'+c[0]+'">'+c[1]+'</label></div>';
+    }).join('');
+    host.dataset.built='1';
+  }
+  // Checked means "show me these", so the box reads as presence not absence;
+  // the underlying store is inverted.
+  NOTIF_CATS.forEach(function(c){
+    var el=document.getElementById('sdrop-notif-'+c[0]); if(!el) return;
+    el.checked = !_notifMute[c[0]];
+    el.disabled = _notifAllOff;
+    var row=el.parentNode; if(row) row.style.opacity=_notifAllOff?'0.45':'1';
+  });
+}
+setTimeout(paintNotifMenu, 300);
+function setNotifAllOff(off){
+  _notifAllOff=!!off;
+  try{ localStorage.setItem(NOTIF_ALL_KEY, _notifAllOff?'1':'0'); }catch(e){}
+}
 function showToast(title, msg, type, ip){
   // Tag the notification with whichever miner it concerns so mobile can colour
   // its edge to match that miner's card. If no ip is passed, scan the text for a
   // known ip or miner name -- that covers every existing call site unchanged.
+  // Muted categories are dropped from the on-screen toast only. The event still
+  // reaches the log panel and the mobile queue -- muting is about not being
+  // interrupted, not about losing the record.
+  var _cat=notifCat(title, msg);
+  var _muted=notifMuted(_cat);
   var _who=ip||null, _col=null;
   try{
     if(!_who){
@@ -5917,6 +6022,7 @@ function showToast(title, msg, type, ip){
   }catch(e){}
   _mobNotifQueue.push({title:String(title||''),msg:String(msg||'').replace(/<[^>]+>/g,' '),type:String(type||'warn'),ts:Date.now(),ip:_who,color:_col});
   if(_mobNotifQueue.length>20) _mobNotifQueue.shift();
+  if(_muted) return;
   const list = document.getElementById('toast-list');
   const t = document.createElement('div');
   t.className = 'toast ' + (type||'warn');

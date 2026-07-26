@@ -923,12 +923,25 @@ function renderMiners(){
     arEl.style.cssText='background:transparent;border:1px solid '+(arOn?'var(--grn)':'var(--muted)')+';border-radius:3px;color:'+(arOn?'var(--grn)':'var(--muted)')+';font-size:.65rem;cursor:pointer;padding:0 2px;margin-left:1px;flex-shrink:0';
     arEl.dataset.on=arOn?'1':'0';
     arEl.onclick=function(){
-      var newVal=this.dataset.on!=='1';
-      this.dataset.on=newVal?'1':'0';
-      this.style.color=newVal?'var(--grn)':'var(--muted)';
-      this.style.borderColor=newVal?'var(--grn)':'var(--muted)';
-      this.textContent='A';
-      mobSetAutoRestart(ip, newVal);
+      var btn=this;
+      var newVal=btn.dataset.on!=='1';
+      // A title tooltip does nothing on a phone, so turning this on used to arm
+      // an automatic power action with no explanation anywhere. Explain it once,
+      // the first time it is switched on, then stay out of the way.
+      if(newVal && !_mobARExplained()){
+        mobConfirmSheet(
+          'Turn on Auto-Restart?',
+          'This miner will be restarted automatically if it reports no hashrate and no shares for 5 minutes.\n\n'+
+          'If that happens more than 3 times in an hour, auto-restart switches itself off for this miner and you get an alert '+
+          '\u2014 repeated stalls usually mean a power or hardware fault that a restart will not fix.\n\n'+
+          'The Windows app must be running for this to work.',
+          function(){
+            try{ localStorage.setItem('bitaxe_ar_explained','1'); }catch(e){}
+            _applyAR(btn, ip, true);
+          });
+        return;
+      }
+      _applyAR(btn, ip, newVal);
     };
     // Tap the miner name to collapse to temps-only — same gesture as the fleet
     // card. Replaces the old thermostat button.
@@ -2521,6 +2534,41 @@ function renderSettings(){
 
   c.appendChild(hrCard);
 
+  // ── Notifications ──
+  var nCard=document.createElement('div');
+  nCard.id='mob-notif-card';
+  nCard.className='card';
+  nCard.style.cssText='margin-bottom:14px';
+  var nHdr=document.createElement('div');
+  nHdr.className='set-sec';
+  nHdr.style.cssText='padding:12px 16px 6px 16px';
+  nHdr.textContent='Notifications';
+  nCard.appendChild(nHdr);
+  var mkRow=function(label, checked, onChange, dim){
+    var r=document.createElement('div');
+    r.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:9px 16px;'+
+                    'border-top:1px solid var(--muted2);'+(dim?'opacity:.45;':'');
+    var l=document.createElement('span');
+    l.style.cssText='font-size:.82rem;color:var(--txt)';
+    l.textContent=label;
+    var t=document.createElement('input');
+    t.type='checkbox'; t.className='toggle'; t.checked=checked; t.disabled=!!dim;
+    t.onchange=function(){ onChange(t.checked); };
+    r.appendChild(l); r.appendChild(t);
+    return r;
+  };
+  nCard.appendChild(mkRow('Silence all popups', _mobNotifAllOff, function(v){ mobSetNotifAll(v); }, false));
+  MOB_NOTIF_CATS.forEach(function(cat){
+    nCard.appendChild(mkRow(cat[1], !_mobNotifMute[cat[0]], function(v){
+      mobSetNotifMute(cat[0], !v);       // checkbox reads as "show", store is inverted
+    }, _mobNotifAllOff));
+  });
+  var nNote=document.createElement('div');
+  nNote.style.cssText='padding:8px 16px 12px 16px;font-size:.68rem;color:var(--muted);line-height:1.45;border-top:1px solid var(--muted2)';
+  nNote.textContent='Muted events are still recorded \u2014 they just don\u2019t pop up. Block found is never muted.';
+  nCard.appendChild(nNote);
+  c.appendChild(nCard);
+
   var themeBtn=document.createElement('button');
   themeBtn.style.cssText='width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);font-size:.85rem;font-weight:600;padding:10px 14px;border-radius:8px;cursor:pointer;margin-bottom:14px;';
   themeBtn.textContent='Theme / BG Color';
@@ -2719,6 +2767,50 @@ function mobAddMiner(){
 var _mobARState={};
 var _mobStallTs={};
 var _mobARTapTime={};
+function _mobARExplained(){ try{ return localStorage.getItem('bitaxe_ar_explained')==='1'; }catch(e){ return false; } }
+function _applyAR(btn, ip, val){
+  btn.dataset.on = val?'1':'0';
+  btn.style.color = val?'var(--grn)':'var(--muted)';
+  btn.style.borderColor = val?'var(--grn)':'var(--muted)';
+  btn.textContent='A';
+  mobSetAutoRestart(ip, val);
+}
+// In-page sheet, not confirm(). A native dialog blocks while the auto-refresh
+// timer keeps firing and rebuilds the page underneath it -- the same failure
+// that froze the app on miner rename and again on the chart <select>.
+function mobConfirmSheet(title, body, onYes){
+  var prev=refreshPaused; refreshPaused=true;
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.65);display:flex;'+
+                   'align-items:center;justify-content:center;padding:18px';
+  var box=document.createElement('div');
+  box.style.cssText='background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:18px;'+
+                    'max-width:420px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 8px 40px rgba(0,0,0,.7)';
+  var h=document.createElement('div');
+  h.style.cssText='font-size:.92rem;font-weight:700;color:var(--txt);margin-bottom:10px';
+  h.textContent=title;
+  var p2=document.createElement('div');
+  p2.style.cssText='font-size:.8rem;color:var(--muted);line-height:1.55;white-space:pre-line;margin-bottom:16px';
+  p2.textContent=body;
+  var row=document.createElement('div');
+  row.style.cssText='display:flex;gap:10px;justify-content:flex-end';
+  var no=document.createElement('button');
+  no.textContent='Cancel';
+  no.style.cssText='flex:1;font-family:inherit;font-size:.82rem;padding:10px;border-radius:8px;cursor:pointer;'+
+                   'background:transparent;border:1px solid var(--bdr);color:var(--muted)';
+  var yes=document.createElement('button');
+  yes.textContent='Turn On';
+  yes.style.cssText='flex:1;font-family:inherit;font-size:.82rem;font-weight:600;padding:10px;border-radius:8px;cursor:pointer;'+
+                    'background:rgba(34,211,122,0.15);border:1px solid var(--grn);color:var(--grn)';
+  var close=function(){ try{ document.body.removeChild(ov); }catch(e){} refreshPaused=prev; };
+  no.onclick=close;
+  yes.onclick=function(){ close(); try{ onYes(); }catch(e){} };
+  ov.onclick=function(e){ if(e.target===ov) close(); };
+  row.appendChild(no); row.appendChild(yes);
+  box.appendChild(h); box.appendChild(p2); box.appendChild(row);
+  ov.appendChild(box); document.body.appendChild(ov);
+}
+
 var _mobARTapExpected={}; // expected value after tap, cleared when confirmed
 var _mobTempsOnly={
   _data: (function(){try{return JSON.parse(localStorage.getItem('mob_tempsonly')||'[]');}catch(e){return [];}}()),
@@ -2734,6 +2826,10 @@ function mobGetARState(ip){
 }
 function mobSetAutoRestart(ip, val){
   _mobARState[ip]=val;
+  // Stamp the tap. Two places read this to hold the local value for 15s so an
+  // in-flight push from Windows can't flip the button back under your finger,
+  // but nothing ever wrote it -- the debounce has never actually engaged.
+  _mobARTapTime[ip]=Date.now();
   try{ var s={}; try{s=JSON.parse(localStorage.getItem('mob_ar')||'{}')}catch(e){} s[ip]=val; localStorage.setItem('mob_ar',JSON.stringify(s)); }catch(e){}
   fetch(SERVER+'/setautorestart',{
     method:'POST',
@@ -2754,7 +2850,51 @@ function _mobNotifSync(){
 function _mobNotifToggle(){
   var list=document.getElementById('mob-notif-list'); if(list) list.classList.toggle('deck');
 }
+// ── Notification categories ──────────────────────────────────────────────────
+// Same buckets and the same title-based classification as the Windows app, so a
+// category muted here means the same thing there. Block found is never muted.
+var MOB_NOTIF_CATS=[
+  ['governor','\u2699 Governor'],
+  ['script','\u{1F4DC} Scripts'],
+  ['restart','\u27f3 Restarts'],
+  ['miner','\u{1F5A5} Miner state'],
+  ['app','\u{1F527} App'],
+  ['other','\u2026 Other']
+];
+var MOB_NOTIF_KEY='bitaxe_notif_mute_v1';
+var MOB_NOTIF_ALL='bitaxe_notif_all_off';
+var _mobNotifMute=(function(){ try{ return JSON.parse(localStorage.getItem(MOB_NOTIF_KEY)||'{}'); }catch(e){ return {}; } })();
+var _mobNotifAllOff=(function(){ try{ return localStorage.getItem(MOB_NOTIF_ALL)==='1'; }catch(e){ return false; } })();
+function mobNotifCat(title){
+  var t=String(title||'');
+  if(t.indexOf('BLOCK FOUND')>=0) return 'block';
+  if(t.indexOf('Governor')>=0) return 'governor';
+  if(t.indexOf('Script')>=0) return 'script';
+  if(t.indexOf('Restart')>=0||t.indexOf('Restarted')>=0) return 'restart';
+  if(t.indexOf('Purged')>=0||t.indexOf('Stall')>=0||t.indexOf('Connect')>=0||
+     t.indexOf('Overlap')>=0||t.indexOf('Miner')>=0) return 'miner';
+  if(t.indexOf('Startup')>=0||t.indexOf('Saved')>=0||t.indexOf('Cleared')>=0||
+     t.indexOf('Storage')>=0||t.indexOf('setting')>=0) return 'app';
+  return 'other';
+}
+function mobNotifMuted(cat){
+  if(cat==='block') return false;
+  if(_mobNotifAllOff) return true;
+  return !!_mobNotifMute[cat];
+}
+function mobSetNotifMute(cat,muted){
+  _mobNotifMute[cat]=!!muted;
+  try{ localStorage.setItem(MOB_NOTIF_KEY, JSON.stringify(_mobNotifMute)); }catch(e){}
+}
+function mobSetNotifAll(off){
+  _mobNotifAllOff=!!off;
+  try{ localStorage.setItem(MOB_NOTIF_ALL, _mobNotifAllOff?'1':'0'); }catch(e){}
+  renderSettings();
+}
 function showMobNotif(title,msg,type,ts,color){
+  // Muted categories are suppressed on screen only; the notification list keeps
+  // the record. Never suppress a found block.
+  if(mobNotifMuted(mobNotifCat(title))) return;
   var wrap=document.getElementById('mob-notif-wrap');
   if(!wrap){wrap=document.createElement('div');wrap.id='mob-notif-wrap';var tm=document.getElementById('tab-miners');if(tm)tm.insertBefore(wrap,tm.firstChild);}
   // ensure deck structure (bar + list) exists inside wrap
