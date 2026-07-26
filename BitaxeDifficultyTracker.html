@@ -275,10 +275,10 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
     
     <div class="chip">TARGET: <b id="h-target">—</b></div>
     <span id="pause-badge">⏸ PAUSED</span>
-    <label style="display:flex;align-items:center;gap:5px;font-size:.72rem;color:var(--muted);cursor:pointer;white-space:nowrap;margin:0 4px" title="Launch app automatically when Windows starts">
-      <input type="checkbox" id="chk-startup" style="cursor:pointer;accent-color:var(--orange)">
-      Startup
-    </label>
+    <!-- Startup checkbox hidden for release: it writes a Windows scheduled task
+         and triggers a UAC prompt, which is easy to toggle by accident. The
+         wiring below (checkStartupState / the /startup endpoint) is intact --
+         restore this label to bring the control back. -->
     <button id="btn-purgeminer" onclick="purgeMinerData()" style="background:transparent;border:1px solid var(--muted2);color:var(--muted);font-family:inherit;font-size:.65rem;padding:3px 12px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .18s" title="Completely remove a miner's stored data (history, ghost IPs) from app and server">🧹 Purge Miner</button>
     <button id="btn-shutdown" style="background:transparent;border:1px solid var(--red);color:var(--red);font-family:inherit;font-size:.65rem;padding:3px 12px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .18s" title="Shut down server and close">⏻ Close App</button>
   </div>
@@ -4255,7 +4255,9 @@ async function checkStartupState(){
     };
   }
 })();
-setTimeout(checkStartupState, 2000);
+// Not polled while the control is hidden -- nothing can display the result.
+// checkStartupState() and the toggle handler remain callable if restored.
+// setTimeout(checkStartupState, 2000);
 
 document.getElementById('btn-shutdown').onclick = async () => {
   try {
