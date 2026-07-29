@@ -276,9 +276,9 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
     <div class="chip">TARGET: <b id="h-target">—</b></div>
     <span id="pause-badge">⏸ PAUSED</span>
     <!-- Startup checkbox hidden for release: it creates a Windows scheduled task
-         and raises a UAC prompt, too easy to hit by accident. All the wiring
-         below (checkStartupState, the /startup endpoint, startup-helper.ps1) is
-         intact -- restore this label to bring the control back. -->
+         and raises a UAC prompt, too easy to hit by accident. The wiring below
+         (checkStartupState, the /startup endpoint, startup-helper.ps1) is intact
+         -- restore this label to bring the control back. -->
     <button id="btn-purgeminer" onclick="purgeMinerData()" style="background:transparent;border:1px solid var(--muted2);color:var(--muted);font-family:inherit;font-size:.65rem;padding:3px 12px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .18s" title="Completely remove a miner's stored data (history, ghost IPs) from app and server">🧹 Purge Miner</button>
     <button id="btn-shutdown" style="background:transparent;border:1px solid var(--red);color:var(--red);font-family:inherit;font-size:.65rem;padding:3px 12px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .18s" title="Shut down server and close">⏻ Close App</button>
   </div>
@@ -793,7 +793,7 @@ function updateFleetCard(){
       var v=f.luck?f.luck[w.key]:null;
       if(v==null) return '<span style="opacity:.5">'+w.lbl+'\u2009—</span>';
       var col=v>=100?'var(--grn)':(v>=90?'var(--txt)':(v>=75?'#f0b429':'var(--red)'));
-      return '<span style="opacity:.7">'+w.lbl+'</span>\u2009<span style="color:'+col+'">'+Math.round(v)+'%</span>';
+      return '<span style="opacity:.7">'+w.lbl+'</span>\u2009<span style="color:'+col+'">'+fmtLuck(v)+'</span>';
     });
     flk.innerHTML=parts.join('\u2003');
   }
@@ -1031,7 +1031,7 @@ function updateCardStats(m){
         var v=lk[w.key];
         if(v==null) return '<span style=\"opacity:.5\">'+w.lbl+'\u2009—</span>';
         var col = v>=100?'var(--grn)':(v>=90?'var(--txt)':(v>=75?'#f0b429':'var(--red)'));
-        return '<span style=\"opacity:.7\">'+w.lbl+'</span>\u2009<span style=\"color:'+col+'\">'+Math.round(v)+'%</span>';
+        return '<span style=\"opacity:.7\">'+w.lbl+'</span>\u2009<span style=\"color:'+col+'\">'+fmtLuck(v)+'</span>';
       });
       luckEl.innerHTML=parts.join('\u2003');
     }catch(e){ luckEl.textContent=' —'; }
@@ -1288,7 +1288,14 @@ function connectMiner(m){
   es.onmessage=ev=>{
     m._lastStreamMsgTs=Date.now();
     const line=stripAnsi((ev.data||'').trim()); if(!line) return;
-    if(line==='CONNECTED'){ m.status='Live'; m.connectedAt=m.connectedAt||Date.now(); setDot(m.id,'live'); updateCardStats(m); addLog('ok','Connected to '+m.ip,m.color); pollAxeOSBests(m); markDirty(); return; }
+    if(line==='CONNECTED'){ m.status='Live'; m.connectedAt=m.connectedAt||Date.now();
+      // Shares submitted before we attached reference stratum jobs we never saw,
+      // so they cannot be reconstructed. Their absence still suppresses luck,
+      // because the elapsed time counts toward expected work while the shares
+      // that would offset it are missing. Exclude that settling window from the
+      // luck calculation on every (re)connect rather than carrying a permanent
+      // penalty for it.
+      m._luckArm = true; m._luckFrom = null; setDot(m.id,'live'); updateCardStats(m); addLog('ok','Connected to '+m.ip,m.color); pollAxeOSBests(m); markDirty(); return; }
     if(line.startsWith('ERROR:')){ m.status='Error'; setDot(m.id,'err'); updateCardStats(m); addLog('er',m.ip+' — '+line); markDirty(); return; }
     if(BLOCK_RE.test(line) && !m._blockFoundShown){ m._blockFoundShown=true; showBlockBanner(m.ip); showToast('🎉 BLOCK FOUND','Miner '+(m.name||m.ip)+' found a block!','ok'); }
     // Detect pool-set difficulty changes
@@ -1300,10 +1307,10 @@ function connectMiner(m){
         m.poolDifficulty=newTarget;
         m.lastTarget=newTarget;
         if(_first){
-          // First time we've ever seen it this session. Every share logged until
-          // now carries the miner's local target, which makes luck read far too
-          // low. Correct exactly those -- vardiff means later changes must NOT
-          // rewrite history, so only noPd shares are touched, once.
+          // Only shares that arrived with NO target at all are corrected. Shares
+          // that carried their own target keep it: under vardiff that value was
+          // true at the time, and overwriting it with the current difficulty is
+          // what made luck read high.
           var _fixed=0;
           [m.series, m.topSeries].forEach(function(arr){
             for(var i=0;i<arr.length;i++){
@@ -1335,8 +1342,14 @@ function connectMiner(m){
     const parsed=parseDiffLine(line); if(!parsed) return;
     const {found,target}=parsed;
     // Use pool-set difficulty if available, otherwise use share's reported target
-    const effectiveTarget = m.poolDifficulty||target;
-    const accepted=found>=effectiveTarget;
+    // Judge the share against the target IT was found under, not the latest pool
+    // difficulty. Under vardiff those differ constantly -- the Nexus swings
+    // 10k-17k -- so using the latest value marked genuinely accepted shares as
+    // rejected whenever difficulty had since risen, dropping them from the luck
+    // count and reading ~20% low. The pool value is only a fallback for lines
+    // that carry no target of their own.
+    const effectiveTarget = (target>0) ? target : (m.poolDifficulty||0);
+    const accepted = effectiveTarget>0 ? (found>=effectiveTarget) : false;
     m.lastDiff=found; m.lastTarget=effectiveTarget; m.sharesFound++;
     if(accepted){ m.sharesAccepted++; if(found>m.bestDiff) m.bestDiff=found; }
     if(found>m.sessionBest) m.sessionBest=found;
@@ -1350,10 +1363,27 @@ function connectMiner(m){
     // noPd marks shares logged before any pool difficulty was known, so they can
     // be corrected later. Shares logged under a KNOWN but different target are
     // not marked: vardiff means that target was genuinely correct at the time.
-    var _noPd = !m.poolDifficulty;
-    m.series.push({ts:nowTs,found,target:effectiveTarget,accepted,noPd:_noPd});
+    // A new accepted share means this session is live again. Leaving the flag
+    // set kept republishing "cleared" long after the fact, and any consumer
+    // reading it fleet-wide would keep acting on a stale signal.
+    if(accepted && m._sessionCleared) m._sessionCleared=false;
+    // Store the target from THIS share's own log line. It is the difficulty that
+    // was actually in effect when the share was found, which is what luck must
+    // sum -- the Nexus swings 10k-17k, so stamping every share with the latest
+    // pool difficulty inflated summed work and read ~130% high. Fall back to the
+    // pool value only when the line carried no target at all.
+    var _t = (target>0) ? target : (m.poolDifficulty||0);
+    var _noT = !(target>0) && !m.poolDifficulty;   // no target from either source yet
+    // The first share we actually plot after connecting marks the moment
+    // reconstruction started working. Anything the miner submitted before that
+    // is unrecoverable, and counting its elapsed time without its shares reads
+    // as a permanent shortfall. A fixed delay was the wrong shape: the Nexus
+    // takes a variable time to hand over extranonce1 and fill the job cache,
+    // so let the data say when it is ready rather than guessing.
+    if(m._luckArm){ m._luckArm=false; m._luckFrom=nowTs; }
+    m.series.push({ts:nowTs,found,target:_t,accepted,noPd:_noT});
     // topSeries - keep top 500 by difficulty (matches max display cap)
-    m.topSeries.push({ts:nowTs,found,target:effectiveTarget,accepted,noPd:_noPd});
+    m.topSeries.push({ts:nowTs,found,target:_t,accepted,noPd:_noT});
     m._sessionCleared = false; // new shares = live session again, allow future restore
     if(m.topSeries.length > 600){
       m.topSeries.sort(function(a,b){return b.found-a.found;});
@@ -2638,6 +2668,32 @@ function _effHint(ctx,W,H,dpr){
 }
 
 // ── Volt/Temp Map: scatter of (temp, volt) that held timing, colored by freq ─
+function _vtSlope(rows){
+  // Group by frequency and centre each group on its own means. A single fit
+  // across all frequencies measures the governor's freq/volt schedule, not the
+  // silicon: MHz drives voltage AND heat, so the two correlate for a reason that
+  // has nothing to do with temperature sensitivity.
+  var by={}, i;
+  for(i=0;i<rows.length;i++){ var f=rows[i].freq; (by[f]=by[f]||[]).push(rows[i]); }
+  var xs=[], ys=[], groups=0;
+  Object.keys(by).forEach(function(f){
+    var g=by[f]; if(g.length<2) return;            // need spread within the group
+    var mt=0, mv=0, k;
+    for(k=0;k<g.length;k++){ mt+=g[k].temp; mv+=g[k].volt; }
+    mt/=g.length; mv/=g.length;
+    var spread=0;
+    for(k=0;k<g.length;k++){ if(Math.abs(g[k].temp-mt)>spread) spread=Math.abs(g[k].temp-mt); }
+    if(spread<0.3) return;                          // temperature never moved here
+    for(k=0;k<g.length;k++){ xs.push(g[k].temp-mt); ys.push(g[k].volt-mv); }
+    groups++;
+  });
+  if(xs.length<3 || groups<1) return null;
+  var n=xs.length, sx=0, sy=0, sxx=0, sxy=0;
+  for(i=0;i<n;i++){ sx+=xs[i]; sy+=ys[i]; sxx+=xs[i]*xs[i]; sxy+=xs[i]*ys[i]; }
+  var den=n*sxx-sx*sx;
+  if(!(Math.abs(den)>1e-9)) return null;
+  return { slope:(n*sxy-sx*sy)/den, groups:groups, pts:n };
+}
 function drawVtMapPanel(panel){
   const {canvas,ctx}=panel;
   const W=canvas.width,H=canvas.height,dpr=Math.min(devicePixelRatio,2);
@@ -2705,8 +2761,14 @@ function drawVtMapPanel(panel){
     ctx.fillStyle=col(r.freq); ctx.beginPath(); ctx.arc(x,y,3.2*dpr,0,Math.PI*2); ctx.fill();
   });
   if(slope!==null){
+    // Report the within-frequency slope when there is enough spread for one;
+    // fall back to the raw fit, labelled, so the two are never confused.
+    var _wf=_vtSlope(pts);
     ctx.fillStyle='#f7931a'; ctx.font=(10*dpr)+'px system-ui'; ctx.textAlign='right';
-    ctx.fillText(Math.abs(slope).toFixed(1)+' mV/\u00b0C', PL+cw, PT-7*dpr);
+    ctx.fillText(_wf
+      ? (Math.abs(_wf.slope).toFixed(1)+' mV/\u00b0C  @fixed MHz')
+      : (Math.abs(slope).toFixed(1)+' mV/\u00b0C  (all MHz \u2014 includes tuning)'),
+      PL+cw, PT-7*dpr);
   }
   ctx.fillStyle='#6b8299'; ctx.font=(9*dpr)+'px system-ui'; ctx.textAlign='center';
   ctx.fillText('ASIC temp (\u00b0C)', PL+cw/2, PT+ch+28*dpr);
@@ -2950,8 +3012,13 @@ function drawPoissonPanel(panel){
   // ideal straight line: survivors(x) = N / x  (since P(beat x)=1/x)
   ctx.strokeStyle='rgba(247,147,26,0.55)'; ctx.lineWidth=1.5*dpr;
   ctx.setLineDash([5*dpr,4*dpr]); ctx.beginPath();
+  // Stop the line where it leaves the chart instead of clamping its endpoint to
+  // 1. Clamping bent the reference upward -- with N=150 over a 1000x axis the
+  // true endpoint is 0.15, drawn at 1, which flattened the slope from -1 to
+  // about -0.4 and made every real curve look like it was falling short.
   var x0=1, x1=Math.pow(10,xMaxLog);
-  ctx.moveTo(X(x0), Y(N/x0)); ctx.lineTo(X(x1), Y(Math.max(N/x1,1)));
+  if(N/x1 < 1) x1 = N;            // survivors hit 1 at x = N; end there
+  ctx.moveTo(X(x0), Y(N/x0)); ctx.lineTo(X(x1), Y(N/x1));
   ctx.stroke(); ctx.setLineDash([]);
 
   // actual survival curve: step down as difficulty rises
@@ -3120,7 +3187,7 @@ document.getElementById('btn-add').onclick=()=>addMiner();
 document.getElementById('btn-con').onclick=connectAll;
 function clearSession(m){
   markSessionCleared(m);
-  m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
+  m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0; try{ _reconBase(m,"counter reset"); }catch(e){}
   m.bestDiff=0; m.sessionBest=0; m.lastDiff=0;
   updateCardStats(m);
 }
@@ -3156,7 +3223,7 @@ function clearMiner(ip){
   list.forEach(function(m){
     markSessionCleared(m);
     m._sessionRestoreAttempted=true;
-    m.series=[];m.topSeries=[];m.sharesFound=0;m.sharesAccepted=0;
+    m.series=[];m.topSeries=[];m.sharesFound=0;m.sharesAccepted=0; try{ _reconBase(m,"counter reset"); }catch(e){}
     m.bestDiff=0;m.sessionBest=0;m.lastDiff=0;m.lastTarget=0;
     updateCardStats(m);
   });
@@ -3233,6 +3300,13 @@ async function pollAxeOSBests(m){
     m._lastApiData=d;
     m.noAxeOS=false;
     try{ runLogSample(m); }catch(e){}
+    // Segment the share reconciliation by operating point. A scheduled tuning
+    // change alters hashrate mid-window, which would otherwise compare shares
+    // earned at one setting against the hashrate of another and make the
+    // effective-hashrate figure meaningless. Closing a segment on every
+    // freq/volt change keeps each reading self-consistent -- and turns a
+    // scheduled change into a before/after measurement instead of ruining it.
+    try{ reconSegment(m, d); }catch(e){}
     try{ degSample(m); }catch(e){}
     if(d.bestDiff        != null) m.axeOSBestDiff    = d.bestDiff;
     if(d.bestSessionDiff != null){
@@ -3241,7 +3315,7 @@ async function pollAxeOSBests(m){
       if(prevSess > 0 && currSess < prevSess){
         // Session best dropped — miner was restarted
         markSessionCleared(m);
-        m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
+        m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0; try{ _reconBase(m,"counter reset"); }catch(e){}
         m.bestDiff=0; m.sessionBest=0; m.lastDiff=0;
         showToast('🔄 Miner Restarted',
           m.ip + ' — Session best reset (' + fmtD(prevSess) + ' → ' + fmtD(currSess) + '). Share list cleared.', 'warn');
@@ -3250,7 +3324,21 @@ async function pollAxeOSBests(m){
       }
       m.axeOSSessionBest = d.bestSessionDiff;
     }
-    if(d.sharesAccepted  != null) m.axeOSShares      = d.sharesAccepted;
+    if(d.sharesAccepted  != null){
+      m.axeOSShares = d.sharesAccepted;
+      // Baseline on first sight so the delta needs no miner restart. A drop
+      // means the miner restarted -- rebaseline instead of reporting nonsense.
+      if(m._shBaseline==null || d.sharesAccepted < m._shBaseline){
+        // Decide the reason BEFORE overwriting the baseline. Testing it after
+        // the assignment meant the null case could never be true, so a normal
+        // first read was reported as "miner restarted".
+        m._reconWhy=(m._shBaseline==null)?'app start':'miner restarted';
+        m._shBaseline=d.sharesAccepted; m._shBaseAt=Date.now();
+        m._parsedBase=m.sharesAccepted||0;
+        m._reconCur=null;
+      }
+      m._shDelta = d.sharesAccepted - m._shBaseline;
+    }
     if(d.sharesRejected  != null) m.axeOSRejected    = d.sharesRejected;
     if(d.errorPercentage != null) m.axeOSErrorRate   = d.errorPercentage;
     if(d.errorPercentage != null) m.axeOSErrorRate   = d.errorPercentage;
@@ -3317,7 +3405,7 @@ async function pollAxeOSBests(m){
         var restartReason = ((d.resetReason || d.lastResetReason) && (d.resetReason || d.lastResetReason).trim()) ? (d.resetReason || d.lastResetReason).trim() : 'Restarted';
         updateReportReason(m.ip, restartReason);
         addLog('ok', m.ip+' — Restart detected: '+restartReason, m.color);
-        m.sharesFound = 0; m.sharesAccepted = 0; // reset avg share time on reboot
+        m.sharesFound = 0; m.sharesAccepted = 0; try{ _reconBase(m,"counter reset"); }catch(e){} // reset avg share time on reboot
       }
       m._lastUptime = d.uptimeSeconds;
     if(d.stratumURL) m._lastStratumURL = d.stratumURL;
@@ -3431,7 +3519,7 @@ async function pollTemps(m){
       }
       saveSessionReport(m, faultState || 'restart', lastGoodPt);
       markSessionCleared(m);
-      m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
+      m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0; try{ _reconBase(m,"counter reset"); }catch(e){}
       m.bestDiff=0; m.sessionBest=0; m.lastDiff=0;
       markDirty(); updateCardStats(m);
     }
@@ -3451,7 +3539,7 @@ async function pollTemps(m){
     // ── Record hashSeries for hash chart ──
     if(hr != null){
       m.hashSeries = m.hashSeries || [];
-      m.hashSeries.push({ts:Date.now(), hr:hr, hr1m:d.hashRate_1m||hr, hr10m:d.hashRate_10m||hr, hr1h:d.hashRate_1h||hr, temps:temps.slice(), pwr:m.axeOSPower||0, fan:(d.fanspeed!=null?d.fanspeed:null), uptime:m.axeOSUptime||null});
+      m.hashSeries.push({ts:Date.now(), hr:hr, hr1m:d.hashRate_1m||hr, hr10m:d.hashRate_10m||hr, hr1h:d.hashRate_1h||hr, temps:temps.slice(), pwr:m.axeOSPower||0, fan:(d.fanspeed!=null?d.fanspeed:null), uptime:m.axeOSUptime||null, sh:(m.axeOSShares!=null?m.axeOSShares:null)});
       if(m.hashSeries.length > MAX_HASH_PTS) m.hashSeries.shift();
     }
 
@@ -3493,7 +3581,7 @@ async function pollTemps(m){
       const currSess = parseDiff(d.bestSessionDiff);
       if(prevSess > 0 && currSess < prevSess){
         markSessionCleared(m);
-        m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0;
+        m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0; try{ _reconBase(m,"counter reset"); }catch(e){}
         m.bestDiff=0; m.sessionBest=0; m.lastDiff=0;
         showToast('🔄 Miner Restarted',
           m.ip+' — Session best reset ('+fmtD(prevSess)+' → '+fmtD(currSess)+'). Share list cleared.','warn');
@@ -3502,7 +3590,21 @@ async function pollTemps(m){
       }
       m.axeOSSessionBest = d.bestSessionDiff;
     }
-    if(d.sharesAccepted  != null) m.axeOSShares      = d.sharesAccepted;
+    if(d.sharesAccepted  != null){
+      m.axeOSShares = d.sharesAccepted;
+      // Baseline on first sight so the delta needs no miner restart. A drop
+      // means the miner restarted -- rebaseline instead of reporting nonsense.
+      if(m._shBaseline==null || d.sharesAccepted < m._shBaseline){
+        // Decide the reason BEFORE overwriting the baseline. Testing it after
+        // the assignment meant the null case could never be true, so a normal
+        // first read was reported as "miner restarted".
+        m._reconWhy=(m._shBaseline==null)?'app start':'miner restarted';
+        m._shBaseline=d.sharesAccepted; m._shBaseAt=Date.now();
+        m._parsedBase=m.sharesAccepted||0;
+        m._reconCur=null;
+      }
+      m._shDelta = d.sharesAccepted - m._shBaseline;
+    }
     if(d.sharesRejected  != null) m.axeOSRejected    = d.sharesRejected;
     if(d.errorPercentage != null) m.axeOSErrorRate   = d.errorPercentage;
 
@@ -4386,7 +4488,11 @@ async function doRestartMiner(m){
       addLog('er','⟳ '+m.ip+' restarted (5 min stall + near-zero hashrate). Share list cleared.',m.color);
       showToast('⟳ Miner Restarted', m.ip+' was restarted — no shares for 5 min AND hashrate near zero. Share list cleared.', 'warn');
       markSessionCleared(m);
-      m.topSeries=[];m.sharesFound=0;m.sharesAccepted=0;m.bestDiff=0;m.sessionBest=0;m.lastDiff=0;m.lastFoundTs=Date.now();
+      m.topSeries=[];m.sharesFound=0;m.sharesAccepted=0; try{ _reconBase(m,"counter reset"); }catch(e){}m.bestDiff=0;m.sessionBest=0;m.lastDiff=0;m.lastFoundTs=Date.now();
+      // Re-arm here too. The reconnect after a reboot normally does this, but
+      // if the stream survives without a fresh CONNECTED the shares lost while
+      // reconstruction warms up would be counted against luck.
+      m._luckArm = true; m._luckFrom = null;
       markDirty();updateCardStats(m);
 
     }else{addLog('er',m.ip+' restart failed: HTTP '+res.status);}
@@ -4422,6 +4528,223 @@ function _saveDegLog(){
 // Storage audit. Reads what is actually written to bitaxe-data.json -- not the
 // in-memory caches -- so an empty section here means it genuinely has not
 // persisted yet. Runs once at startup and can be re-run from the console.
+// Nexus stratum diagnostics, printed as a flat table. The relay console scrolls
+// too fast to read, so this pulls the same counters from /nxdiag instead.
+// Same check with ckpool's hashrate typed in, so no firmware number is used at
+// all: nxcheck('10.0.0.81', 15.0)
+function nxcheck(ip, poolTH){
+  return fetch(SERVER+'/nxdiag',{signal:AbortSignal.timeout(5000)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var arr=Array.isArray(d)?d:[];
+      var x=arr.filter(function(z){return z.ip===ip;})[0];
+      var mm=Object.values(miners).filter(function(z){return z.ip===ip;})[0];
+      if(!x||!mm){ console.log('[nxcheck] no data for '+ip); return; }
+      var tgt=x.poolDiff||mm.poolDifficulty||0;
+      var mins=(Date.now()-(mm._shBaseAt||Date.now()))/60000;
+      if(!(tgt>0)||!(poolTH>0)||!(mins>0)){ console.log('[nxcheck] need target and pool TH/s'); return; }
+      var poolRate=(tgt*4294967296)/(poolTH*1e12);
+      var ourRate=(x.submits>0)?(mins*60/x.submits):null;
+      console.log('%c[nxcheck] '+ip+'  ckpool '+poolTH+' TH/s, target '+tgt,'font-weight:bold');
+      console.log('  pool implies      : '+poolRate.toFixed(2)+' s/share');
+      console.log('  we saw            : '+(ourRate==null?'n/a':ourRate.toFixed(2)+' s/share')+
+                  '  ('+x.submits+' submits in '+mins.toFixed(1)+' min)');
+      if(ourRate){
+        var seen=100*poolRate/ourRate;
+        console.log('  observed          : '+seen.toFixed(1)+'% of the pool\u2019s shares');
+        console.log('  device claims     : '+mm._shDelta+' submitted, pool implies '+
+                    Math.round(mins*60/poolRate));
+        console.log('  -> '+(seen>95
+          ? 'stream COMPLETE. If luck is still low, the firmware hashrate is overstated.'
+          : 'shares are reaching the pool but NOT our stream.'));
+      }
+    }).catch(function(e){ console.log('[nxcheck] failed:', e&&e.message); });
+}
+// Keep both halves of the share reconciliation on the SAME baseline. The parsed
+// counter is zeroed in six places (session clear, restart detect, purge), while
+// the device baseline only moves when the miner's own counter goes backwards.
+// If those fire independently the comparison silently goes nonsense, so any
+// reset rebaselines both and restarts the clock.
+var RECON_MIN_SEG_MS=10*60*1000;   // ignore brief settling periods
+function reconSegment(m, d){
+  if(!m || !d) return;
+  var f=d.frequency, v=d.coreVoltage;
+  if(!f || !v) return;
+  var key=f+'|'+v, now=Date.now();
+  var parsed=m.sharesAccepted||0;
+  var hr=(d.hashRate_1m!=null?d.hashRate_1m:d.hashRate)||0;
+  if(!m._reconSegs) m._reconSegs=[];
+  var cur=m._reconCur;
+  if(cur && cur.key===key){
+    if(hr>0){ cur.hrSum+=hr; cur.hrN++; }
+    cur.t1=now; cur.parsed1=parsed;
+    cur.tgt=m.poolDifficulty||cur.tgt;
+    return;
+  }
+  // setting changed: bank the finished segment if it ran long enough to mean
+  // anything, then open a new one
+  if(cur && (cur.t1-cur.t0)>=RECON_MIN_SEG_MS && (cur.parsed1-cur.parsed0)>20){
+    m._reconSegs.push(cur);
+    if(m._reconSegs.length>24) m._reconSegs.shift();
+  }
+  m._reconCur={ key:key, freq:f, volt:v, t0:now, t1:now,
+                parsed0:parsed, parsed1:parsed, hrSum:(hr>0?hr:0), hrN:(hr>0?1:0),
+                tgt:m.poolDifficulty||0 };
+}
+// Effective hashrate and implied error for one segment.
+function reconStats(sg){
+  if(!sg) return null;
+  var shares=sg.parsed1-sg.parsed0, secs=(sg.t1-sg.t0)/1000;
+  if(!(shares>20) || !(secs>60) || !(sg.tgt>0) || !(sg.hrN>0)) return null;
+  var rate=secs/shares;                                   // s per share
+  var effTH=(sg.tgt*4294967296)/(rate*1e12);              // TH/s actually delivered
+  var repTH=(sg.hrSum/sg.hrN)/1000;                       // TH/s reported
+  return { freq:sg.freq, volt:sg.volt, hours:secs/3600, shares:shares,
+           rate:rate, effTH:effTH, repTH:repTH,
+           err:(repTH>0)?(100*(1-effTH/repTH)):null };
+}
+function _reconBase(m, why){
+  if(!m) return;
+  m._shBaseline = (m.axeOSShares!=null) ? m.axeOSShares : null;
+  m._parsedBase = 0;
+  m._shBaseAt   = Date.now();
+  m._shDelta    = 0;
+  m._reconWhy   = why||'reset';
+  // The open segment holds a parsed0 from before the reset. Left alone it would
+  // exceed parsed1 forever, so every operating-point row evaluates to null and
+  // the whole breakdown silently disappears -- which is what happened when the
+  // miner restarted overnight.
+  m._reconCur   = null;
+}
+function nxdiag(){
+  return fetch(SERVER+'/nxdiag',{signal:AbortSignal.timeout(5000)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var arr = Array.isArray(d) ? d : (d && typeof d==='object' ? Object.keys(d).map(function(k){ var v=d[k]; if(v&&!v.ip) v.ip=k; return v; }) : []);
+      if(!arr.length){ console.log('[nxdiag] nothing yet - is the relay the new build?'); return null; }
+      arr.forEach(function(x){
+        var ip=x.ip||'?';
+        var pct=(x.submits>0)?(100*x.dropped/x.submits).toFixed(1):'0';
+        console.log('%c[nxdiag] '+ip,'font-weight:bold');
+        console.log('  set_difficulty seen : '+(x.diffKnown?('YES x'+x.setDiffCount):'NO  <-- target is being GUESSED'));
+        console.log('  pool difficulty     : '+x.poolDiff);
+        console.log('  submits / plotted   : '+x.submits+' / '+x.plotted);
+        console.log('  dropped             : '+x.dropped+'  ('+pct+'%)');
+        console.log('  extranonce1 present : '+x.en1);
+        console.log('  last targets        : '+((x.lastTargets||[]).join(', ')||'none'));
+        console.log('  last share diffs    : '+((x.lastDiffs||[]).join(', ')||'none'));
+        console.log('  min-estimates used  : '+((x.estimates||[]).join(', ')||'none'));
+        // Does the miner LOG every share it submits? The device counter is
+        // authoritative; `submits` is what actually reached our stream.
+        var mm=Object.values(miners).filter(function(z){ return z.ip===ip; })[0];
+        if(mm && mm._shDelta!=null){
+          var mins=(Date.now()-(mm._shBaseAt||Date.now()))/60000;
+          var parsedGain=(mm.sharesAccepted||0)-(mm._parsedBase||0);
+          var logged=(mm._shDelta>0)?(100*(x.submits||0)/mm._shDelta):null;
+          // Say how long the current run has been clean, so a full-day figure can
+          // be trusted without remembering whether anything restarted.
+          var hrs=mins/60;
+          var clean=(hrs>=1)?(hrs.toFixed(1)+' h'):(mins.toFixed(0)+' min');
+          // Per-setting breakdown. Each row is self-contained, so a tuning change
+          // overnight gives a before/after comparison rather than a spoiled run.
+          var segs=(mm._reconSegs||[]).slice();
+          if(mm._reconCur) segs.push(mm._reconCur);
+          var rows=segs.map(reconStats).filter(function(z){ return z; });
+          if(rows.length){
+            console.log('  --- BY OPERATING POINT ---');
+            rows.forEach(function(r){
+              console.log('  '+(r.freq+'MHz '+r.volt+'mV').padEnd(16)+
+                          r.hours.toFixed(1)+'h  '+String(r.shares).padStart(6)+' shares  '+
+                          r.rate.toFixed(2)+'s  eff '+r.effTH.toFixed(2)+' vs '+r.repTH.toFixed(2)+' TH/s'+
+                          (r.err!=null?'   err '+r.err.toFixed(1)+'%':''));
+            });
+          }
+          console.log('  --- SHARE RECONCILIATION ---');
+          console.log('  clean run           : '+clean+'   (since '+(mm._reconWhy||'app start')+')');
+          console.log('  miner total at start: '+(mm._shBaseline!=null?mm._shBaseline:'?'));
+          console.log('  we plotted since    : '+parsedGain);
+          console.log('  so miner should show: '+((mm._shBaseline||0)+parsedGain));
+          console.log('  miner actually shows: '+(mm.axeOSShares!=null?mm.axeOSShares:'?'));
+          var miss=(mm._shDelta||0)-parsedGain;
+          var acc=(mm._shDelta>0)?(100*parsedGain/mm._shDelta):null;
+          console.log('  difference          : '+(miss>0?'+':'')+miss+
+                      (acc!=null?'   ('+acc.toFixed(1)+'% of the miner\u2019s shares captured)':''));
+          console.log('  verdict             : '+(acc==null?'no data yet'
+            : (acc>=98 ? 'MATCH \u2014 we capture every share the miner reports'
+                       : 'we are missing '+(100-acc).toFixed(1)+'% of logged shares')));
+          // Relay submit counter is baselined at RELAY start, which is usually
+          // later than app start, so it is reported for reference only and must
+          // not be compared against an app-start window.
+          console.log('  (relay saw '+(x.submits||0)+' submits since its own start \u2014 different baseline)');
+          if(mm._shDelta>0 && mins>0){
+            console.log('  device rate         : '+(mins*60/mm._shDelta).toFixed(2)+' s/share');
+            if(parsedGain>0) console.log('  our parsed rate     : '+(mins*60/parsedGain).toFixed(2)+' s/share');
+          }
+          // ── Firmware-independent cross-check ──────────────────────────────
+          // Everything above leans on NexusOS counters. BM1373 support there is
+          // new and unverified upstream, so the share count may be wrong even if
+          // the hashrate is right. This branch uses only the pool's own numbers
+          // (hashrate it measured, difficulty it assigned) against our own count
+          // of mining.submit messages -- neither passes through the firmware.
+          // Scope this to the CURRENT operating point. Using the whole window
+          // against the live hashrate compares shares earned before a tuning
+          // change against the hashrate after it -- which produced a nonsense
+          // -9.4% error rate the morning a scheduled script fired.
+          var curSeg=mm._reconCur, curStats=(typeof reconStats==='function')?reconStats(curSeg):null;
+          var hr1h=curStats?(curStats.repTH*1000)
+                 :((mm.hashSeries&&mm.hashSeries.length)
+                    ? (function(){ var a=mm.hashSeries[mm.hashSeries.length-1]; return a.hr1h||a.hr; })() : null);
+          var tgt=(curSeg&&curSeg.tgt>0)?curSeg.tgt:(x.poolDiff||mm.poolDifficulty||0);
+          if(curStats){
+            console.log('  --- CURRENT SETTING ('+curStats.freq+'MHz '+curStats.volt+'mV, '+
+                        curStats.hours.toFixed(1)+'h) ---');
+          }
+          console.log('  --- POOL-DERIVED (firmware not trusted) ---');
+          if(hr1h>0 && tgt>0){
+            var poolRate=(tgt*4294967296)/(hr1h*1e9);      // s/share the pool implies
+            // Use OUR parsed rate over the app window. The relay's submit counter
+            // has a different (later) baseline and mixing them made this read
+            // ~61% when the true capture rate is ~99%.
+            var ourRate=curStats?curStats.rate:((parsedGain>0)?(mins*60/parsedGain):null);
+            console.log('  pool/reported 1h HR : '+(hr1h/1000).toFixed(2)+' TH/s   target '+tgt);
+            console.log('  implied share rate  : '+poolRate.toFixed(2)+' s/share');
+            console.log('  our submit rate     : '+(ourRate==null?'n/a':ourRate.toFixed(2)+' s/share'));
+            if(ourRate){
+              var seen=100*poolRate/ourRate;
+              console.log('  we capture          : '+seen.toFixed(1)+'% of what this hashrate implies');
+              console.log('  verdict             : '+(seen>95
+                ? 'shares match the hashrate \u2014 nothing is being lost'
+                : 'the miner submits '+seen.toFixed(0)+'% of what its reported hashrate predicts'));
+              // Effective hashrate implied by shares actually delivered.
+              // Sum each share's OWN target instead of applying one target to the
+              // whole window. ckpool moves the target mid-window (12139 -> 16009
+              // today), so using the latest value against shares earned at the old
+              // one read 126% capture and -26% error. Per-share work is immune.
+              var effTH=null;
+              (function(){
+                var wSum=0, since=mm._shBaseAt||0, ser=mm.series||[];
+                for(var q=ser.length-1;q>=0;q--){
+                  var e=ser[q];
+                  if(e.ts<since) break;
+                  if(e.accepted) wSum+=(e.target||0);
+                }
+                var secs=(Date.now()-since)/1000;
+                if(wSum>0 && secs>0) effTH=(wSum*4294967296)/(secs*1e12);
+              })();
+              if(effTH==null) effTH=curStats?curStats.effTH:((tgt*4294967296)/((mins*60/parsedGain)*1e12));
+              console.log('  effective hashrate  : '+effTH.toFixed(2)+' TH/s vs '+(hr1h/1000).toFixed(2)+' TH/s reported');
+              console.log('  implied error rate  : '+(100*(1-effTH/(hr1h/1000))).toFixed(1)+'%');
+            }
+          } else {
+            console.log('  need 1h hashrate + target; not available yet');
+          }
+          console.log('  (enter ckpool\u2019s own hashrate here to remove firmware entirely:');
+          console.log('   nxcheck(\''+ip+'\', <ckpool TH/s>) )');
+        }
+      });
+      return d;
+    }).catch(function(e){ console.log('[nxdiag] failed:', e && e.message); return null; });
+}
 function auditStore(quiet){
   return fetch(SERVER+'/storeinfo',{signal:AbortSignal.timeout(5000)})
     .then(function(r){return r.json();})
@@ -4437,6 +4760,14 @@ function auditStore(quiet){
       });
       if(!quiet){
         addLog('ok','Storage: '+kb(d.bytes)+' on disk, last written '+(d.modified||'never'));
+      // Surface the per-miner preserve guard here. It fires when a payload tried
+      // to blank a miner's session list without that miner being cleared -- the
+      // failure that lost the lists. If this is ever non-zero the underlying bug
+      // is still live, and the console is unreadable at speed.
+      if(d.preserved>0){
+        addLog('er','  \u26a0 session list PRESERVED '+d.preserved+'x \u2014 something tried to blank a miner without clearing it');
+        (d.preservedLog||[]).forEach(function(l){ addLog('er','      '+l); });
+      }
         addLog('ok','  '+rows.join('  \u00b7  '));
         if(empty.length) addLog('wa','  not yet persisted: '+empty.join(', '));
       }
@@ -5061,6 +5392,17 @@ var sessionPushTimer = null;
 // a trend. Each returns {act, exp} rather than a percentage, because a fleet
 // figure must be sum(act)/sum(exp) — averaging per-miner percentages would let a
 // 2 TH/s miner outvote a 14 TH/s one.
+function fmtLuck(v){
+  if(v==null) return '\u2014';
+  // Coerce: some paths hand this a numeric STRING. Math.round() accepted that
+  // silently, but .toFixed() does not exist on a string -- it threw, and the
+  // miner card's try/catch swallowed it into a single dash.
+  v = Number(v);
+  if(!isFinite(v)) return '\u2014';
+  // Below 100 the tenths matter -- 99.7 vs 100 is the difference between a real
+  // shortfall and none. At or above, the extra digit is just noise.
+  return (v<100 ? v.toFixed(1) : Math.round(v))+'%';
+}
 var LUCK_WINDOWS=[
   {key:'h1',  ms:3600000,  lbl:'1h'},
   {key:'h4',  ms:14400000, lbl:'4h'},
@@ -5136,7 +5478,23 @@ function luckForCount(m, winMs){
   // mean target — this only scales both act and exp equally, so the ratio (luck)
   // is unaffected; it just keeps fleet act/exp in comparable work units.
   var meanTarget=tgtSum/tgtN;
-  return { act: cnt*meanTarget, exp: expCount*meanTarget };
+  // `cnt` is parsed log lines. A log-at-target miner emits few of them, so every
+  // line lost to a poll gap or a reconnect is a share permanently missing from
+  // the numerator while expected (from hashrate) is unaffected -- which reads
+  // low and never recovers. The device's own accepted-share counter is
+  // authoritative, so use its delta across the window when it's available and
+  // consistent, and fall back to the parsed count otherwise.
+  var actCount=cnt;
+  var hsSh=m.hashSeries||[], shNew=null, shOld=null;
+  for(var a=hsSh.length-1;a>=0;a--){ if(hsSh[a].sh!=null){ shNew=hsSh[a].sh; break; } }
+  for(var b=0;b<hsSh.length;b++){ if(hsSh[b].ts>=oldest && hsSh[b].sh!=null){ shOld=hsSh[b].sh; break; } }
+  if(shNew!=null && shOld!=null && shNew>=shOld){
+    var devCount=shNew-shOld;
+    // A miner restart zeroes the counter; only trust a delta that is plausible
+    // against what we did see, so a reset can't invent a huge count.
+    if(devCount>=cnt && (cnt===0 || devCount <= cnt*3 + 10)) actCount=devCount;
+  }
+  return { act: actCount*meanTarget, exp: expCount*meanTarget };
 }
 // Active (hashing) seconds since `oldest`, from hashSeries. A miner restart (or
 // any outage) leaves a stretch where hashrate is 0/absent. Counting that stretch
@@ -5145,12 +5503,14 @@ function luckForCount(m, winMs){
 // intervals where the miner was actually hashing, capping each interval so a long
 // gap (miner down, app closed) can never be counted as active time.
 var LUCK_MAX_GAP_MS = 30000;
-function activeSpanSec(m, oldest){
+function activeSpanSec(m, oldest, untilTs){
   var hs=m.hashSeries||[];
   if(!hs.length) return 0;
+  var lim=(untilTs!=null)?untilTs:Infinity;   // stop at the newest share, not now
   var active=0, prev=null;
   for(var i=0;i<hs.length;i++){
     var q=hs[i];
+    if(q.ts>lim) break;
     if(q.ts<oldest){ prev=q; continue; }
     if(prev && q.hr>0 && prev.hr>0){
       var dt=q.ts-prev.ts;
@@ -5216,36 +5576,90 @@ function paceCells(o){
 function luckFor(m, winMs){
   var series=m.series||[];
   if(!series.length) return null;
-  // Nexus-style miners only log shares at/above pool target; summing their
-  // logged targets undercounts work and reads artificially LOW. For those, use
-  // the count-based method so they're comparable to log-everything miners.
-  if(!minerLogsEverything(m)) return luckForCount(m, winMs);
+  // The count-based branch used to be routed here for log-at-target miners,
+  // because summing their targets read low. That was a symptom of acceptance
+  // being judged against the LATEST pool difficulty instead of the target each
+  // share was found under -- genuinely accepted shares were being marked
+  // rejected and dropped from the sum. With that fixed, summing is correct for
+  // every miner: the pool credits work at the target in force when the share
+  // was found, which is exactly what this sums. Sub-target shares never counted
+  // for the pool either, so there is nothing hidden to compensate for.
+  //
+  // The count method also derived expected from reported hashrate rather than
+  // from shares, which is why it drifted away from the pool's own figure --
+  // starting near 100% and decaying toward 82% as its window filled.
+  // luckForCount() is left in place but no longer routed to.
+  // if(!minerLogsEverything(m)) return luckForCount(m, winMs);
   // The window is a MAX lookback, not a requirement. If the miner has only run
   // 6h, the "24h" window just measures those 6h — better than showing a blank.
   // (Requested: don't gate on reaching the window; go off elapsed time.)
   var now=Date.now(), cutoff=now-winMs;
-  var act=0, oldest=null;
+  // Never reach back past the settling window -- shares there were unrecoverable
+  // and would read as a permanent shortfall.
+  if(m._luckFrom && cutoff < m._luckFrom) cutoff = m._luckFrom;
+  if(now-cutoff < 20000) return null;      // too little clean data to mean anything
+  var act=0, oldest=null, newest=null, oldestTarget=0;
   for(var i=series.length-1;i>=0;i--){
     var p=series[i];
     if(p.ts<cutoff) break;
     if(p.accepted) act+=(p.target||0);  // target, not found — see note above
+    if(newest==null) newest=p.ts;
+    oldestTarget=(p.accepted?(p.target||0):0);   // running: ends as the oldest share's
     oldest=p.ts;
   }
   if(oldest==null) return null;
+  // End the span at the NEWEST share, not at now. Shares arrive through the log
+  // stream, so there is always an unparsed tail; charging that tail as elapsed
+  // time bills expected work against a stretch with no shares in it. With a ~45s
+  // tail that reads 25% at one minute and 85% at five, climbing to 100% as the
+  // fixed lag shrinks against elapsed time — the startup ramp seen on the
+  // bitaxes. Needs at least two shares to define a span; below that fall back to
+  // now, which is noisy but not blank.
+  // The span from first share to last contains exactly N-1 intervals, so the
+  // work credited over it is N-1 shares, not N. Counting the boundary share
+  // inflates luck by N/(N-1) -- 200% at two shares, 105% at twenty, decaying to
+  // 100%: the high start seen on the bitaxes. Drop the oldest share's work,
+  // since its arrival is what opened the span rather than being earned inside it.
+  if(act>oldestTarget) act-=oldestTarget;
+  var spanEnd = (newest!=null && newest>oldest) ? newest : now;
   // only count time the miner was actually hashing (see activeSpanSec)
-  var spanSec=activeSpanSec(m, oldest);
-  if(!(spanSec>0)) spanSec=(now-oldest)/1000;   // fallback if no hashrate history
+  var spanSec=activeSpanSec(m, oldest, spanEnd);
+  if(!(spanSec>0)) spanSec=(spanEnd-oldest)/1000;   // fallback if no hashrate history
   if(spanSec<=0) return null;
   // Mean hashrate across the same stretch, from the 2s poll series (GH/s)
   var hs=m.hashSeries||[], sum=0, n=0;
   for(var j=hs.length-1;j>=0;j--){
     var q=hs[j];
     if(q.ts<oldest) break;
+    if(q.ts>spanEnd) continue;
     if(q.hr>0){ sum+=q.hr; n++; }
   }
+  // If the bounded stretch held no samples yet (very few shares so far), widen
+  // to the whole window rather than returning nothing.
+  if(!n){
+    for(var j2=hs.length-1;j2>=0;j2--){
+      var q3=hs[j2];
+      if(q3.ts<oldest) break;
+      if(q3.hr>0){ sum+=q3.hr; n++; }
+    }
+  }
   if(!n) return null;
+  // The Nexus emits share lines faster than the log can be polled, so roughly
+  // one in five never reaches us: ckpool sees a share every ~3.4 s while the app
+  // parses one every ~4.3 s. Work summed from parsed lines is therefore short by
+  // that fraction, which read as ~80% luck no matter how the targets were
+  // handled. AxeOS reports the device's own accepted-share counter, which the
+  // pool agrees with, so scale the summed work by parsed-vs-actual. A miner
+  // whose lines all arrive scales by 1.0 and is untouched.
+  // Scaling by the device share counter was removed. It existed when we were
+  // missing ~20% of Nexus lines, but capture is now 99.6%+ and it had shrunk to a
+  // 0.24% pad -- which is precisely the gap this instrument is meant to MEASURE,
+  // not paper over. Luck is raw work found over work expected; nothing corrects
+  // it toward 100%.
+  var actAdj=act;
+  m._luckShareScale=null;
   var hashes=(sum/n)*1e9*spanSec;       // GH/s -> H/s -> total hashes
-  return { act:act, exp:hashes/4294967296 };   // 2^32
+  return { act:actAdj, exp:hashes/4294967296 };   // 2^32
 }
 // All four windows for one miner, flattened for the session push.
 function luckAll(m){
@@ -5326,7 +5740,13 @@ function pushSessionData(){
         avgShare:avgStr,
         avgShareSec:avgSecNum,
         top10:(m.topSeries&&m.topSeries.length?m.topSeries:m.series).slice().sort((a,b)=>b.found-a.found).slice(0,500),
-        topSeriesSnapshot:(m.topSeries&&m.topSeries.length) ? (m.topSeries||[]).slice() : [],
+        // Publish an EMPTY snapshot only when this miner was itself cleared.
+        // Any other reason for topSeries being empty -- a transient during
+        // rebuild, a miner that has not scored yet -- must not be allowed to
+        // overwrite what is already stored for it. Omitting the field entirely
+        // makes the relay preserve the previous value instead.
+        topSeriesSnapshot:(m.topSeries&&m.topSeries.length) ? (m.topSeries||[]).slice()
+                         : (m._sessionCleared ? [] : undefined),
         uptimeSnapshot:m.axeOSUptime||0,
         snapshotTs:Date.now(),
         sessionCleared:!!(m._sessionCleared),
@@ -5437,10 +5857,10 @@ function pushFleet(){
       power:       f.totalW>0?f.totalW.toFixed(1)+' W':'—',
       efficiency:  f.wth!=null?f.wth.toFixed(1)+' W/TH':'—',
       online:      f.online+'/'+f.count,
-      luck1h:      f.luck.h1 !=null?Math.round(f.luck.h1) +'%':'—',
-      luck4h:      f.luck.h4 !=null?Math.round(f.luck.h4) +'%':'—',
-      luck12h:     f.luck.h12!=null?Math.round(f.luck.h12)+'%':'—',
-      luck24h:     f.luck.h24!=null?Math.round(f.luck.h24)+'%':'—',
+      luck1h:      f.luck.h1 !=null?fmtLuck(f.luck.h1):'—',
+      luck4h:      f.luck.h4 !=null?fmtLuck(f.luck.h4):'—',
+      luck12h:     f.luck.h12!=null?fmtLuck(f.luck.h12):'—',
+      luck24h:     f.luck.h24!=null?fmtLuck(f.luck.h24):'—',
       luck1hNum:   f.luck.h1 !=null?parseFloat(f.luck.h1.toFixed(1)) :0,
       luck4hNum:   f.luck.h4 !=null?parseFloat(f.luck.h4.toFixed(1)) :0,
       luck12hNum:  f.luck.h12!=null?parseFloat(f.luck.h12.toFixed(1)):0,
@@ -6474,11 +6894,73 @@ async function _scExec(m, action){
         // every miner. Never resend autofanspeed - it reads wrong on Nexus-class
         // boards and would flip the fan to manual.
         var _t = parseInt(action.value);
+        // Mirror the Miner Settings panel, which has always worked: send the
+        // flat temptarget AND echo fans[] back VERBATIM without touching
+        // fans[0].pid. The board applies the ASIC target from temptarget;
+        // rewriting fans[0].pid.targetTemp as well is the one thing the working
+        // path never does, and it is the only difference left between them.
+        // (Sending fans[] alone was tried and is wrong -- the settings panel
+        // proves temptarget alongside the array is fine.)
+        // Use the SAME fan source the settings panel uses. The script was reading
+        // m._lastApiData, and on the Nexus that poll payload does not always
+        // carry fans[] -- so _scKeepFans fell through to its else branch and sent
+        // autofanspeed/manualFanSpeed instead, which never sets the PID target.
+        // That is why this works on the bitaxes and not the Nexus, while the
+        // settings panel works on both: it reads _vrFansCache, populated by its
+        // own fetch. Fetch fresh if the cache is cold rather than guessing.
+        var _fd = d;
+        if(!(d && Array.isArray(d.fans) && d.fans.length)){
+          var _cached = _vrFansCache[ip];
+          if(_cached && _cached.length){ _fd = Object.assign({}, d, {fans:_cached}); }
+          else {
+            try{
+              var _r = await fetch(SERVER+'/api?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000)});
+              if(_r.ok){
+                var _j = await _r.json();
+                if(_j && Array.isArray(_j.fans) && _j.fans.length){
+                  _vrFansCache[ip]=_j.fans;
+                  _fd = Object.assign({}, d, {fans:_j.fans});
+                }
+              }
+            }catch(e){}
+          }
+        }
+        // The Nexus does not report temptarget at all (verified: "now: -/47") and
+        // drives the ASIC fan purely from fans[0].pid.targetTemp. Echoing the
+        // array verbatim therefore sent the OLD value straight back and the
+        // miner kept it -- the array wins over the flat field on this board.
+        // So: take the array from whichever source has it, and actually patch
+        // pid[0].targetTemp. temptarget is still included for boards that use it.
         body = {temptarget:_t};
-        var _ft = _scFanPatch(d, 0, function(f){ if(f.pid) f.pid.targetTemp=_t; });
-        if(_ft) body.fans = _ft;
+        var _ft = _scFanPatch(_fd, 0, function(f){
+          if(!f.pid) f.pid = {};
+          f.pid.targetTemp = _t;
+        });
+        if(_ft) body.fans = _ft; else _scKeepFans(body, _fd);
         await fetch(SERVER+'/patch?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000),headers:{'Content-Type':'application/json','X-Body':JSON.stringify(body)}});
-        showToast('📜 Script',ip+' ASIC target -> '+_t+'\u00b0C','ok');
+        // Report what was ACTUALLY sent and what the miner reports back, rather
+        // than a success toast that says nothing. Three attempts at this bug have
+        // failed because the toast could not distinguish "sent correctly and
+        // ignored" from "sent the wrong shape".
+        var _sent = Object.keys(body).join('+');
+        var _fanN = (body.fans && body.fans.length) ? body.fans.length : 0;
+        var _pidT = (body.fans && body.fans[0] && body.fans[0].pid) ? body.fans[0].pid.targetTemp : 'n/a';
+        console.log('[asicTarget] '+ip+' sent:', JSON.stringify(body));
+        var _after='?';
+        try{
+          await new Promise(function(r){ setTimeout(r,1500); });
+          var _v = await fetch(SERVER+'/api?ip='+encodeURIComponent(ip),{signal:AbortSignal.timeout(5000)});
+          if(_v.ok){
+            var _vj = await _v.json();
+            _after = (_vj.temptarget!=null?_vj.temptarget:'-') + '/' +
+                     ((_vj.fans && _vj.fans[0] && _vj.fans[0].pid) ? _vj.fans[0].pid.targetTemp : '-');
+            console.log('[asicTarget] '+ip+' after:', JSON.stringify({temptarget:_vj.temptarget, fan0pid:(_vj.fans&&_vj.fans[0]?_vj.fans[0].pid:null)}));
+          }
+        }catch(e){}
+        var _ok = (String(_after).indexOf(String(_t))>=0);
+        showToast('📜 Script',
+          ip+' ASIC target -> '+_t+'\u00b0C  [sent '+_sent+', fans='+_fanN+', pid0='+_pidT+'] now: '+_after,
+          _ok?'ok':'warn');
         break;
       }
       case 'setVrTargetTemp': {

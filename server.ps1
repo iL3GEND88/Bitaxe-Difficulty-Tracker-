@@ -178,7 +178,17 @@ $sseScript = {
     # Nexus per-share difficulty: load the proven library + per-connection stratum state.
     # State is local to this runspace, which is correct: extranonce1 is per pool connection.
     try { . ([scriptblock]::Create($nexusLib)) } catch {}
-    $nxMask=0x1fffe000; $nxSub=0
+    $nxMask=0x1fffe000; $nxDrop = 0
+    # Nexus counters, mirrored to a file. The relay console scrolls too fast to
+    # read, and this handler runs in its OWN runspace, so script-scope variables
+    # are invisible to the listener that serves /nxdiag. A file crosses both.
+    $nxDiagFile = Join-Path $env:TEMP ("bitaxe_nxdiag_" + ($minerIP -replace '[^0-9A-Za-z]','_') + ".json")
+    $nxD = @{ ip=$minerIP; poolDiff=0; diffKnown=$false; setDiffCount=0;
+        submits=0; dropped=0; plotted=0; lastDiffs=@(); lastTargets=@();
+        estimates=@(); en1=$false; started=(Get-Date).ToString('HH:mm:ss') }
+    $nxDiagWrite = { param($o,$f) try { ($o | ConvertTo-Json -Depth 4 -Compress) | Set-Content -Path $f -Encoding UTF8 } catch {} }
+    & $nxDiagWrite $nxD $nxDiagFile
+        $nxSub=0
     $nxJobs=@{}; $nxOrder=New-Object System.Collections.ArrayList
     $nxStore = Join-Path $env:TEMP 'bitaxe_nexus_enonce.json'
     $nxDiffStore = Join-Path $env:TEMP 'bitaxe_nexus_pooldiff.json'
@@ -250,14 +260,23 @@ $sseScript = {
                                         $nxPoolDiff=$nd; NX-SaveDiff $nxDiffStore $minerIP $nd
                                     }
                                     $nxDiffKnown=$true; $nxMinSeen=[double]0; $nxMinCount=0
+                                    $nxD.diffKnown=$true; $nxD.setDiffCount++; $nxD.poolDiff=$nxPoolDiff
+                                    & $nxDiagWrite $nxD $nxDiagFile
                                 }
                                 elseif ($j.method -eq 'mining.notify') {
                                     $job=@{ prevhash=[string]$j.params[1]; coinb1=[string]$j.params[2]; coinb2=[string]$j.params[3]; merkle=$j.params[4]; version=[string]$j.params[5]; nbits=[string]$j.params[6] }
                                     $jid=[string]$j.params[0]; $nxJobs[$jid]=$job; [void]$nxOrder.Add($jid)
-                                    while($nxOrder.Count -gt 12){ $old=[string]$nxOrder[0]; $nxOrder.RemoveAt(0); $nxJobs.Remove($old) }
+                                    # Was 12. ckpool issues a new job on every block template
+                                    # update and clean_jobs, and a submit can reference a job
+                                    # several notifies old. Once evicted, the share cannot be
+                                    # computed and is dropped silently -- the pool counted it,
+                                    # we did not, which read as ~20% low luck on the Nexus.
+                                    # 200 jobs is a few minutes of history for a few KB.
+                                    while($nxOrder.Count -gt 200){ $old=[string]$nxOrder[0]; $nxOrder.RemoveAt(0); $nxJobs.Remove($old) }
                                 }
                                 elseif ($j.method -eq 'mining.submit') {
                                     $nxSub++
+                                    $nxD.submits++; $nxD.en1=[bool]$nxEn1
                                     $jid=[string]$j.params[1]; $job=$nxJobs[$jid]
                                     if ($job -and $nxEn1) {
                                         $d = NX-ShareDiff $nxEn1 $job ([string]$j.params[2]) ([string]$j.params[3]) ([string]$j.params[4]) ([string]$j.params[5]) $nxMask
@@ -269,9 +288,18 @@ $sseScript = {
                                                 $nxMinCount++
                                                 if ($nxMinCount -ge 20 -and $nxMinSeen -gt 0) {
                                                     $est=[int][math]::Round($nxMinSeen)
-                                                    if ($est -gt 0 -and ([math]::Abs($est-$nxPoolDiff)/[double]$nxPoolDiff) -gt 0.15) {
+                                                    # Report every estimate, applied or not. The 15% deadband was
+                                                    # silently swallowing corrections that sat just under it -- a
+                                                    # 13.8% gap leaves every share credited ~12% light.
+                                                    $nxD.estimates=(@($est)+$nxD.estimates)[0..([math]::Min(4,$nxD.estimates.Count))]
+                                                    & $nxDiagWrite $nxD $nxDiagFile
+                                                    # Deadband tightened 15% -> 4%: it only needs to damp jitter in
+                                                    # the minimum-share estimate, not block real vardiff moves.
+                                                    if ($est -gt 0 -and ([math]::Abs($est-$nxPoolDiff)/[double]$nxPoolDiff) -gt 0.04) {
                                                         Write-Host "  [Nexus] no set_difficulty yet; estimated pool difficulty $est from $nxMinCount shares (was $nxPoolDiff)" -ForegroundColor Yellow
                                                         $nxPoolDiff=$est; NX-SaveDiff $nxDiffStore $minerIP $est
+                                                        $nxD.estimates=(@($est)+$nxD.estimates)[0..([math]::Min(4,$nxD.estimates.Count))]
+                                                        & $nxDiagWrite $nxD $nxDiagFile
                                                     }
                                                     $nxMinCount=0; $nxMinSeen=[double]0
                                                 }
@@ -280,9 +308,19 @@ $sseScript = {
                                             $dl=$enc.GetBytes("data: Nexus share  diff $ds of $nxPoolDiff`n`n")
                                             $stream.Write($dl,0,$dl.Length); $stream.Flush()
                                             Write-Host "  [Nexus] share diff $ds of $nxPoolDiff (plotted)" -ForegroundColor DarkGreen
+                                            $nxD.plotted++; $nxD.poolDiff=$nxPoolDiff
+                                            $nxD.lastDiffs=(@($ds)+$nxD.lastDiffs)[0..([math]::Min(9,$nxD.lastDiffs.Count))]
+                                            $nxD.lastTargets=(@($nxPoolDiff)+$nxD.lastTargets)[0..([math]::Min(9,$nxD.lastTargets.Count))]
+                                            if ($nxD.plotted % 5 -eq 0) { & $nxDiagWrite $nxD $nxDiagFile }
                                         }
-                                    } elseif ($nxSub -le 3 -or ($nxSub % 25 -eq 0)) {
-                                        Write-Host "  [Nexus] submit seen, cannot compute yet (en1=$([bool]$nxEn1) jobCached=$([bool]$job)) - if en1 is False, reboot the Nexus once while the tracker is running" -ForegroundColor DarkYellow
+                                    } else {
+                                        # Track drops so the shortfall is visible rather than silent.
+                                        $nxDrop++
+                                        $nxD.dropped++; & $nxDiagWrite $nxD $nxDiagFile
+                                        if ($nxSub -le 3 -or ($nxDrop % 20 -eq 0)) {
+                                            $pct = if ($nxSub -gt 0) { [math]::Round(100.0*$nxDrop/$nxSub,1) } else { 0 }
+                                            Write-Host "  [Nexus] cannot compute share (en1=$([bool]$nxEn1) jobCached=$([bool]$job)) - dropped $nxDrop of $nxSub submits ($pct%)" -ForegroundColor DarkYellow
+                                        }
                                     }
                                 }
                             }
@@ -415,6 +453,42 @@ function Get-StoreSection($raw, $name) {
     return $null
 }
 
+# Per-miner snapshot protection. Save-Store refuses to blank a whole SECTION,
+# but the session section is a MAP OF MINERS -- so a payload that kept one
+# miner's data while dropping another's still destroyed the second. This merges
+# at the miner level: a miner whose incoming snapshot is missing or empty keeps
+# what is already stored, unless that miner is itself flagged cleared. Losing
+# session bests is unrecoverable, so the bias is always toward keeping.
+function Merge-SessionSnapshots($incoming, $prevRaw) {
+    if (-not $incoming) { return $incoming }
+    if (-not $prevRaw)  { return $incoming }
+    try {
+        $prevSess = Get-StoreSection $prevRaw 'session'
+        if (-not $prevSess) { return $incoming }
+        $prev = ConvertFrom-Json $prevSess
+        $cur  = ConvertFrom-Json $incoming
+    } catch { return $incoming }
+    $changed = $false
+    foreach ($ip in $prev.PSObject.Properties.Name) {
+        $pm = $prev.$ip
+        if (-not $pm.topSeriesSnapshot -or $pm.topSeriesSnapshot.Count -eq 0) { continue }
+        $cm = $cur.$ip
+        if (-not $cm) { continue }
+        if ($cm.sessionCleared -eq $true) { continue }
+        if ($cm.topSeriesSnapshot -and $cm.topSeriesSnapshot.Count -gt 0) { continue }
+        $cm | Add-Member -NotePropertyName topSeriesSnapshot -NotePropertyValue $pm.topSeriesSnapshot -Force
+        if ($pm.snapshotTs)     { $cm | Add-Member -NotePropertyName snapshotTs     -NotePropertyValue $pm.snapshotTs -Force }
+        if ($pm.uptimeSnapshot) { $cm | Add-Member -NotePropertyName uptimeSnapshot -NotePropertyValue $pm.uptimeSnapshot -Force }
+        $changed = $true
+        if (-not $script:preserveLog) { $script:preserveLog = @() }
+        $script:preserveCount++
+        $script:preserveLog = (@("$([datetime]::Now.ToString('HH:mm:ss')) $ip ($($pm.topSeriesSnapshot.Count) entries)") + $script:preserveLog) | Select-Object -First 10
+        Write-Host "  [Store] preserved $ip session list ($($pm.topSeriesSnapshot.Count) entries) - incoming was empty without a clear" -ForegroundColor Yellow
+    }
+    if ($changed) { return ($cur | ConvertTo-Json -Depth 12 -Compress) }
+    return $incoming
+}
+
 function Save-Store {
     param([switch]$Force)
     $now = Now-Ms
@@ -423,17 +497,36 @@ function Save-Store {
         if (($now - $script:lastFlush) -lt $script:STORE_MIN_MS) { return }
     }
     try {
+        # PRESERVE-ON-WRITE. Every one of the eleven Save-Store call sites rewrites
+        # the WHOLE file, so a section that happens to be empty in memory would
+        # blank whatever is on disk. That is how session bests were lost overnight:
+        # the desktop reconnected and posted a fresh empty session, /session
+        # correctly declined to write it, and then the ambient log's 2-minute save
+        # wrote the empty session over good data. A section is only ever replaced
+        # by something with content; an empty cache keeps what is already stored.
+        $prev = $null
+        if (Test-Path $script:dataFile) {
+            try { $prev = [System.IO.File]::ReadAllText($script:dataFile, [System.Text.Encoding]::UTF8) } catch {}
+        }
+        $keep = {
+            param($name, $cur)
+            $c = if ($cur) { ([string]$cur).Trim() } else { '' }
+            $empty = ($c -eq '' -or $c -eq 'null' -or $c -eq '{}' -or $c -eq '[]')
+            if (-not $empty) { return $c }
+            if ($prev) { $old = Get-StoreSection $prev $name; if ($old) { return $old } }
+            return $null
+        }
         $sb = New-Object System.Text.StringBuilder
         [void]$sb.Append('{"v":1')
         $sections = @(
-            @('session',     $script:sessionCache),
-            @('scripts',     $script:scriptsCache),
-            @('reports',     $script:reportsCache),
-            @('degradation', $script:degCache),
-            @('runlog',      $script:runlogCache),
-            @('governors',   $script:govCache),
-            @('alltime',     $script:allTimeCache),
-            @('ambientlog',  $script:ambLogCache)
+            @('session',     (& $keep 'session'     $script:sessionCache)),
+            @('scripts', (& $keep 'scripts' $script:scriptsCache)),
+            @('reports', (& $keep 'reports' $script:reportsCache)),
+            @('degradation', (& $keep 'degradation' $script:degCache)),
+            @('runlog', (& $keep 'runlog' $script:runlogCache)),
+            @('governors', (& $keep 'governors' $script:govCache)),
+            @('alltime', (& $keep 'alltime' $script:allTimeCache)),
+            @('ambientlog', (& $keep 'ambientlog' $script:ambLogCache))
         )
         foreach ($sec in $sections) {
             [void]$sb.Append(',"'); [void]$sb.Append($sec[0]); [void]$sb.Append('":')
@@ -680,6 +773,23 @@ while ($running -and $listener.IsListening) {
         # Storage audit: what is actually on disk, section by section. Reports
         # the real file, not the in-memory caches, so it can confirm a section
         # genuinely persisted rather than merely existing in the browser.
+        # Nexus stratum diagnostics. Everything the console prints, served as JSON
+        # so it can be read from the browser console instead of watching a window
+        # that scrolls too fast to follow.
+        if ($path -eq "/nxdiag") {
+            $parts=@()
+            try {
+                Get-ChildItem -Path $env:TEMP -Filter 'bitaxe_nxdiag_*.json' -ErrorAction SilentlyContinue | ForEach-Object {
+                    try { $parts += (Get-Content $_.FullName -Raw -ErrorAction Stop) } catch {}
+                }
+            } catch {}
+            $out = if ($parts.Count) { '[' + ($parts -join ',') + ']' } else { '[]' }
+            $b=[System.Text.Encoding]::UTF8.GetBytes($out)
+            $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64=$b.Length; $resp.OutputStream.Write($b,0,$b.Length)
+            $resp.Close(); continue
+        }
+
         if ($path -eq "/storeinfo") {
             $fileBytes = 0; $fileTime = ''
             try {
@@ -698,7 +808,22 @@ while ($running -and $listener.IsListening) {
                 $cnt = Count-JsonTop $raw
                 $secs += ('"' + $nm + '":{"bytes":' + $len + ',"items":' + $cnt + '}')
             }
-            $js = '{"file":' + (ConvertTo-Json $script:dataFile) + ',"bytes":' + $fileBytes +
+            # Console scrolls far too fast to read, so anything worth knowing has
+            # to be served here instead.
+            # -like treats '[' as a character-class opener, so the old
+            # `-notlike '[*'` test was a malformed pattern that threw and killed
+            # the whole handler -- the endpoint returned a blank page.
+            $pc = 0
+            $pl = '[]'
+            try {
+                if ($script:preserveCount) { $pc = $script:preserveCount }
+                if ($script:preserveLog -and $script:preserveLog.Count -gt 0) {
+                    $items = @()
+                    foreach ($e in $script:preserveLog) { $items += (ConvertTo-Json ([string]$e) -Compress) }
+                    $pl = '[' + ($items -join ',') + ']'
+                }
+            } catch { $pc = 0; $pl = '[]' }
+            $js = '{"preserved":' + $pc + ',"preservedLog":' + $pl + ',"file":' + (ConvertTo-Json $script:dataFile) + ',"bytes":' + $fileBytes +
                   ',"modified":"' + $fileTime + '","sections":{' + ($secs -join ',') + '}}'
             $b=[System.Text.Encoding]::UTF8.GetBytes($js)
             $resp.ContentType="application/json"; $resp.Headers.Add("Access-Control-Allow-Origin","*")
@@ -1049,6 +1174,14 @@ while ($running -and $listener.IsListening) {
                 # entirely -- which is most posts, since a new top share lands
                 # minutes or hours apart, not every 2 seconds.
                 $psig = $req.Headers['X-Persist-Sig']
+                # Merge BEFORE any write decision, so a payload that blanks a
+                # miner without that miner being cleared cannot reach disk.
+                try {
+                    $prevRaw = $null
+                    if (Test-Path $script:dataFile) { $prevRaw = [System.IO.File]::ReadAllText($script:dataFile, [System.Text.Encoding]::UTF8) }
+                    $merged = Merge-SessionSnapshots $script:sessionCache $prevRaw
+                    if ($merged) { $script:sessionCache = $merged }
+                } catch {}
                 if ($psig -and $psig -eq $script:lastPsig) {
                     # nothing persistable changed
                 } else {

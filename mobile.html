@@ -567,7 +567,7 @@ function _buildFleetCard(){
 function _fleetLuckInline(f){
   return MOB_LUCK_WINDOWS.map(function(w){
     var v=f&&f.luck?f.luck[w.key]:null;
-    var txt=(v==null)?'\u2014':(Math.round(v)+'%');
+    var txt=(v==null)?'\u2014':(fmtLuck(v));
     var col=_fleetLuckColor(v);
     return '<span style="color:var(--muted)">'+w.lbl+'</span> '+
            '<span id="fv-fluck-'+w.key+'" style="color:'+col+';font-weight:600">'+txt+'</span>';
@@ -630,6 +630,17 @@ function _mobChartPicker(){
   return d;
 }
 
+function fmtLuck(v){
+  if(v==null) return '\u2014';
+  // Coerce: some paths hand this a numeric STRING. Math.round() accepted that
+  // silently, but .toFixed() does not exist on a string -- it threw, and the
+  // miner card's try/catch swallowed it into a single dash.
+  v = Number(v);
+  if(!isFinite(v)) return '\u2014';
+  // Below 100 the tenths matter -- 99.7 vs 100 is the difference between a real
+  // shortfall and none. At or above, the extra digit is just noise.
+  return (v<100 ? v.toFixed(1) : Math.round(v))+'%';
+}
 function _fleetLuckColor(l){
   if(l==null) return 'var(--muted)';
   return l>=100 ? 'var(--grn)' : (l<85 ? '#f7931a' : 'var(--txt)');
@@ -818,7 +829,7 @@ function _fleetLuckCells(f){
   var vals='<span></span>'+
     wins.map(function(w){
       var v=f.luck?f.luck[w.key]:null;
-      return '<span class="fluck-v" style="color:'+_fleetLuckColor(v)+'">'+(v!=null?Math.round(v)+'%':'—')+'</span>';
+      return '<span class="fluck-v" style="color:'+_fleetLuckColor(v)+'">'+(v!=null?fmtLuck(v):'—')+'</span>';
     }).join('');
   return head+vals;
 }
@@ -1064,7 +1075,7 @@ function renderMiners(){
       var WINS=[['1h','h1'],['4h','h4'],['12h','h12'],['24h','h24']];
       var cells=WINS.map(function(w){
         var v=lk[w[1]];
-        var txt=(v!=null)?Math.round(v)+'%':'—';
+        var txt=(v!=null)?fmtLuck(v):'—';
         var col=(v==null)?'var(--muted)':(v>=100?'var(--grn)':(v>=90?'var(--txt)':(v>=75?'#f0b429':'var(--red)')));
         return '<span style="color:var(--muted)">'+w[0]+'</span> <span id="mluck-'+w[1]+'-'+key+'" style="color:'+col+';font-weight:600">'+txt+'</span>';
       });
@@ -1390,16 +1401,67 @@ function drawEffChart(ip){
   for(var g=0;g<=3;g++){ var j=jMin+(jMax-jMin)*g/3,y=Y(j); ctx.beginPath();ctx.moveTo(PL,y);ctx.lineTo(PL+cw,y);ctx.stroke(); ctx.fillText(j.toFixed(2),PL-4*dpr,y+3*dpr); }
   ctx.textAlign='center';
   for(var g=0;g<=3;g++){ var f=fMin+(fMax-fMin)*g/3; ctx.fillText(Math.round(f),X(f),PT+ch+11*dpr); }
-  var byF={}; rl.forEach(function(r){ (byF[r.freq]=byF[r.freq]||[]).push(r.jth); });
-  var fq=Object.keys(byF).map(Number).sort(function(a,b){return a-b;});
-  ctx.strokeStyle='rgba(56,189,248,0.5)'; ctx.lineWidth=1.4*dpr; ctx.beginPath();
-  fq.forEach(function(f,i){ var av=byF[f].reduce(function(a,b){return a+b;},0)/byF[f].length; var x=X(f),y=Y(av); if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y); }); ctx.stroke();
-  rl.forEach(function(r){ ctx.fillStyle='#38bdf8'; ctx.beginPath(); ctx.arc(X(r.freq),Y(r.jth),2.6*dpr,0,Math.PI*2); ctx.fill(); });
+  // Matches the Windows redesign. Averaging J/TH per frequency drew a line no
+  // measurement sat on, leaving the real points scattered around it. One
+  // trajectory through every point in frequency order means no dot is orphaned,
+  // and a frequency held at several voltages shows as a vertical bracket.
+  var byVolt={}; rl.forEach(function(r){ var v=r.volt||0; (byVolt[v]=byVolt[v]||[]).push(r); });
+  var volts=Object.keys(byVolt).map(Number).sort(function(a,b){return a-b;});
+  var vMin=volts[0], vMax=volts[volts.length-1];
+  var vcol=function(v,a){
+    var t=(vMax>vMin)?((v-vMin)/(vMax-vMin)):0.5;
+    return 'rgba('+Math.round(56+(247-56)*t)+','+Math.round(189+(147-189)*t)+','+Math.round(248+(26-248)*t)+','+a+')';
+  };
+  var byFreq={}; rl.forEach(function(r){ (byFreq[r.freq]=byFreq[r.freq]||[]).push(r); });
+  Object.keys(byFreq).forEach(function(f){
+    var g2=byFreq[f]; if(g2.length<2) return;
+    var js=g2.map(function(r){return r.jth;});
+    ctx.strokeStyle='rgba(255,255,255,0.16)'; ctx.lineWidth=4*dpr; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(X(+f),Y(Math.min.apply(null,js))); ctx.lineTo(X(+f),Y(Math.max.apply(null,js))); ctx.stroke();
+    ctx.lineCap='butt';
+  });
+  var ordered=rl.slice().sort(function(a,b){ return (a.freq-b.freq)||((a.volt||0)-(b.volt||0)); });
+  if(ordered.length>1){
+    ctx.strokeStyle='rgba(56,189,248,0.65)'; ctx.lineWidth=1.5*dpr; ctx.beginPath();
+    ordered.forEach(function(r,k){ var x=X(r.freq),y=Y(r.jth); if(k)ctx.lineTo(x,y); else ctx.moveTo(x,y); });
+    ctx.stroke();
+  }
+  ordered.forEach(function(r){
+    var x=X(r.freq), y=Y(r.jth);
+    ctx.fillStyle='#0b1929'; ctx.beginPath(); ctx.arc(x,y,3.8*dpr,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=vcol(r.volt||0,1); ctx.beginPath(); ctx.arc(x,y,2.6*dpr,0,Math.PI*2); ctx.fill();
+  });
   var best=rl.reduce(function(a,b){return b.jth<a.jth?b:a;});
   ctx.strokeStyle='#22c55e'; ctx.lineWidth=1.4*dpr; ctx.beginPath(); ctx.arc(X(best.freq),Y(best.jth),4.5*dpr,0,Math.PI*2); ctx.stroke();
   ctx.fillStyle='#22c55e'; ctx.font=(8*dpr)+'px system-ui'; ctx.textAlign='right'; ctx.fillText('best '+best.jth.toFixed(2),PL+cw,PT+7*dpr);
 }
 
+function _vtSlope(rows){
+  // Group by frequency and centre each group on its own means. A single fit
+  // across all frequencies measures the governor's freq/volt schedule, not the
+  // silicon: MHz drives voltage AND heat, so the two correlate for a reason that
+  // has nothing to do with temperature sensitivity.
+  var by={}, i;
+  for(i=0;i<rows.length;i++){ var f=rows[i].freq; (by[f]=by[f]||[]).push(rows[i]); }
+  var xs=[], ys=[], groups=0;
+  Object.keys(by).forEach(function(f){
+    var g=by[f]; if(g.length<2) return;            // need spread within the group
+    var mt=0, mv=0, k;
+    for(k=0;k<g.length;k++){ mt+=g[k].temp; mv+=g[k].volt; }
+    mt/=g.length; mv/=g.length;
+    var spread=0;
+    for(k=0;k<g.length;k++){ if(Math.abs(g[k].temp-mt)>spread) spread=Math.abs(g[k].temp-mt); }
+    if(spread<0.3) return;                          // temperature never moved here
+    for(k=0;k<g.length;k++){ xs.push(g[k].temp-mt); ys.push(g[k].volt-mv); }
+    groups++;
+  });
+  if(xs.length<3 || groups<1) return null;
+  var n=xs.length, sx=0, sy=0, sxx=0, sxy=0;
+  for(i=0;i<n;i++){ sx+=xs[i]; sy+=ys[i]; sxx+=xs[i]*xs[i]; sxy+=xs[i]*ys[i]; }
+  var den=n*sxx-sx*sx;
+  if(!(Math.abs(den)>1e-9)) return null;
+  return { slope:(n*sxy-sx*sy)/den, groups:groups, pts:n };
+}
 function drawVtChart(ip){
   var o=_mobCanvas('vt-'+ip.replace(/\./g,'_')); if(!o) return;
   var rl=((sessionData[ip]||{}).runlog||[]).filter(function(r){return r.temp>0&&r.volt>0;});
@@ -1417,14 +1479,46 @@ function drawVtChart(ip){
   for(var g=0;g<=3;g++){ var t=tMin+(tMax-tMin)*g/3; ctx.fillText(Math.round(t)+'\u00b0',X(t),PT+ch+11*dpr); }
   var fs=rl.map(function(r){return r.freq;}); var fmn=Math.min.apply(null,fs),fmx=Math.max.apply(null,fs);
   var col=function(f){ if(fmx===fmn)return '#38bdf8'; var t=(f-fmn)/(fmx-fmn); return 'rgb('+Math.round(56+t*191)+','+Math.round(189-t*42)+','+Math.round(248-t*222)+')'; };
-  rl.forEach(function(r){ ctx.fillStyle=col(r.freq); ctx.beginPath(); ctx.arc(X(r.temp),Y(r.volt),2.8*dpr,0,Math.PI*2); ctx.fill(); });
+  // Matches the Windows redesign: trend and scatter band behind, the tuning path
+  // through the settings, then dots on top. Without the path each setting sat as
+  // an isolated dot with no indication they form one walk.
+  var slope=null, ic=null;
   if(rl.length>=3){
     var n=rl.length,sx=0,sy=0,sxy=0,sxx=0;
     rl.forEach(function(r){ sx+=r.temp;sy+=r.volt;sxy+=r.temp*r.volt;sxx+=r.temp*r.temp; });
-    var slope=(n*sxy-sx*sy)/(n*sxx-sx*sx||1), ic=(sy-slope*sx)/n;
-    ctx.strokeStyle='rgba(247,147,26,0.6)'; ctx.lineWidth=1.4*dpr; ctx.setLineDash([4*dpr,3*dpr]);
+    slope=(n*sxy-sx*sy)/(n*sxx-sx*sx||1); ic=(sy-slope*sx)/n;
+    var resid=rl.map(function(r){ return Math.abs(r.volt-(slope*r.temp+ic)); });
+    var sd=Math.max.apply(null,resid)||0;
+    if(sd>0){
+      ctx.fillStyle='rgba(247,147,26,0.07)';
+      ctx.beginPath();
+      ctx.moveTo(X(tMin),Y(slope*tMin+ic+sd));
+      ctx.lineTo(X(tMax),Y(slope*tMax+ic+sd));
+      ctx.lineTo(X(tMax),Y(slope*tMax+ic-sd));
+      ctx.lineTo(X(tMin),Y(slope*tMin+ic-sd));
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle='rgba(247,147,26,0.55)'; ctx.lineWidth=1.4*dpr; ctx.setLineDash([4*dpr,3*dpr]);
     ctx.beginPath(); ctx.moveTo(X(tMin),Y(slope*tMin+ic)); ctx.lineTo(X(tMax),Y(slope*tMax+ic)); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle='#f7931a'; ctx.font=(8*dpr)+'px system-ui'; ctx.textAlign='right'; ctx.fillText(Math.abs(slope).toFixed(1)+' mV/\u00b0C',PL+cw,PT+7*dpr);
+  }
+  var walk=rl.slice().sort(function(a,b){ return (a.freq-b.freq)||(a.temp-b.temp); });
+  if(walk.length>1){
+    ctx.strokeStyle='rgba(138,180,204,0.28)'; ctx.lineWidth=1.2*dpr;
+    ctx.beginPath();
+    walk.forEach(function(r,k){ var x=X(r.temp),y=Y(r.volt); if(k)ctx.lineTo(x,y); else ctx.moveTo(x,y); });
+    ctx.stroke();
+  }
+  walk.forEach(function(r){
+    var x=X(r.temp), y=Y(r.volt);
+    ctx.fillStyle='#0b1929'; ctx.beginPath(); ctx.arc(x,y,4*dpr,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=col(r.freq); ctx.beginPath(); ctx.arc(x,y,2.8*dpr,0,Math.PI*2); ctx.fill();
+  });
+  if(slope!==null){
+    var _wf=_vtSlope(rl);
+    ctx.fillStyle='#f7931a'; ctx.font=(8*dpr)+'px system-ui'; ctx.textAlign='right';
+    ctx.fillText(_wf ? (Math.abs(_wf.slope).toFixed(1)+' mV/\u00b0C @MHz')
+                     : (Math.abs(slope).toFixed(1)+' mV/\u00b0C all'),
+                 PL+cw,PT+7*dpr);
   }
 }
 
@@ -1516,7 +1610,12 @@ function drawPoissonChart(ip){
 
   // ideal N/x
   ctx.strokeStyle='rgba(247,147,26,0.55)'; ctx.lineWidth=1.4*dpr; ctx.setLineDash([4*dpr,3*dpr]);
-  ctx.beginPath(); ctx.moveTo(X(1),Y(N)); ctx.lineTo(X(Math.pow(10,xMaxLog)),Y(Math.max(N/Math.pow(10,xMaxLog),1))); ctx.stroke(); ctx.setLineDash([]);
+  // End the line where survivors reach 1 (x = N) instead of clamping the
+  // endpoint upward. Clamping bent the reference: with N=150 over a 1000x
+  // axis the true endpoint is 0.15, drawn at 1, flattening slope -1 to about
+  // -0.4 and making every real curve look short of it.
+  var _x1=Math.pow(10,xMaxLog); if(N/_x1 < 1) _x1 = N;
+  ctx.beginPath(); ctx.moveTo(X(1),Y(N)); ctx.lineTo(X(_x1),Y(N/_x1)); ctx.stroke(); ctx.setLineDash([]);
 
   // actual
   ctx.strokeStyle='#38bdf8'; ctx.lineWidth=2*dpr; ctx.beginPath();
@@ -4098,7 +4197,7 @@ function updateMinerData(){
       ['h1','h4','h12','h24'].forEach(function(wk){
         var el=document.getElementById('mluck-'+wk+'-'+key); if(!el) return;
         var v=lk[wk];
-        el.textContent=(v!=null)?Math.round(v)+'%':'—';
+        el.textContent=(v!=null)?fmtLuck(v):'—';
         el.style.color=(v==null)?'var(--muted)':(v>=100?'var(--grn)':(v>=90?'var(--txt)':(v>=75?'#f0b429':'var(--red)')));
       });
     })();
