@@ -8,6 +8,43 @@ No cloud. No accounts. No installs beyond the files in this zip. Runs entirely o
 
 ## What's New (Recent Updates)
 
+**Diagnostics page — 🔍 Diag**
+- A per-miner diagnostics view on both platforms (toolbar **🔍 Diag** on Windows; a **Diagnostics** button under Crash/Restart Reports on mobile).
+- **By operating point** — one collapsible block per distinct freq/voltage the miner has run, newest first. Each block carries the full stat set: pool/reported hashrate, implied vs actual share rate, capture %, effective hashrate, implied error rate with a confidence band, and the miner's own reported error rate with an agreement check. Returning to a setting **overwrites** its block with the latest run (conditions differ between runs, so averaging a cold night with a hot afternoon would hide the effect) — the label notes how many times it's been used.
+- **Per-setting share reconciliation** nested under each block: hours run, shares plotted, the device's own share-counter delta, and capture %. A combined all-settings reconciliation sits below.
+- **Stratum reconstruction** section (Nexus only — Bitaxes log shares directly): set_difficulty count, pool difficulty, submits/plotted/dropped, extranonce1 status, recent targets and share diffs.
+- Everything is collapsible with state that persists (mobile remembers what you collapsed across app restarts). Toggling flips visibility in place — no scroll jump.
+
+**Effective hashrate mirrors the console exactly** — the diagnostics effective-hashrate figure uses the identical maths to the `nxdiag()` console output: span from the share baseline, work summed from each share's own target (vardiff-proof), reported side from the segment mean. Page and console can no longer disagree.
+
+**Network block timer**
+- A **BLOCK** stat in the Windows top bar (green) and on both fleet cards showing time since the last block was found network-wide. Counts up live and resets when a new block lands.
+- Sourced from a non-blocking relay endpoint (mempool.space, blockchain.info fallback) modelled on the existing network-hashrate fetch, refreshed every 30 seconds and counted up locally between fetches so the display is smooth.
+- The Windows top bar's per-fleet **TARGET** was removed — it wasn't meaningful across multiple miners on different pool difficulties.
+
+**Fleet pace — per-miner honest**
+- Fleet pace now judges each miner against **its own work and its own current best**, then combines like-for-like — rather than comparing the single tallest session best against everyone's summed work.
+- This fixes a staggered-restart distortion: when some miners restarted (zeroing their session best on the device) while one kept running, the fleet pace effectively tracked only the un-restarted miner. Each miner now contributes a matched work-and-best pair, so no single miner dominates. Individual miner pace still resets on that miner's own restart, as before.
+
+**Session-best clearing — restart-corroborated**
+- A drop in a miner's firmware-reported session best no longer clears the saved share list on its own. A single low reading — a firmware glitch, a vardiff artifact — used to be treated as a restart and wiped the list with the miner still running.
+- The clear now requires **uptime corroboration**: the list clears only if the session best dropped **and** the miner's uptime reset (a real restart). A drop with uptime still climbing is treated as a glitch and the list is kept.
+- Both outcomes are recorded to the **Crash/Restart Reports** panel as reviewable, timestamped cards — **Session Cleared** (real restart) or **Best Kept** (glitch) — so overnight events can be checked afterward instead of watching the live log.
+
+**Newer Nexus firmware support**
+- The relay now captures a Nexus's **extranonce1** from the `mining.subscribe` reply, not just the older `extranonce_str:` log line. Newer NexusOS builds dropped that line and only present extranonce1 in the subscribe reply — which the relay previously couldn't read, so the miner connected for stats but never plotted shares.
+- Both formats are handled, so any Nexus (old or new firmware) is covered without per-unit changes. Extranonce1 is still captured once and saved, persisting across reconnects — a newly added Nexus captures it on its next pool re-subscribe (a reboot forces this if needed).
+
+**Top-bar polish (Windows)**
+- The **SHARES / HR / BLOCK** stats are enlarged and use the same green as the miner-card stats and toolbar buttons, filling the bar without the old pill outlines and without growing the bar's height.
+- The miner-management bar's action buttons (**+Miner**, **Connect**, **Clear Data**, **Clear Sessions**, **Reset Miners**) are a uniform height — the emoji glyphs in +Miner/Connect were stretching those two taller. Wasted vertical padding on both bars was trimmed.
+
+**Linux / Umbrel variant brought current**
+- The headless Node/Umbrel build (`server.js`) was updated to match the Windows version, including a Node port of the Nexus share-reconstruction diagnostics (`/nxdiag`) with the same self-test vector verified byte-for-byte against the PowerShell relay. Headless users accessing by phone get the full mobile feature set, including diagnostics and the session-clear reports.
+
+
+---
+
 **Fleet card**
 - A single aggregate card above the miners showing the whole rig as one unit: combined hashrate, total power, fleet efficiency, total shares/rejects, fleet-wide all-time and session bests, and 10m / 1h averages.
 - Collapsible (tap the header), colour-settable, and it shows the session best even while collapsed.
@@ -140,6 +177,18 @@ No cloud. No accounts. No installs beyond the files in this zip. Runs entirely o
 4. On iPhone/Android: open Safari or Chrome and go to the IP shown in yellow in the console window (e.g. `http://10.0.0.145:19248`)
 
 > **The launcher self-elevates to administrator** — no need to right-click Run as administrator.
+
+---
+
+## First-Time Setup for Nexus Miners
+
+Nexus-class miners (BM1373) don't log share difficulties directly — the relay reconstructs them from the stratum stream. To do this it needs the connection's **extranonce1**, which the pool sends only once, during the `mining.subscribe` handshake when the miner first connects to the pool.
+
+If you add a Nexus while it's already connected to its pool, the relay may have missed that handshake and won't plot its shares yet (stats still work — it's only share plotting that waits). To fix this:
+
+**Reboot the Nexus once while the tracker is running.** On reboot it reconnects to the pool, re-sends the subscribe handshake, and the relay captures its extranonce1. From then on the value is **saved to disk and reused automatically** — you won't need to do this again for that miner, even across relay restarts.
+
+You'll know it worked when shares start appearing on the chart, and the console prints a line like `[Nexus] extranonce1 captured … (saved)`. This is a one-time step per Nexus; Bitaxes and other AxeOS boards need nothing special.
 
 ---
 
@@ -428,7 +477,7 @@ The relay exposes `GET /fleet` returning fleet hashrate, share counts, best diff
 
 Some firmwares (Nexus-class / BM1373) never print an `asic_result ... diff X of Y` line — they emit only the raw stratum JSON. For those the relay reconstructs each share's difficulty itself from the job and the submitted nonce, and synthesises the log line the dashboard expects.
 
-That needs two things from the stratum stream: the connection's `extranonce1`, and the pool's current difficulty. Both are captured live and **persisted to disk**, so a relay restart resumes from the real values instead of a default. If the relay attaches mid-session and hasn't seen a `mining.set_difficulty` yet, it estimates the target from the smallest share the miner has submitted — since it never submits below target, that converges from above within about 20 shares.
+That needs two things from the stratum stream: the connection's `extranonce1`, and the pool's current difficulty. `extranonce1` is captured from whichever form the firmware uses — an `extranonce_str:` log line on older builds, or the `mining.subscribe` reply on newer NexusOS builds that dropped that line — so both firmware generations work. Both values are **persisted to disk**, so a relay restart resumes from the real values instead of a default, and a given miner only needs its `extranonce1` captured once. If the relay attaches mid-session and hasn't seen a `mining.set_difficulty` yet, it estimates the target from the smallest share the miner has submitted — since it never submits below target, that converges from above within about 20 shares.
 
 ---
 

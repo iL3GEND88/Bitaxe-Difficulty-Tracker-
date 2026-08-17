@@ -245,7 +245,15 @@ $sseScript = {
                     if ($line -match 'mining\.|extranonce_str|version mask') {
                         try {
                             if ($line -match 'extranonce_str:\s*([0-9a-fA-F]+)') {
+                                # OLD firmware path: a plain extranonce_str line.
                                 if ($nxEn1 -ne $matches[1]) { $nxEn1=$matches[1]; NX-SaveEnonce $nxStore $minerIP $nxEn1; Write-Host "  [Nexus] extranonce1 captured $nxEn1 for $minerIP (saved)" -ForegroundColor Green }
+                            }
+                            elseif ($line -match '"result":\s*\[\s*\[.*?\]\s*,\s*"([0-9a-fA-F]{4,})"\s*,\s*\d+\s*\]') {
+                                # NEW firmware path: the mining.subscribe reply. en1 is
+                                # result[1], a bare hex string after the nested notify
+                                # sub-array. This reply has no "method" field, so it must
+                                # be caught here rather than in the method-gated branch.
+                                if ($nxEn1 -ne $matches[1]) { $nxEn1=$matches[1]; NX-SaveEnonce $nxStore $minerIP $nxEn1; Write-Host "  [Nexus] extranonce1 captured $nxEn1 for $minerIP (subscribe reply, saved)" -ForegroundColor Green }
                             }
                             elseif ($line -match 'version mask:\s*([0-9a-fA-F]+)') { $nxMask=[Convert]::ToInt64($matches[1],16) }
                             elseif ($line -match '"method":\s*"mining\.(notify|submit|set_difficulty)"' -or $line -match '"result":\[\[\["mining\.notify"') {
@@ -544,6 +552,8 @@ function Save-Store {
 # ── Shared state initialization ──────────────────────────────────────────────
 if (-not $script:netHashCache)   { $script:netHashCache   = @{btc='{}';bch='{}';dgb='{}';xec='{}';fb='{}'} }
 if (-not $script:netHashLastFetch){ $script:netHashLastFetch = @{btc=0;bch=0;dgb=0;xec=0;fb=0} }
+if (-not $script:blockTimeCache){ $script:blockTimeCache = $null }
+if (-not $script:blockTimeLastFetch){ $script:blockTimeLastFetch = 0 }
 if (-not $script:storeLoaded) {
     $script:storeLoaded = $true
     $script:degCache    = $null
@@ -1414,6 +1424,62 @@ while ($running -and $listener.IsListening) {
         }
 
         # Simple test page to confirm iPhone can reach server
+        # Time of the most recent Bitcoin block (unix seconds). Non-blocking like
+        # /nethash: serve cache immediately, refresh in a background runspace at
+        # most every 30s. The client turns this into a live count-up.
+        if ($path -eq "/blocktime") {
+            $btCached = if ($script:blockTimeCache) { $script:blockTimeCache } else { '{"time":0}' }
+            $btBytes = [System.Text.Encoding]::UTF8.GetBytes($btCached)
+            $resp.ContentType = "application/json"
+            $resp.Headers.Add("Access-Control-Allow-Origin","*")
+            $resp.ContentLength64 = $btBytes.Length
+            $resp.OutputStream.Write($btBytes,0,$btBytes.Length)
+            $resp.Close()
+            $btNow = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+            if (($btNow - $script:blockTimeLastFetch) -gt 30) {
+                $script:blockTimeLastFetch = $btNow
+                $rsBT = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+                $rsBT.Open()
+                $psBT = [System.Management.Automation.PowerShell]::Create()
+                $psBT.Runspace = $rsBT
+                [void]$psBT.AddScript({
+                    param($cacheRef)
+                    try {
+                        # mempool.space first; blockchain.info as fallback
+                        $t = 0
+                        try {
+                            $r1 = [System.Net.HttpWebRequest]::Create("https://mempool.space/api/blocks/tip/height")
+                            $r1.Timeout = 8000; $r1.UserAgent = "BitaxeTracker"
+                            $resp1 = $r1.GetResponse(); $sr1 = New-Object System.IO.StreamReader($resp1.GetResponseStream())
+                            $height = $sr1.ReadToEnd().Trim(); $sr1.Close(); $resp1.Close()
+                            $r2 = [System.Net.HttpWebRequest]::Create("https://mempool.space/api/block-height/$height")
+                            $r2.Timeout = 8000; $r2.UserAgent = "BitaxeTracker"
+                            $resp2 = $r2.GetResponse(); $sr2 = New-Object System.IO.StreamReader($resp2.GetResponseStream())
+                            $hash = $sr2.ReadToEnd().Trim(); $sr2.Close(); $resp2.Close()
+                            $r3 = [System.Net.HttpWebRequest]::Create("https://mempool.space/api/block/$hash")
+                            $r3.Timeout = 8000; $r3.UserAgent = "BitaxeTracker"
+                            $resp3 = $r3.GetResponse(); $sr3 = New-Object System.IO.StreamReader($resp3.GetResponseStream())
+                            $blockJson = $sr3.ReadToEnd(); $sr3.Close(); $resp3.Close()
+                            if ($blockJson -match '"timestamp"\s*:\s*(\d+)') { $t = [int64]$Matches[1] }
+                        } catch {
+                            $rb = [System.Net.HttpWebRequest]::Create("https://blockchain.info/q/getblockcount")
+                            $rb.Timeout = 8000; $rb.UserAgent = "BitaxeTracker"
+                            $respb = $rb.GetResponse(); $srb = New-Object System.IO.StreamReader($respb.GetResponseStream())
+                            $srb.ReadToEnd() | Out-Null; $srb.Close(); $respb.Close()
+                            $rl = [System.Net.HttpWebRequest]::Create("https://blockchain.info/latestblock")
+                            $rl.Timeout = 8000; $rl.UserAgent = "BitaxeTracker"
+                            $respl = $rl.GetResponse(); $srl = New-Object System.IO.StreamReader($respl.GetResponseStream())
+                            $lj = $srl.ReadToEnd(); $srl.Close(); $respl.Close()
+                            if ($lj -match '"time"\s*:\s*(\d+)') { $t = [int64]$Matches[1] }
+                        }
+                        if ($t -gt 0) { $cacheRef.Value = ('{"time":' + $t + '}') }
+                    } catch {}
+                }).AddArgument([ref]$script:blockTimeCache)
+                [void]$psBT.BeginInvoke()
+            }
+            continue
+        }
+
         if ($path -eq "/nethash") {
             $coin = $req.QueryString["coin"]
             if (-not $coin) { $coin = "btc" }

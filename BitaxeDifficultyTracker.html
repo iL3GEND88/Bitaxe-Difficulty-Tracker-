@@ -17,24 +17,24 @@ body::before{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
   background:repeating-linear-gradient(0deg,transparent 0,transparent 3px,rgba(0,160,255,.011) 3px,rgba(0,160,255,.011) 4px)}
 
 /* HEADER */
-#hdr{display:flex;align-items:center;gap:12px;padding:8px 16px;flex-shrink:0;
+#hdr{display:flex;align-items:center;gap:12px;padding:1px 16px;flex-shrink:0;
   border-bottom:1px solid var(--bdr);background:linear-gradient(90deg,rgba(247,147,26,.07),transparent 60%)}
 .axe{width:32px;height:32px;border-radius:6px;background:#f7931a;display:flex;align-items:center;
   justify-content:center;font-size:17px;flex-shrink:0;box-shadow:0 0 18px rgba(247,147,26,.6);animation:glow 3s ease-in-out infinite}
 @keyframes glow{0%,100%{box-shadow:0 0 18px rgba(247,147,26,.5)}50%{box-shadow:0 0 36px rgba(247,147,26,.9)}}
 #ttl{font-size:.88rem;letter-spacing:.14em;font-weight:bold;text-transform:uppercase;white-space:nowrap}
 #ttl em{color:#f7931a;font-style:normal}
-#hdr-r{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.chip{display:flex;align-items:center;gap:5px;font-size:.64rem;color:#e8f4ff;
-  background:var(--surf);border:1px solid var(--bdr);border-radius:20px;padding:2px 10px;white-space:nowrap}
-.chip b{color:#fff;font-weight:normal}
+#hdr-r{margin-left:auto;display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:8px;font-size:1.05rem;color:#e8f4ff;
+  background:transparent;border:none;padding:0;white-space:nowrap;letter-spacing:.03em}
+.chip b{color:var(--grn);font-weight:700;font-size:1.6rem;line-height:1}
 #pause-badge{font-size:.6rem;color:var(--red);border:1px solid var(--red);border-radius:3px;
   padding:1px 7px;display:none;animation:blink 1s infinite;letter-spacing:.08em}
 #pause-badge.on{display:inline-block}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* MINER MANAGER */
-#mgr{padding:6px 16px;border-bottom:1px solid var(--bdr);background:var(--surf2);
+#mgr{padding:1px 16px;border-bottom:1px solid var(--bdr);background:var(--surf2);
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0}
 #miner-list{display:flex;gap:7px;flex-wrap:wrap;flex:1;align-items:center}
 .mtag{display:flex;align-items:center;gap:5px;background:var(--surf);border:1px solid var(--bdr);border-radius:5px;padding:3px 7px}
@@ -50,6 +50,7 @@ body::before{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
 .cpicker{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
 button{font-family:inherit;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;
   cursor:pointer;border-radius:4px;padding:4px 12px;transition:all .18s;white-space:nowrap;background:transparent}
+#mgr button{height:24px;padding:0 12px;line-height:1;display:inline-flex;align-items:center;box-sizing:border-box}
 button.abtn{border:1px solid var(--grn);color:var(--grn)}
 button.abtn:hover{background:rgba(34,211,122,.1)}
 button.cbtn{border:1px solid #38bdf8;color:#38bdf8}
@@ -266,19 +267,18 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
 <body>
 
 <div id="hdr">
-  <div class="axe">⛏</div>
   <div id="ttl"><em>BITAXE</em> DIFFICULTY TRACKER</div>
   <button id="btn-donate" onclick="document.getElementById('donate-overlay').style.display='flex'" style="background:transparent;border:1px solid #f7931a;color:#f7931a;font-family:inherit;font-size:.65rem;padding:4px 12px;border-radius:4px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;margin:0 auto">💛 Donate</button>
   <div id="hdr-r">
     <div class="chip">SHARES: <b id="h-shares">0</b></div>
     <div class="chip">HR: <b id="h-totalhr">—</b></div>
     
-    <div class="chip">TARGET: <b id="h-target">—</b></div>
+    <div class="chip">BLOCK: <b id="h-blocktime">—</b></div>
     <span id="pause-badge">⏸ PAUSED</span>
-    <!-- Startup checkbox hidden for release: it creates a Windows scheduled task
-         and raises a UAC prompt, too easy to hit by accident. The wiring below
-         (checkStartupState, the /startup endpoint, startup-helper.ps1) is intact
-         -- restore this label to bring the control back. -->
+    <label style="display:none;align-items:center;gap:5px;font-size:.72rem;color:var(--muted);cursor:pointer;white-space:nowrap;margin:0 4px" title="Launch app automatically when Windows starts">
+      <input type="checkbox" id="chk-startup" style="cursor:pointer;accent-color:var(--orange)">
+      Startup
+    </label>
     <button id="btn-purgeminer" onclick="purgeMinerData()" style="background:transparent;border:1px solid var(--muted2);color:var(--muted);font-family:inherit;font-size:.65rem;padding:3px 12px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .18s" title="Completely remove a miner's stored data (history, ghost IPs) from app and server">🧹 Purge Miner</button>
     <button id="btn-shutdown" style="background:transparent;border:1px solid var(--red);color:var(--red);font-family:inherit;font-size:.65rem;padding:3px 12px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .18s" title="Shut down server and close">⏻ Close App</button>
   </div>
@@ -297,8 +297,32 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
 </div>
 
 <div id="toolbar">
-  <!-- Difficulty timeframe moved into each chart panel header (see DIFF_TF_OPTIONS) -->
+  <!-- Left: what you DO. Right: how the charts LOOK. Stats leads the left
+       group because it gates everything else on screen. Chart controls are
+       pushed right by margin-left:auto on the divider so they stay grouped
+       together at the far end regardless of window width. -->
+  <div id="stats-dropdown-wrap"><button class="tbtn on" id="btn-toggletemps">📊 Stats ▾</button><div id="stats-dropdown-menu"><div class="sdrop-item"><input type="checkbox" id="sdrop-best" checked><label for="sdrop-best">Best Difficulty</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-status" checked><label for="sdrop-status">Status / Uptime</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-stats" checked><label for="sdrop-stats">Shares / Rejected / Last</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-temps" checked><label for="sdrop-temps">Temperatures</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-power" checked onchange="statsVis.power=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-power">Power (W)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-amps" checked onchange="statsVis.amps=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-amps">Amps (A)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-volt" checked onchange="statsVis.volt=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-volt">Voltage (mV)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-freq" checked onchange="statsVis.freq=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-freq">Frequency (MHz)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-asics" checked onchange="statsVis.asics=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-asics">Per-ASIC HR/Err</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-luck" checked onchange="statsVis.luck=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-luck">Luck (per miner)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-pace" checked onchange="statsVis.pace=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-pace">Best-share pace</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-top10" checked><label for="sdrop-top10">Top Diffs List</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-fleet" onchange="statsVis.fleet=this.checked;saveStatsVis();renderCards();Object.values(miners).forEach(updateCardStats);updateFleetCard();"><label for="sdrop-fleet">Fleet stats card</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-fleetbest" onchange="statsVis.fleetBest=this.checked;saveStatsVis();try{updateDiffPanelContent();}catch(e){};try{updateHrPanelContent();}catch(e){};"><label for="sdrop-fleetbest">Fleet on best lists</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-log" checked onchange="statsVis.log=this.checked;saveStatsVis();var s=document.getElementById('slog');if(s)s.style.display=this.checked?'block':'none';" ><label for="sdrop-log">Live Log</label></div><div class="sdrop-sep"></div><div class="sdrop-sep"></div><div style="padding:4px 14px 2px 14px;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Notifications</div><div class="sdrop-item"><input type="checkbox" id="sdrop-notif-all" onchange="setNotifAllOff(this.checked);paintNotifMenu();"><label for="sdrop-notif-all">Silence all popups</label></div><div id="notif-cat-list"></div><div style="padding:2px 14px 6px 14px;font-size:.6rem;color:var(--muted);line-height:1.4">Muted events still appear in the log. Block found is never muted.</div><div class="sdrop-item"><input type="checkbox" id="sdrop-disco" onchange="toggleDiscoMode(this.checked)"><label for="sdrop-disco">🪩 Disco Mode</label></div></div></div>
   <div class="sep"></div>
+  <button class="tbtn" id="btn-alltime">📊 Difficulty Scores</button>
+  <button class="tbtn" id="btn-hr-scores">⚡ HR High Scores</button>
+  <button class="tbtn" id="btn-settings">⚙ Settings</button>
+  <button class="tbtn" id="btn-pool">⛁ Pool</button>
+  <button class="tbtn" onclick="openScriptsPanel()">📜 Scripts</button>
+  <button class="tbtn" onclick="openGovernorPanel()">⚙ Governor</button>
+  <button class="tbtn" onclick="openReportsPanel()">📋 Reports</button>
+  <button class="tbtn" onclick="openDiagPanel()">🔍 Diag</button>
+  <button class="tbtn" onclick="openHourReport()">⏱ Last Hour</button>
+  <div class="sep"></div>
+  <span class="tlbl">Top N:</span>
+  <select class="topn-sel" id="topn-sel">
+    <option value="10" selected>10</option>
+    <option value="25">25</option>
+    <option value="50">50</option>
+    <option value="100">100</option>
+    <option value="250">250</option>
+    <option value="500">500</option>
+  </select>
+  <div class="sep" style="margin-left:auto"></div>
   <span class="tlbl">Scale:</span>
   <div class="btngrp">
     <button class="tbtn on" id="btn-log">Log</button>
@@ -341,26 +365,7 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
     <button class="tbtn" id="btn-split">Split</button>
     <button class="tbtn" id="btn-both">Both</button>
   </div>
-  <div class="sep"></div>
-  <span class="tlbl">Top N:</span>
-  <select class="topn-sel" id="topn-sel">
-    <option value="10" selected>10</option>
-    <option value="25">25</option>
-    <option value="50">50</option>
-    <option value="100">100</option>
-    <option value="250">250</option>
-    <option value="500">500</option>
-  </select>
-  <div class="sep"></div>
-  <button class="tbtn" id="btn-alltime">📊 Difficulty Scores</button>
-  <button class="tbtn" id="btn-hr-scores">⚡ HR High Scores</button>
-  <button class="tbtn" id="btn-settings">⚙ Settings</button>
-  <button class="tbtn" id="btn-pool">⛁ Pool</button>
-  <button class="tbtn" onclick="openScriptsPanel()">📜 Scripts</button>
-  <button class="tbtn" onclick="openGovernorPanel()">⚙ Governor</button>
-  <button class="tbtn" onclick="openReportsPanel()">📋 Reports</button>
-  <button class="tbtn" onclick="openHourReport()">⏱ Last Hour</button>
-  <div id="stats-dropdown-wrap"><button class="tbtn on" id="btn-toggletemps">📊 Stats ▾</button><div id="stats-dropdown-menu"><div class="sdrop-item"><input type="checkbox" id="sdrop-best" checked><label for="sdrop-best">Best Difficulty</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-status" checked><label for="sdrop-status">Status / Uptime</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-stats" checked><label for="sdrop-stats">Shares / Rejected / Last</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-temps" checked><label for="sdrop-temps">Temperatures</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-power" checked onchange="statsVis.power=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-power">Power (W)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-amps" checked onchange="statsVis.amps=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-amps">Amps (A)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-volt" checked onchange="statsVis.volt=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-volt">Voltage (mV)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-freq" checked onchange="statsVis.freq=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-freq">Frequency (MHz)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-asics" checked onchange="statsVis.asics=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-asics">Per-ASIC HR/Err</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-luck" checked onchange="statsVis.luck=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-luck">Luck (per miner)</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-pace" checked onchange="statsVis.pace=this.checked;saveStatsVis();Object.values(miners).forEach(updateCardStats);"><label for="sdrop-pace">Best-share pace</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-top10" checked><label for="sdrop-top10">Top Diffs List</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-fleet" onchange="statsVis.fleet=this.checked;saveStatsVis();renderCards();Object.values(miners).forEach(updateCardStats);updateFleetCard();"><label for="sdrop-fleet">Fleet stats card</label></div><div class="sdrop-item"><input type="checkbox" id="sdrop-fleetbest" onchange="statsVis.fleetBest=this.checked;saveStatsVis();try{updateDiffPanelContent();}catch(e){};try{updateHrPanelContent();}catch(e){};"><label for="sdrop-fleetbest">Fleet on best lists</label></div><div class="sdrop-sep"></div><div class="sdrop-item"><input type="checkbox" id="sdrop-log" checked onchange="statsVis.log=this.checked;saveStatsVis();var s=document.getElementById('slog');if(s)s.style.display=this.checked?'block':'none';" ><label for="sdrop-log">Live Log</label></div><div class="sdrop-sep"></div><div class="sdrop-sep"></div><div style="padding:4px 14px 2px 14px;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Notifications</div><div class="sdrop-item"><input type="checkbox" id="sdrop-notif-all" onchange="setNotifAllOff(this.checked);paintNotifMenu();"><label for="sdrop-notif-all">Silence all popups</label></div><div id="notif-cat-list"></div><div style="padding:2px 14px 6px 14px;font-size:.6rem;color:var(--muted);line-height:1.4">Muted events still appear in the log. Block found is never muted.</div><div class="sdrop-item"><input type="checkbox" id="sdrop-disco" onchange="toggleDiscoMode(this.checked)"><label for="sdrop-disco">🪩 Disco Mode</label></div></div></div>
+
 </div>
 
 <div id="body">
@@ -432,6 +437,17 @@ input.vslider::-moz-range-thumb{width:13px;height:13px;border-radius:50%;backgro
 
 
 
+
+<div id="diag-overlay" style="position:fixed;inset:0;z-index:8500;background:var(--bg);display:none;flex-direction:column;overflow:hidden">
+  <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--bdr)">
+    <span style="font-size:1.1rem;font-weight:700;color:var(--txt)">🔍 Diagnostics</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+      <button class="tbtn" onclick="renderDiagPanel()">Refresh</button>
+      <button class="tbtn" onclick="document.getElementById('diag-overlay').style.display='none'">✕ Close</button>
+    </div>
+  </div>
+  <div id="diag-body" style="flex:1;overflow:auto;padding:18px 20px;font-size:.8rem;line-height:1.55"></div>
+</div>
 
 <div id="alltime-overlay" style="position:fixed;inset:0;z-index:8500;background:var(--bg);display:none;flex-direction:column;overflow:hidden">
   <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--bdr)">
@@ -675,8 +691,23 @@ function fleetStats(){
     if(ab>f.atBest){ f.atBest=ab; f.atBestColor=m.color; }
     var sb=(m.axeOSSessionBest!=null?parseDiff(m.axeOSSessionBest):(m.sessionBest||0))||0;
     if(sb>f.sessBest){ f.sessBest=sb; f.sessBestColor=m.color; }
-    // Fleet pace: sum each miner's work (shares x mean target). Stalled miners
-    // still count -- the work already happened, and f.sessBest includes them.
+    // Fleet pace (option 1: per-miner honest). Each miner is judged against its
+    // OWN work and its OWN current best, then combined -- rather than comparing
+    // the single tallest best against everyone's summed work. Staggered restarts
+    // broke the old model: a restarted miner's best resets on the device, so
+    // comparing the survivor's tall best against the whole fleet's (now reduced)
+    // work made pace look like it tracked only the un-restarted miner.
+    // We sum each miner's expected median (from ITS work) and each miner's best.
+    var _mb=(m.axeOSSessionBest!=null?parseDiff(m.axeOSSessionBest):(m.sessionBest||0))||0;
+    var _mp=paceFor(paceN(m), paceTarget(m), _mb);
+    if(_mp && _mp.med>0){
+      f.paceExpSum = (f.paceExpSum||0) + _mp.med;   // sum of per-miner expected medians
+      f.paceBestSum = (f.paceBestSum||0) + _mb;      // sum of per-miner actual bests
+      f.paceP10Sum = (f.paceP10Sum||0) + _mp.p10;
+      f.paceP90Sum = (f.paceP90Sum||0) + _mp.p90;
+      f.paceMinerN = (f.paceMinerN||0) + 1;
+    }
+    // keep the old summed-work too, in case anything else references it
     var _pw=paceN(m)*paceTarget(m); if(_pw>0) f.paceW+=_pw;
     var acc=(m.series||[]).filter(function(p){return p.accepted;});
     if(acc.length>=2){
@@ -700,7 +731,13 @@ function fleetStats(){
     var e=f.lk[w.key];
     f.luck[w.key] = (e && e.exp>0) ? (e.act/e.exp*100) : null;
   });
-  f.pace = paceForW(f.paceW, f.sessBest);
+  // Combine the per-miner sums. Summing expected medians and actual bests keeps
+  // the comparison coherent under staggered restarts: each miner brought its own
+  // matched pair, so the fleet 'best vs expected' is the sum of like-for-like.
+  f.pace = (f.paceExpSum>0)
+    ? { w:f.paceW, best:(f.paceBestSum||0),
+        med:f.paceExpSum, p10:(f.paceP10Sum||f.paceExpSum), p90:(f.paceP90Sum||f.paceExpSum) }
+    : null;
   return f;
 }
 function _fmtFleetAvg(s){
@@ -735,6 +772,7 @@ function buildFleetCard(){
       <div><span class="lbl">Session best:  </span><span class="val" id="fb-ss">—</span></div>
     </div>
     <div class="mcst-status">Status:<span class="mg" id="fb-status"> —</span></div>
+    <div class="mcst-status">Block:<span class="mg" id="fb-blocktime" style="color:var(--grn)"> —</span></div>
     <div class="stats-cols" style="display:flex;gap:4px;width:100%;font-size:.82em">
       <div style="min-width:0;color:var(--muted);line-height:1.25">
         Shares:<span class="mg" id="fb-shares"> —</span><br>
@@ -802,7 +840,7 @@ function updateFleetCard(){
     try{
       var _ms=Object.values(miners), _tsum=0, _tn=0;
       _ms.forEach(function(mm){ var t=paceTarget(mm); if(t>0){ _tsum+=t; _tn++; } });
-      fpc.innerHTML=' '+paceCells(paceFor(f.shares||0, _tn?_tsum/_tn:0, f.sessBest||0));
+      fpc.innerHTML=' '+paceCells(f.pace);
     }catch(e){ fpc.textContent=' \u2014'; }
   }
   var fpr=g2('fb-row-pace'); if(fpr) fpr.style.display=(statsVis.pace!==false)?'':'none';
@@ -829,19 +867,19 @@ function updateFleetCard(){
           var medal=i<3?medals[i]:'<span style="color:var(--muted);font-size:.8em">'+(i+1)+'</span>';
           var acc=p.accepted?'<span style="color:var(--grn);font-size:.8em;flex-shrink:0">✓</span>'
                             :'<span style="color:var(--muted2);font-size:.8em;flex-shrink:0">✗</span>';
-          return '<div style="display:flex;align-items:center;gap:3px;border-bottom:1px solid var(--muted2);padding:2px 2px">'+
+          return '<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--muted2);padding:2px 4px">'+
             '<span style="width:16px;text-align:center;flex-shrink:0;font-size:.8em">'+medal+'</span>'+
-            '<span style="color:'+p.color+';font-weight:bold;font-size:1.05em;white-space:nowrap">'+fmtD(p.found)+'</span>'+
+            '<span style="color:'+p.color+';font-weight:bold;font-size:1.05em;white-space:nowrap;flex:1;text-align:right">'+fmtD(p.found)+'</span>'+
             acc+'</div>';
         };
         // Two columns, same as the miner cards
         var half=Math.ceil(all.length/2);
         var leftRows=all.slice(0,half).map(function(p,i){return mkRow(p,i);}).join('');
         var rightRows=all.slice(half).map(function(p,i){return mkRow(p,i+half);}).join('');
-        tEl.innerHTML='<div style="display:flex;gap:6px;width:100%">'+
-          '<div style="min-width:0">'+leftRows+'</div>'+
+        tEl.innerHTML='<div style="display:flex;gap:10px;width:100%">'+
+          '<div style="flex:1;min-width:0">'+leftRows+'</div>'+
           '<div style="width:1px;background:var(--bdr);flex-shrink:0"></div>'+
-          '<div style="min-width:0">'+rightRows+'</div>'+
+          '<div style="flex:1;min-width:0">'+rightRows+'</div>'+
         '</div>';
       }
     }
@@ -1147,9 +1185,9 @@ function updateCardStats(m){
         const acc = p.accepted
           ? '<span style="color:var(--grn);font-size:.8em;flex-shrink:0">✓</span>'
           : '<span style="color:var(--muted2);font-size:.8em;flex-shrink:0">✗</span>';
-        return `<div style="display:flex;align-items:center;gap:3px;border-bottom:1px solid var(--muted2);padding:2px 2px">
+        return `<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--muted2);padding:2px 4px">
           <span style="width:16px;text-align:center;flex-shrink:0;font-size:.8em">${medal}</span>
-          <span style="color:${m.color};font-weight:bold;font-size:1.05em;white-space:nowrap">${fmtD(p.found)}</span>
+          <span style="color:${m.color};font-weight:bold;font-size:1.05em;white-space:nowrap;flex:1;text-align:right">${fmtD(p.found)}</span>
           ${acc}
         </div>`;
       }
@@ -1157,10 +1195,10 @@ function updateCardStats(m){
       const half = Math.ceil(sorted.length / 2);
       const leftRows  = sorted.slice(0, half).map((p,i) => makeRow(p, i)).join('');
       const rightRows = sorted.slice(half).map((p,i) => makeRow(p, i+half)).join('');
-      top10el.innerHTML = `<div style="display:flex;gap:6px;width:100%">
-        <div style="min-width:0">${leftRows}</div>
+      top10el.innerHTML = `<div style="display:flex;gap:10px;width:100%">
+        <div style="flex:1;min-width:0">${leftRows}</div>
         <div style="width:1px;background:var(--bdr);flex-shrink:0"></div>
-        <div style="min-width:0">${rightRows}</div>
+        <div style="flex:1;min-width:0">${rightRows}</div>
       </div>`;
     }
   }
@@ -1202,7 +1240,6 @@ function updateHeader(){
   const hrEl=document.getElementById('h-totalhr');
   if(hrEl) hrEl.textContent=totalHR>0?(totalHR>=1000?(totalHR/1000).toFixed(2)+' TH/s':totalHR.toFixed(1)+' GH/s'):'—';
   var hbest=document.getElementById('h-best'); if(hbest) hbest.textContent=best?fmtD(best):'—';
-  var htarget=document.getElementById('h-target'); if(htarget) htarget.textContent=target?fmtD(target):'—';
   // Fleet card rides the same refresh cycle as the header totals
   try{ updateFleetCard(); }catch(e){}
 }
@@ -1295,7 +1332,7 @@ function connectMiner(m){
       // that would offset it are missing. Exclude that settling window from the
       // luck calculation on every (re)connect rather than carrying a permanent
       // penalty for it.
-      m._luckArm = true; m._luckFrom = null; setDot(m.id,'live'); updateCardStats(m); addLog('ok','Connected to '+m.ip,m.color); pollAxeOSBests(m); markDirty(); return; }
+      m._luckArm = true; m._luckFrom = null; m._reconArm = true; setDot(m.id,'live'); updateCardStats(m); addLog('ok','Connected to '+m.ip,m.color); pollAxeOSBests(m); markDirty(); return; }
     if(line.startsWith('ERROR:')){ m.status='Error'; setDot(m.id,'err'); updateCardStats(m); addLog('er',m.ip+' — '+line); markDirty(); return; }
     if(BLOCK_RE.test(line) && !m._blockFoundShown){ m._blockFoundShown=true; showBlockBanner(m.ip); showToast('🎉 BLOCK FOUND','Miner '+(m.name||m.ip)+' found a block!','ok'); }
     // Detect pool-set difficulty changes
@@ -1381,6 +1418,16 @@ function connectMiner(m){
     // takes a variable time to hand over extranonce1 and fill the job cache,
     // so let the data say when it is ready rather than guessing.
     if(m._luckArm){ m._luckArm=false; m._luckFrom=nowTs; }
+    // First plotted share: this is the moment the two counts can be compared.
+    // Baseline the device counter HERE, not on the first API poll.
+    if(m._reconArm!==false){
+      m._reconArm=false;
+      m._shBaseline=(m.axeOSShares!=null)?m.axeOSShares:null;
+      m._shBaseAt=Date.now();
+      m._parsedBase=m.sharesAccepted||0;
+      m._shDelta=0;
+      m._reconWhy='first plotted share';
+    }
     m.series.push({ts:nowTs,found,target:_t,accepted,noPd:_noT});
     // topSeries - keep top 500 by difficulty (matches max display cap)
     m.topSeries.push({ts:nowTs,found,target:_t,accepted,noPd:_noT});
@@ -1533,7 +1580,7 @@ function buildPanels(){
           <span>24h <b id="hravg24h-${def.id}" style="color:var(--txt);font-weight:600">—</b></span>
         </span>` : ''}
         <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
-          ${chartMode==='diff' ? `
+          ${(chartMode==='diff'||chartMode==='ambient'||chartMode==='colddrop') ? `
           <span style="position:relative;display:inline-block">
             <button data-dtftoggle="1" onclick="toggleDiffTfMenu('${def.id}')" title="Visible window for this chart. Older shares stay available - scroll left." style="background:transparent;border:1px solid var(--bdr);color:var(--muted);font-size:.7rem;padding:2px 8px;border-radius:4px;cursor:pointer">&#9660; <span id="dtflabel-${def.id}">${(function(){var ms=(typeof getDiffTf==='function')&&getDiffTf(def.id);var f=ms&&DIFF_TF_OPTIONS.filter(function(o){return o[1]===ms;})[0];return f?f[0]:'Auto';})()}</span></button>
             <div id="dtfmenu-${def.id}" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#0f2438;border:1px solid var(--bdr);border-radius:6px;z-index:60;min-width:78px;box-shadow:0 6px 18px rgba(0,0,0,.45)">
@@ -2103,7 +2150,15 @@ function drawHashPanel(panel){
     hrMin=rawMin*(1-pad); hrMax=rawMax*(1+pad);
     if(hrMin===hrMax){ hrMin*=0.999; hrMax*=1.001; }
   }
-  const tempVals=allPts.flatMap(p=>p.temps.map(t=>t.val)).filter(v=>v>0);
+  // Scale the temperature axis from RUNNING samples only. A restart drops
+  // hashrate to zero and the chips cool, and those cold readings dragged tMin
+  // down far enough to compress every normal reading into a thin band. The
+  // hashrate axis already excludes its own zeros (filter v>0); temperature was
+  // not doing the same. The cold points are still drawn -- they just run off the
+  // bottom instead of rescaling the whole chart around a few minutes of downtime.
+  const tempValsRun=allPts.filter(p=>getHr(p)>0).flatMap(p=>p.temps.map(t=>t.val)).filter(v=>v>0);
+  const tempVals=(tempValsRun.length>=3 ? tempValsRun
+                  : allPts.flatMap(p=>p.temps.map(t=>t.val)).filter(v=>v>0));
   let tMin=tempVals.length?Math.min(...tempVals)-3:40, tMax=tempVals.length?Math.max(...tempVals)+3:100;
   var tsMin2=Infinity,tsMax2=-Infinity;allPts.forEach(function(p){if(p.ts<tsMin2)tsMin2=p.ts;if(p.ts>tsMax2)tsMax2=p.ts;});var tsMin=tsMin2===Infinity?Date.now()-60000:tsMin2,tsMax=tsMax2===-Infinity?Date.now():tsMax2,tsR=tsMax-tsMin||1;
   const xOf=ts=>PL+((ts-tsMin)/tsR)*CW;
@@ -2837,7 +2892,13 @@ function drawAmbientPanel(panel){
   // Persisted series is the source of truth -- hashSeries only lives in memory,
   // so replaying it meant the curve restarted blank every launch. The live
   // reading is appended so the right edge stays current between 5-min samples.
-  var series=_ambLog.map(function(p){ return {ts:p.ts, amb:p.a}; });
+  // Honour the panel's timeframe picker, same as the difficulty chart. Without
+  // this the ambient view always showed its whole 30-day history with no way to
+  // narrow it.
+  var _tfMs=(typeof getDiffTf==='function')?getDiffTf(panel.id):null;
+  var _cut=_tfMs?(Date.now()-_tfMs):0;
+  var series=_ambLog.filter(function(p){ return !_cut || p.ts>=_cut; })
+                    .map(function(p){ return {ts:p.ts, amb:p.a}; });
   var lastStored=series.length?series[series.length-1].ts:0;
   var liveA=fleetAmbient();
   if(liveA!=null && isFinite(liveA) && Date.now()-lastStored>15000){
@@ -3298,6 +3359,12 @@ async function pollAxeOSBests(m){
     const d=await res.json();
     if(d.error){ m.noAxeOS=true; return; }
     m._lastApiData=d;
+    // Remember settings from ANY poll path. Both handlers assign _lastApiData
+    // to the same object, so reading it back was no fallback at all -- and
+    // only one of the two paths calls reconSegment. Tracking them here means
+    // a change seen on either path is picked up.
+    if(d.frequency   != null) m._curFreq = d.frequency;
+    if(d.coreVoltage != null) m._curVolt = d.coreVoltage;
     m.noAxeOS=false;
     try{ runLogSample(m); }catch(e){}
     // Segment the share reconciliation by operating point. A scheduled tuning
@@ -3312,22 +3379,48 @@ async function pollAxeOSBests(m){
     if(d.bestSessionDiff != null){
       const prevSess = m.axeOSSessionBest ? parseDiff(m.axeOSSessionBest) : 0;
       const currSess = parseDiff(d.bestSessionDiff);
-      if(prevSess > 0 && currSess < prevSess){
-        // Session best dropped — miner was restarted
+      // A drop in the firmware's session-best figure USED to be treated as proof
+      // of a restart and cleared the saved list outright. But that field can read
+      // low for a single poll without any restart -- a firmware glitch, a vardiff
+      // artifact -- and when it did, a miner's overnight best was wiped with the
+      // miner still running (observed on the 801 GT, stock AxeOS, one miner, no
+      // restart). A real restart ALSO resets uptime to near zero, so we now
+      // require that corroboration: clear only if uptime actually dropped and is
+      // small. _lastUptime still holds the previous poll here (it is updated
+      // further below), so it is the right thing to compare against.
+      // dedicated tracker so both poll paths (pollAxeOSBests, pollTemps) compare
+      // against the last uptime EITHER of them saw, not the shared _lastUptime
+      // that only one path maintains.
+      var _upNow = d.uptimeSeconds;
+      var _realRestart = (_upNow != null && m._lastUpSeen != null && _upNow < m._lastUpSeen && _upNow < 120);
+      if(prevSess > 0 && currSess < prevSess && _realRestart){
         markSessionCleared(m);
         m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0; try{ _reconBase(m,"counter reset"); }catch(e){}
         m.bestDiff=0; m.sessionBest=0; m.lastDiff=0;
         showToast('🔄 Miner Restarted',
           m.ip + ' — Session best reset (' + fmtD(prevSess) + ' → ' + fmtD(currSess) + '). Share list cleared.', 'warn');
-        addLog('er', m.ip + ' — Session best dropped. Miner restarted. Share list cleared.', m.color);
+        addLog('er', m.ip + ' — Session best dropped AND uptime reset. Miner restarted. Share list cleared.', m.color);
+        try{ saveSessionBestEvent(m,'session-cleared',prevSess,currSess); }catch(e){}
         markDirty();
+      } else if(prevSess > 0 && currSess < prevSess){
+        // best dropped but uptime kept climbing -> not a restart. Keep the stored
+        // best, and record it to the reports panel rather than only the live log.
+        try{ saveSessionBestEvent(m,'glitch-kept',prevSess,currSess); }catch(e){}
       }
       m.axeOSSessionBest = d.bestSessionDiff;
+      if(_upNow != null) m._lastUpSeen = _upNow;
     }
     if(d.sharesAccepted  != null){
       m.axeOSShares = d.sharesAccepted;
-      // Baseline on first sight so the delta needs no miner restart. A drop
-      // means the miner restarted -- rebaseline instead of reporting nonsense.
+      // Do NOT baseline until we are actually plotting. The API poll starts
+      // before the share stream connects, so baselining on first sight counts
+      // every share the miner found during that gap as one we "missed" -- which
+      // is what produced a 3.4% shortfall on a miner that was losing nothing.
+      // _reconArm is cleared by the first plotted share; until then the counter
+      // is recorded but no comparison is made.
+      if(m._reconArm !== false){
+        m.axeOSShares = d.sharesAccepted;
+      } else
       if(m._shBaseline==null || d.sharesAccepted < m._shBaseline){
         // Decide the reason BEFORE overwriting the baseline. Testing it after
         // the assignment meant the null case could never be true, so a normal
@@ -3470,6 +3563,15 @@ async function pollTemps(m){
     const d=await res.json();
     if(d.error){ m.noAxeOS=true; m._noAxeOSsince=Date.now(); return; }
     m._lastApiData=d;
+    if(d.frequency   != null) m._curFreq = d.frequency;
+    if(d.coreVoltage != null) m._curVolt = d.coreVoltage;
+    // Segment tracking belongs HERE, on the recurring 2s poll. It used to sit
+    // in pollAxeOSBests, which pollAllAxeOS calls exactly once at startup and
+    // never schedules again -- so reconSegment ran once per miner, the segment
+    // froze at whatever settings were live at launch, parsed1 never advanced
+    // past parsed0 (hence "only 0 shares" forever) and no settings change was
+    // ever detected.
+    try{ reconSegment(m, d); }catch(e){}
     m.noAxeOS=false; m._noAxeOSsince=null;
     m._unreach=false; m._unreachSince=null;
     m._lastApiOkTs=Date.now();
@@ -3539,7 +3641,7 @@ async function pollTemps(m){
     // ── Record hashSeries for hash chart ──
     if(hr != null){
       m.hashSeries = m.hashSeries || [];
-      m.hashSeries.push({ts:Date.now(), hr:hr, hr1m:d.hashRate_1m||hr, hr10m:d.hashRate_10m||hr, hr1h:d.hashRate_1h||hr, temps:temps.slice(), pwr:m.axeOSPower||0, fan:(d.fanspeed!=null?d.fanspeed:null), uptime:m.axeOSUptime||null, sh:(m.axeOSShares!=null?m.axeOSShares:null)});
+      m.hashSeries.push({ts:Date.now(), hr:hr, hr1m:d.hashRate_1m||hr, hr10m:d.hashRate_10m||hr, hr1h:d.hashRate_1h||hr, temps:temps.slice(), pwr:m.axeOSPower||0, fan:(d.fanspeed!=null?d.fanspeed:null), uptime:m.axeOSUptime||null, sh:(m.axeOSShares!=null?m.axeOSShares:null), err:(d.errorPercentage!=null?d.errorPercentage:null)});
       if(m.hashSeries.length > MAX_HASH_PTS) m.hashSeries.shift();
     }
 
@@ -3579,21 +3681,36 @@ async function pollTemps(m){
     if(d.bestSessionDiff != null){
       const prevSess = m.axeOSSessionBest ? parseDiff(m.axeOSSessionBest) : 0;
       const currSess = parseDiff(d.bestSessionDiff);
-      if(prevSess > 0 && currSess < prevSess){
+      // Same uptime corroboration as the other poll path -- a session-best drop
+      // alone is not enough to clear; a real restart resets uptime too.
+      var _upNowB = d.uptimeSeconds;
+      var _realRestartB = (_upNowB != null && m._lastUpSeen != null && _upNowB < m._lastUpSeen && _upNowB < 120);
+      if(prevSess > 0 && currSess < prevSess && _realRestartB){
         markSessionCleared(m);
         m.topSeries=[]; m.topHrSeries=[]; m.sharesFound=0; m.sharesAccepted=0; try{ _reconBase(m,"counter reset"); }catch(e){}
         m.bestDiff=0; m.sessionBest=0; m.lastDiff=0;
         showToast('🔄 Miner Restarted',
           m.ip+' — Session best reset ('+fmtD(prevSess)+' → '+fmtD(currSess)+'). Share list cleared.','warn');
-        addLog('er',m.ip+' — Session best dropped. Share list cleared.',m.color);
+        addLog('er',m.ip+' — Session best dropped AND uptime reset. Share list cleared.',m.color);
+        try{ saveSessionBestEvent(m,'session-cleared',prevSess,currSess); }catch(e){}
         markDirty();
+      } else if(prevSess > 0 && currSess < prevSess){
+        try{ saveSessionBestEvent(m,'glitch-kept',prevSess,currSess); }catch(e){}
       }
+      if(_upNowB != null) m._lastUpSeen = _upNowB;
       m.axeOSSessionBest = d.bestSessionDiff;
     }
     if(d.sharesAccepted  != null){
       m.axeOSShares = d.sharesAccepted;
-      // Baseline on first sight so the delta needs no miner restart. A drop
-      // means the miner restarted -- rebaseline instead of reporting nonsense.
+      // Do NOT baseline until we are actually plotting. The API poll starts
+      // before the share stream connects, so baselining on first sight counts
+      // every share the miner found during that gap as one we "missed" -- which
+      // is what produced a 3.4% shortfall on a miner that was losing nothing.
+      // _reconArm is cleared by the first plotted share; until then the counter
+      // is recorded but no comparison is made.
+      if(m._reconArm !== false){
+        m.axeOSShares = d.sharesAccepted;
+      } else
       if(m._shBaseline==null || d.sharesAccepted < m._shBaseline){
         // Decide the reason BEFORE overwriting the baseline. Testing it after
         // the assignment meant the null case could never be true, so a normal
@@ -4395,8 +4512,35 @@ async function checkStartupState(){
     };
   }
 })();
-// Not polled while the control is hidden -- nothing displays the result.
-// setTimeout(checkStartupState, 2000);
+
+// ── Network block timer ──────────────────────────────────────────────────────
+// Time since the last block anyone found, worldwide. The relay serves the last
+// block's unix timestamp (cached, refreshed ~30s in the background); we count up
+// from it every second so the display is smooth between fetches.
+var _blockTipTime = 0;         // unix seconds of the latest block
+function _fmtSince(sec){
+  if(!(sec>0)) return '—';
+  var m=Math.floor(sec/60), s=Math.floor(sec%60);
+  if(m>=60){ var h=Math.floor(m/60); return h+'h '+(m%60)+'m'; }
+  return m+'m '+(s<10?'0':'')+s+'s';
+}
+function _tickBlockTimer(){
+  if(!(_blockTipTime>0)) return;
+  var since=(Date.now()/1000)-_blockTipTime;
+  var txt=_fmtSince(since);
+  var a=document.getElementById('h-blocktime'); if(a) a.textContent=txt;
+  var b=document.getElementById('fb-blocktime'); if(b) b.textContent=' '+txt;
+}
+function _fetchBlockTime(){
+  fetch(SERVER+'/blocktime',{signal:AbortSignal.timeout(5000)})
+    .then(function(r){return r.json();})
+    .then(function(d){ if(d && d.time>0) _blockTipTime=d.time; })
+    .catch(function(){});
+}
+_fetchBlockTime();
+setInterval(_fetchBlockTime, 30000);   // refresh source every 30s
+setInterval(_tickBlockTimer, 1000);    // smooth local count-up
+setTimeout(checkStartupState, 2000);
 
 document.getElementById('btn-shutdown').onclick = async () => {
   try {
@@ -4492,7 +4636,7 @@ async function doRestartMiner(m){
       // Re-arm here too. The reconnect after a reboot normally does this, but
       // if the stream survives without a fresh CONNECTED the shares lost while
       // reconstruction warms up would be counted against luck.
-      m._luckArm = true; m._luckFrom = null;
+      m._luckArm = true; m._luckFrom = null; m._reconArm = true;
       markDirty();updateCardStats(m);
 
     }else{addLog('er',m.ip+' restart failed: HTTP '+res.status);}
@@ -4568,28 +4712,63 @@ function nxcheck(ip, poolTH){
 var RECON_MIN_SEG_MS=10*60*1000;   // ignore brief settling periods
 function reconSegment(m, d){
   if(!m || !d) return;
-  var f=d.frequency, v=d.coreVoltage;
+  // Read settings from _lastApiData, which is what the miner card displays and
+  // is demonstrably current. The `d` handed to this function does not carry
+  // frequency/coreVoltage on every poll: bailing out when they were missing
+  // froze the segment (p0=p1=0 for 11,622 s), and caching the first-seen value
+  // was worse -- it pinned the key at a stale 550/1040 for 30 minutes after the
+  // voltage had actually been changed to 1050.
+  var f = (d.frequency   != null) ? d.frequency   : m._curFreq;
+  var v = (d.coreVoltage != null) ? d.coreVoltage : m._curVolt;
   if(!f || !v) return;
   var key=f+'|'+v, now=Date.now();
   var parsed=m.sharesAccepted||0;
   var hr=(d.hashRate_1m!=null?d.hashRate_1m:d.hashRate)||0;
   if(!m._reconSegs) m._reconSegs=[];
+  // The bitaxes never set poolDifficulty -- that comes from a stratum line only
+  // the Nexus path parses -- so segments opened without one scored tgt:0 and
+  // reconStats rejected them, which is why BY OPERATING POINT never printed for
+  // them. Every share carries its own target, so fall back to the newest one.
+  var _tgtNow = m.poolDifficulty || 0;
+  if(!_tgtNow){
+    var _sr=m.series||[];
+    for(var _z=_sr.length-1;_z>=0;_z--){ if(_sr[_z].target>0){ _tgtNow=_sr[_z].target; break; } }
+  }
   var cur=m._reconCur;
   if(cur && cur.key===key){
     if(hr>0){ cur.hrSum+=hr; cur.hrN++; }
     cur.t1=now; cur.parsed1=parsed;
-    cur.tgt=m.poolDifficulty||cur.tgt;
+    if(m.axeOSShares!=null){ if(cur.sh0==null) cur.sh0=m.axeOSShares; cur.sh1=m.axeOSShares; }
+    cur.tgt=_tgtNow||cur.tgt;
     return;
   }
   // setting changed: bank the finished segment if it ran long enough to mean
   // anything, then open a new one
+  // reconSegment already had to notice this transition to bank its segment, so
+  // the luck blackout is recorded here rather than in a second copy of the same
+  // comparison. cur.t1 is the previous segment's true last sample -- a better
+  // boundary than "now", which is up to one poll late.
+  if(cur){
+    var _chg = cur.t1 || now;
+    if(!m._luckBlackouts) m._luckBlackouts = [];
+    m._luckBlackouts.push({ from:_chg-60000, to:now+60000 });
+    var _keep = Date.now() - 24*3600*1000;
+    m._luckBlackouts = m._luckBlackouts.filter(function(b){ return b.to > _keep; });
+    if(m._luckBlackouts.length > 40) m._luckBlackouts.shift();
+    addLog('ok', m.ip+' \u2014 settings changed ('+cur.freq+'MHz/'+cur.volt+'mV \u2192 '+
+           f+'MHz/'+v+'mV), luck excludes 2 min', m.color);
+  }
   if(cur && (cur.t1-cur.t0)>=RECON_MIN_SEG_MS && (cur.parsed1-cur.parsed0)>20){
     m._reconSegs.push(cur);
     if(m._reconSegs.length>24) m._reconSegs.shift();
   }
   m._reconCur={ key:key, freq:f, volt:v, t0:now, t1:now,
                 parsed0:parsed, parsed1:parsed, hrSum:(hr>0?hr:0), hrN:(hr>0?1:0),
-                tgt:m.poolDifficulty||0 };
+                tgt:_tgtNow||0,
+                // device counter at both ends, so each setting carries its own
+                // capture figure rather than sharing one session-wide number
+                sh0:(m.axeOSShares!=null?m.axeOSShares:null),
+                sh1:(m.axeOSShares!=null?m.axeOSShares:null) };
 }
 // Effective hashrate and implied error for one segment.
 function reconStats(sg){
@@ -4604,6 +4783,10 @@ function reconStats(sg){
            err:(repTH>0)?(100*(1-effTH/repTH)):null };
 }
 function _reconBase(m, why){
+  // Re-arm rather than baseline now: the comparison is only meaningful from the
+  // first share we actually plot, not from whenever the counter happened to
+  // reset. The first plotted share sets the baseline.
+  m._reconArm = true;
   if(!m) return;
   m._shBaseline = (m.axeOSShares!=null) ? m.axeOSShares : null;
   m._parsedBase = 0;
@@ -4615,6 +4798,373 @@ function _reconBase(m, why){
   // the whole breakdown silently disappears -- which is what happened when the
   // miner restarted overnight.
   m._reconCur   = null;
+}
+// ── Diagnostics data ─────────────────────────────────────────────────────────
+// Builds everything nxdiag() prints, as a structure both the Windows page and
+// the mobile page can render. Computed ON DEMAND only -- nothing here runs on a
+// timer, hooks the poll path, or is written to disk. That is deliberate: the
+// persistence experiment is what made the app sluggish and is left out.
+function diagFor(m, x){
+  x = x || {};
+  var d = { ip:m.ip, name:m.name||m.ip, color:m.color||'var(--txt)' };
+
+  // ── stratum reconstruction (Nexus-class only) ──
+  if(x.submits>0 || x.diffKnown){
+    d.stratum = { diffKnown:!!x.diffKnown, setDiffCount:x.setDiffCount||0,
+                  poolDiff:x.poolDiff||0, submits:x.submits||0, plotted:x.plotted||0,
+                  dropped:x.dropped||0, en1:!!x.en1,
+                  lastTargets:(x.lastTargets||[]).slice(0,10),
+                  lastDiffs:(x.lastDiffs||[]).slice(0,10),
+                  estimates:(x.estimates||[]) };
+    d.stratum.dropPct = d.stratum.submits>0 ? (100*d.stratum.dropped/d.stratum.submits) : 0;
+  }
+
+  // ── by operating point, pooled across repeat visits ──
+  var segs=(m._reconSegs||[]).slice();
+  if(m._reconCur) segs.push(m._reconCur);
+  var pool={};
+  segs.forEach(function(sg){
+    if(!sg||!sg.key) return;
+    var shares=(sg.parsed1-sg.parsed0), secs=(sg.t1-sg.t0)/1000;
+    // fall back to the miner's current target: a segment opened on the very
+    // first poll has none, because no share had arrived yet to read one from
+    var t=sg.tgt;
+    if(!(t>0)){
+      t=m.poolDifficulty||0;
+      if(!t){ var sr=m.series||[]; for(var z=sr.length-1;z>=0;z--){ if(sr[z].target>0){ t=sr[z].target; break; } } }
+    }
+    if(!(shares>20)||!(secs>60)||!(t>0)||!(sg.hrN>0)){
+      // Say WHY rather than silently dropping it. "Nothing banked yet" with no
+      // reason is unreadable, and guessing at it has cost several rounds.
+      d.blocked = d.blocked || [];
+      d.blocked.push((sg===m._reconCur?'open':'closed')+' '+sg.freq+'/'+sg.volt+': '+
+        (!(shares>20)?('only '+shares+' shares'):
+         !(secs>60)?('only '+secs.toFixed(0)+'s'):
+         !(t>0)?'no target':
+         'no hashrate samples'));
+      return;
+    }
+    // Returning to a setting REPLACES its row rather than pooling with it.
+    // Pooling would blend a run from a cold night with one from a hot afternoon
+    // at the same nominal setting, hiding the difference. Segments arrive in
+    // chronological order, so the last one for a key wins. `visits` still counts
+    // how many times the setting has been used, but the figures are the latest
+    // run only.
+    var prevVisits = pool[sg.key] ? pool[sg.key].visits : 0;
+    var p = pool[sg.key] = { freq:sg.freq, volt:sg.volt,
+                             shares:shares, secs:secs, work:shares*t,
+                             hrSum:sg.hrSum, hrN:sg.hrN,
+                             visits:prevVisits+1, t0:sg.t0, t1:sg.t1,
+                             sh0:sg.sh0, sh1:sg.sh1,
+                             open:(sg===m._reconCur) };
+    // pull the miner's own error rate from the hashrate samples inside this
+    // segment, so each setting carries its own independent check
+    var hsS=m.hashSeries||[];
+    for(var w=hsS.length-1;w>=0;w--){
+      var hv=hsS[w];
+      if(hv.ts<sg.t0) break;
+      if(hv.ts>sg.t1) continue;
+      if(hv.err!=null){
+        p.errSum=(p.errSum||0)+hv.err; p.errN=(p.errN||0)+1;
+        if(p.errMin==null||hv.err<p.errMin) p.errMin=hv.err;
+        if(p.errMax==null||hv.err>p.errMax) p.errMax=hv.err;
+      }
+    }
+  });
+  d.ops = Object.keys(pool).map(function(k){
+    var p=pool[k];
+    var rate=p.secs/p.shares;
+    var effTH=(p.work*4294967296)/(p.secs*1e12);
+    var repTH=(p.hrSum/p.hrN)/1000;
+    var raw=(repTH>0)?(100*(1-effTH/repTH)):null;
+    // Mean target over the segment, so implied share rate and capture can be
+    // computed per setting rather than only for the current one.
+    var mTgt=(p.shares>0)?(p.work/p.shares):0;
+    var impl=(repTH>0&&mTgt>0)?((mTgt*4294967296)/(repTH*1e12)):null;
+    // per-setting reconciliation: device counter delta vs what we plotted
+    var devDelta=(p.sh0!=null&&p.sh1!=null)?(p.sh1-p.sh0):null;
+    var r={ freq:p.freq, volt:p.volt, hours:p.secs/3600, shares:p.shares, visits:p.visits,
+            devDelta:devDelta, sh0:p.sh0, sh1:p.sh1,
+            acc:(devDelta>0)?(100*p.shares/devDelta):null,
+            devRate:(devDelta>0)?(p.secs/devDelta):null,
+            rate:rate, effTH:effTH, repTH:repTH, tgt:Math.round(mTgt),
+            impliedRate:impl, capture:(impl!=null)?(100*impl/rate):null,
+            // errors can only REDUCE delivered work, so a negative value is
+            // surplus, not a negative error rate
+            err:(raw==null)?null:Math.max(0,raw), raw:raw,
+            sigma:100/Math.sqrt(p.shares) };
+    // the miner's own reported error rate over the same stretch
+    if(p.errN>0) r.reported={ mean:p.errSum/p.errN, n:p.errN, min:p.errMin, max:p.errMax,
+                              gap:(r.err!=null)?Math.abs(r.err-(p.errSum/p.errN)):null };
+    return r;
+  }).sort(function(a,b){ return b.shares-a.shares; });
+
+  // ── share reconciliation ──
+  if(m._shDelta!=null){
+    var mins=(Date.now()-(m._shBaseAt||Date.now()))/60000;
+    var parsedGain=(m.sharesAccepted||0)-(m._parsedBase||0);
+    d.recon = { hours:mins/60, why:m._reconWhy||'app start',
+                baseline:m._shBaseline, plotted:parsedGain,
+                should:(m._shBaseline||0)+parsedGain, actual:m.axeOSShares,
+                diff:(m._shDelta||0)-parsedGain,
+                acc:(m._shDelta>0)?(100*parsedGain/m._shDelta):null,
+                relaySubmits:x.submits||0,
+                deviceRate:(m._shDelta>0)?(mins*60/m._shDelta):null,
+                parsedRate:(parsedGain>0)?(mins*60/parsedGain):null };
+  }
+
+  // ── effective hashrate vs reported ───────────────────────────────────────
+  // MIRRORS nxdiag() exactly. An earlier attempt here wrote a parallel
+  // implementation and produced different numbers than the console -- there is
+  // no reason for two versions of this maths, so the console's logic is used
+  // verbatim: span starts at the later of the share baseline and the current
+  // segment, work is the sum of each share's OWN target (vardiff-proof), and the
+  // reported side is the segment mean where there is one, else hr1h.
+  (function(){
+    var curSeg = m._reconCur;
+    var segStart = (curSeg && curSeg.t0) ? curSeg.t0 : 0;
+    var since = Math.max(m._shBaseAt||0, segStart);
+    var wSum=0, ser=m.series||[], oldestTs=null, nAcc=0;
+    for(var q=ser.length-1;q>=0;q--){
+      var e=ser[q];
+      if(e.ts<since) break;
+      if(e.accepted){ wSum+=(e.target||0); nAcc++; }
+      oldestTs=e.ts;
+    }
+    if(oldestTs==null || !(wSum>0) || !(nAcc>20)) return;
+    var secs=(Date.now()-oldestTs)/1000;
+    if(!(secs>60)) return;
+    var effTH=(wSum*4294967296)/(secs*1e12);
+
+    // reported side: segment mean when available, else the miner's 1h figure
+    var repTH=null;
+    if(curSeg && curSeg.hrN>0) repTH=(curSeg.hrSum/curSeg.hrN)/1000;
+    if(!(repTH>0)){
+      var hs=m.hashSeries||[];
+      if(hs.length){ var a=hs[hs.length-1]; var v=a.hr1h||a.hr; if(v>0) repTH=v/1000; }
+    }
+    if(!(repTH>0)) return;
+
+    var tgt=(curSeg&&curSeg.tgt>0)?curSeg.tgt:(m.poolDifficulty||0);
+    if(!tgt){ for(var z=ser.length-1;z>=0;z--){ if(ser[z].target>0){ tgt=ser[z].target; break; } } }
+
+    var rate=secs/nAcc;
+    var raw=100*(1-effTH/repTH);
+    d.eff = { hours:secs/3600, shares:nAcc, tgt:tgt, rate:rate,
+              effTH:effTH, repTH:repTH,
+              impliedRate:(tgt>0)?((tgt*4294967296)/(repTH*1e12)):null,
+              // errors can only REDUCE work, so a negative value is surplus
+              err:Math.max(0,raw), raw:raw, sigma:100/Math.sqrt(nAcc),
+              scoped:!!(curSeg && curSeg.t0 && segStart>=(m._shBaseAt||0)) };
+    if(d.eff.impliedRate) d.eff.capture=100*d.eff.impliedRate/rate;
+
+    // the miner's own reported error rate, averaged over the SAME window
+    var hs2=m.hashSeries||[], eS=0,eN=0,eMin=null,eMax=null;
+    for(var k=hs2.length-1;k>=0;k--){
+      var h=hs2[k];
+      if(h.ts<oldestTs) break;
+      if(h.err!=null){ eS+=h.err; eN++; if(eMin==null||h.err<eMin)eMin=h.err; if(eMax==null||h.err>eMax)eMax=h.err; }
+    }
+    if(eN>0) d.eff.reported={ mean:eS/eN, n:eN, min:eMin, max:eMax, gap:Math.abs(d.eff.err-(eS/eN)) };
+  })();
+
+  // ── current setting, and the pool-derived comparison ──
+  var cur=m._reconCur;
+  if(cur){
+    var cs=(cur.parsed1-cur.parsed0), csec=(cur.t1-cur.t0)/1000;
+    var ctgt=cur.tgt||m.poolDifficulty||0;
+    if(cs>20 && csec>60 && ctgt>0 && cur.hrN>0){
+      var crate=csec/cs;
+      var ceff=(ctgt*4294967296)/(crate*1e12);
+      var crep=(cur.hrSum/cur.hrN)/1000;
+      var craw=(crep>0)?(100*(1-ceff/crep)):null;
+      d.current = { freq:cur.freq, volt:cur.volt, hours:csec/3600, shares:cs,
+                    tgt:ctgt, rate:crate, effTH:ceff, repTH:crep,
+                    impliedRate:(crep>0)?((ctgt*4294967296)/(crep*1e12)):null,
+                    capture:(crep>0)?(100*((ctgt*4294967296)/(crep*1e12))/crate):null,
+                    err:(craw==null)?null:Math.max(0,craw), raw:craw,
+                    sigma:100/Math.sqrt(cs) };
+      // the miner's own reported error rate, averaged over the SAME window --
+      // AxeOS reports it instantaneously and it swings, so one sample would not
+      // be comparable with a figure integrated over hours
+      var eS=0,eN=0,eMin=null,eMax=null;
+      var hsE=m.hashSeries||[];
+      for(var k=hsE.length-1;k>=0;k--){
+        var e=hsE[k];
+        if(e.ts<cur.t0) break;
+        if(e.err!=null){ eS+=e.err; eN++; if(eMin==null||e.err<eMin)eMin=e.err; if(eMax==null||e.err>eMax)eMax=e.err; }
+      }
+      if(eN>0) d.current.reported={ mean:eS/eN, n:eN, min:eMin, max:eMax,
+                                    gap:(d.current.err!=null)?Math.abs(d.current.err-(eS/eN)):null };
+    }
+  }
+  return d;
+}
+
+// Collapse state, in memory only. Miners and setting groups default open;
+// reconciliation and stratum default closed, since they are reference detail
+// rather than the numbers you scan for.
+var _dgOpen={};
+function _dgToggle(k){
+  var openByDefault = (k.charAt(0)==='m' || k.charAt(0)==='g');
+  var isOpen = openByDefault ? (_dgOpen[k]!==false) : (_dgOpen[k]===true);
+  _dgOpen[k] = !isOpen;
+  // Flip visibility in place. Re-rendering the whole panel rebuilt the DOM and
+  // threw the scroll position back to the top on every click.
+  var body=document.getElementById('dgb-'+k.replace(/[^A-Za-z0-9]/g,'_'));
+  var arrow=document.getElementById('dga-'+k.replace(/[^A-Za-z0-9]/g,'_'));
+  if(body) body.style.display = _dgOpen[k] ? '' : 'none';
+  if(arrow) arrow.textContent = _dgOpen[k] ? '\u25be' : '\u25b8';
+}
+function _dgId(k){ return k.replace(/[^A-Za-z0-9]/g,'_'); }
+function openDiagPanel(){
+  var el=document.getElementById('diag-overlay');
+  if(!el) return;
+  el.style.display='flex';
+  renderDiagPanel();
+}
+function _dgR(label, value, note){
+  return '<div style="display:flex;gap:10px;padding:1px 0">'+
+         '<span style="color:var(--muted);min-width:210px">'+label+'</span>'+
+         '<span style="color:var(--txt)">'+value+'</span>'+
+         (note?('<span style="color:var(--muted);font-size:.72rem;align-self:center">'+note+'</span>'):'')+
+         '</div>';
+}
+function _dgH(t){
+  return '<div style="color:var(--muted);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;margin:12px 0 5px">'+t+'</div>';
+}
+function renderDiagPanel(){
+  var host=document.getElementById('diag-body');
+  if(!host) return;
+  host.innerHTML='<div style="color:var(--muted)">Loading\u2026</div>';
+  fetch(SERVER+'/nxdiag',{signal:AbortSignal.timeout(5000)})
+    .then(function(r){ return r.json(); })
+    .catch(function(){ return []; })
+    .then(function(arr){
+      arr = Array.isArray(arr) ? arr : [];
+      var html='';
+      // Bodies are ALWAYS rendered and hidden with display:none, so toggling is a
+      // style flip rather than a rebuild -- rebuilding threw the scroll position
+      // to the top on every click.
+      function sec(k, title, right, body, indent, defOpen){
+        var open = defOpen ? (_dgOpen[k]!==false) : (_dgOpen[k]===true);
+        var id=_dgId(k);
+        return '<div style="border:1px solid var(--bdr);border-radius:6px;margin:0 0 8px '+(indent||0)+'px;overflow:hidden">'+
+          '<div onclick="_dgToggle(\''+k+'\')" style="display:flex;align-items:center;gap:8px;padding:7px 10px;'+
+            'background:var(--surf2,rgba(255,255,255,.03));cursor:pointer;user-select:none">'+
+            '<span id="dga-'+id+'" style="color:var(--muted);width:12px">'+(open?'\u25be':'\u25b8')+'</span>'+
+            title+
+            '<span style="margin-left:auto;font-size:.76rem;color:var(--muted)">'+(right||'')+'</span></div>'+
+          '<div id="dgb-'+id+'" style="padding:8px 10px'+(open?'':';display:none')+'">'+body+'</div></div>';
+      }
+      Object.values(miners).forEach(function(m){
+        if(!m||!m.ip) return;
+        var x=arr.filter(function(z){ return z.ip===m.ip; })[0];
+        var d;
+        try{ d=diagFor(m,x); }catch(e){ return; }
+        var mk='m:'+d.ip, mOpen=_dgOpen[mk]!==false, mid=_dgId(mk);
+        html+='<div style="margin-bottom:14px;border:1px solid var(--bdr);border-radius:8px;overflow:hidden">';
+        html+='<div onclick="_dgToggle(\''+mk+'\')" style="display:flex;align-items:center;gap:8px;'+
+              'padding:10px 14px;background:var(--surf);font-weight:700;color:'+d.color+';cursor:pointer;user-select:none">'+
+              '<span id="dga-'+mid+'" style="color:var(--muted);font-weight:400;width:12px">'+(mOpen?'\u25be':'\u25b8')+'</span>'+
+              d.name+'<span style="color:var(--muted);font-weight:400;font-size:.78rem"> '+d.ip+'</span>'+
+              '<span style="margin-left:auto;color:var(--muted);font-weight:400;font-size:.74rem">'+
+                d.ops.length+(d.ops.length===1?' setting':' settings')+'</span></div>';
+        html+='<div id="dgb-'+mid+'" style="padding:8px 14px 12px'+(mOpen?'':';display:none')+'">';
+
+        if(d.ops.length){
+          d.ops.forEach(function(r){
+            var gk='g:'+d.ip+':'+r.freq+':'+r.volt;
+            var real=(r.err!=null && r.err>2*r.sigma);
+            var body='';
+            body+=_dgR('Pool / reported HR', r.repTH.toFixed(2)+' TH/s', 'target '+r.tgt);
+            body+=_dgR('Implied share rate', (r.impliedRate!=null?r.impliedRate.toFixed(2)+' s/share':'\u2014'));
+            body+=_dgR('Our submit rate', r.rate.toFixed(2)+' s/share');
+            if(r.capture!=null) body+=_dgR('We capture', r.capture.toFixed(1)+'% of what this hashrate implies');
+            body+=_dgR('Effective hashrate', r.effTH.toFixed(2)+' TH/s vs '+r.repTH.toFixed(2)+' reported');
+            body+=_dgR('Implied error rate',
+              '<span style="color:'+(real?'var(--orange)':'var(--muted)')+'">'+
+              (r.err==null?'\u2014':(r.err.toFixed(1)+'% \u00b1'+r.sigma.toFixed(1)+
+                (r.raw<-1?('   (found '+Math.abs(r.raw).toFixed(1)+'% MORE work than predicted)'):
+                          (real?'':'   (under noise)'))))+'</span>');
+            if(r.reported){
+              body+=_dgR('Miner reports', r.reported.mean.toFixed(2)+'% mean over '+r.reported.n+' samples',
+                         'range '+r.reported.min.toFixed(2)+'\u2013'+r.reported.max.toFixed(2)+'%');
+              body+=_dgR('Agreement', (r.reported.gap<=1.5
+                ? '\u2713 within '+r.reported.gap.toFixed(2)+' points \u2014 method validated here'
+                : '\u26a0 differs by '+r.reported.gap.toFixed(1)+' points'));
+            } else {
+              body+=_dgR('Miner reports', 'nothing \u2014 this derived figure is the only one available');
+            }
+
+            // this setting's own reconciliation, nested and indented so it is
+            // obviously scoped to the setting above it
+            var rb='';
+            rb+=_dgR('Ran for', r.hours.toFixed(2)+' h', (r.visits>1?('latest of '+r.visits+' runs'):''));
+            rb+=_dgR('We plotted', Math.round(r.shares).toLocaleString()+' shares');
+            if(r.devDelta!=null){
+              rb+=_dgR('Miner counted', r.devDelta.toLocaleString()+' shares',
+                       (r.sh0!=null?(r.sh0.toLocaleString()+' \u2192 '+r.sh1.toLocaleString()):''));
+              rb+=_dgR('Captured', (r.acc!=null?r.acc.toFixed(1)+'%':'\u2014'),
+                       (r.acc!=null&&r.acc>=98?'match':''));
+              if(r.devRate!=null) rb+=_dgR('Device rate', r.devRate.toFixed(2)+' s/share');
+              rb+=_dgR('Our parsed rate', r.rate.toFixed(2)+' s/share');
+            } else {
+              rb+='<div style="color:var(--muted)">Device counter not sampled for this run.</div>';
+            }
+            body+=sec('rg:'+d.ip+':'+r.freq+':'+r.volt, '<span style="font-weight:600;color:var(--txt)">Share reconciliation</span>',
+                      (r.acc!=null?r.acc.toFixed(1)+'% captured':''), rb, 14, false);
+
+            var title='<span style="font-weight:600;color:var(--txt)">'+(r.open?'\u25cf ':'')+r.freq+'MHz '+r.volt+'mV</span>'+
+                      '<span style="color:var(--muted);font-size:.74rem">'+r.hours.toFixed(1)+'h \u00b7 '+
+                        Math.round(r.shares).toLocaleString()+' shares'+(r.open?' \u00b7 running':'')+
+                        (r.visits>1?(' \u00b7 used '+r.visits+'\u00d7'):'')+'</span>';
+            var right='<span style="color:'+(real?'var(--orange)':'var(--muted)')+'">'+
+                      (r.err==null?'':(r.err.toFixed(1)+'% err'))+'</span>';
+            html+=sec(gk, title, right, body, 0, true);
+          });
+        } else {
+          html+='<div style="color:var(--muted);padding:4px 0">Nothing banked yet.'+
+                ((d.blocked&&d.blocked.length)?('<br>'+d.blocked.map(function(b){ return '\u2022 '+b; }).join('<br>')):
+                  ' No segment has opened \u2014 is frequency/voltage being reported?')+'</div>';
+        }
+
+        if(d.recon){
+          var rc=d.recon, rb2='';
+          rb2+=_dgR('Clean run', rc.hours.toFixed(1)+' h', 'since '+rc.why);
+          rb2+=_dgR('Miner total at start', (rc.baseline!=null?rc.baseline.toLocaleString():'?'));
+          rb2+=_dgR('We plotted since', rc.plotted.toLocaleString());
+          rb2+=_dgR('So miner should show', rc.should.toLocaleString());
+          rb2+=_dgR('Miner actually shows', (rc.actual!=null?rc.actual.toLocaleString():'?'));
+          rb2+=_dgR('Difference', (rc.diff>0?'+':'')+rc.diff, rc.acc!=null?(rc.acc.toFixed(1)+'% captured'):'');
+          rb2+=_dgR('Verdict', rc.acc==null?'no data yet'
+                    :(rc.acc>=98?'MATCH \u2014 we capture every share the miner reports'
+                                :'missing '+(100-rc.acc).toFixed(1)+'% of logged shares'));
+          if(rc.deviceRate!=null) rb2+=_dgR('Device rate', rc.deviceRate.toFixed(2)+' s/share');
+          if(rc.parsedRate!=null) rb2+=_dgR('Our parsed rate', rc.parsedRate.toFixed(2)+' s/share');
+          html+=sec('r:'+d.ip, '<span style="font-weight:600;color:var(--txt)">Share reconciliation \u2014 all settings combined</span>',
+                    (rc.acc!=null?rc.acc.toFixed(1)+'% captured':''), rb2, 0, false);
+        }
+
+        if(d.stratum){
+          var st=d.stratum, sb='';
+          sb+='<div style="color:var(--muted);margin-bottom:6px;font-size:.72rem">'+
+              'Relay-wide since the relay started \u2014 these counters are not split by setting.</div>';
+          sb+=_dgR('set_difficulty seen', st.diffKnown?('yes \u00d7'+st.setDiffCount):'no \u2014 target is being guessed');
+          sb+=_dgR('Pool difficulty', st.poolDiff);
+          sb+=_dgR('Submits / plotted', st.submits+' / '+st.plotted);
+          sb+=_dgR('Dropped', st.dropped+'  ('+st.dropPct.toFixed(1)+'%)');
+          sb+=_dgR('extranonce1 present', st.en1?'true':'false');
+          sb+=_dgR('Last targets', st.lastTargets.length?st.lastTargets.join(', '):'none');
+          sb+=_dgR('Last share diffs', st.lastDiffs.length?st.lastDiffs.join(', '):'none');
+          sb+=_dgR('Min-estimates used', st.estimates.length?st.estimates.join(', '):'none');
+          html+=sec('s:'+d.ip, '<span style="font-weight:600;color:var(--txt)">Stratum reconstruction</span>',
+                    st.dropped+' dropped of '+st.submits, sb, 0, false);
+        }
+        html+='</div></div>';
+      });
+      host.innerHTML=html||'<div style="color:var(--muted)">No miners.</div>';
+    });
 }
 function nxdiag(){
   return fetch(SERVER+'/nxdiag',{signal:AbortSignal.timeout(5000)})
@@ -4647,16 +5197,44 @@ function nxdiag(){
           var clean=(hrs>=1)?(hrs.toFixed(1)+' h'):(mins.toFixed(0)+' min');
           // Per-setting breakdown. Each row is self-contained, so a tuning change
           // overnight gives a before/after comparison rather than a spoiled run.
+          // Merge repeat visits to the same freq/volt. The governor walks up and
+          // back down all day, so one setting can appear as a dozen short
+          // segments; separately they are all noise, pooled they are a real
+          // sample. Shares, seconds and hashrate samples all add.
           var segs=(mm._reconSegs||[]).slice();
           if(mm._reconCur) segs.push(mm._reconCur);
-          var rows=segs.map(reconStats).filter(function(z){ return z; });
+          var pool={};
+          segs.forEach(function(sg){
+            if(!sg || !sg.key) return;
+            var p=pool[sg.key];
+            if(!p){ pool[sg.key]={freq:sg.freq,volt:sg.volt,t0:sg.t0,t1:sg.t1,
+                                  parsed0:sg.parsed0,parsed1:sg.parsed1,
+                                  hrSum:sg.hrSum,hrN:sg.hrN,tgt:sg.tgt,
+                                  secs:(sg.t1-sg.t0),shares:(sg.parsed1-sg.parsed0),visits:1}; return; }
+            p.secs   += (sg.t1-sg.t0);
+            p.shares += (sg.parsed1-sg.parsed0);
+            p.hrSum  += sg.hrSum; p.hrN += sg.hrN;
+            if(sg.tgt>0) p.tgt=sg.tgt;
+            p.visits++;
+          });
+          var rows=Object.keys(pool).map(function(k){
+            var p=pool[k];
+            if(!(p.shares>20) || !(p.secs>60000) || !(p.tgt>0) || !(p.hrN>0)) return null;
+            var rate=(p.secs/1000)/p.shares;
+            var effTH=(p.tgt*4294967296)/(rate*1e12);
+            var repTH=(p.hrSum/p.hrN)/1000;
+            return { freq:p.freq, volt:p.volt, hours:p.secs/3600000, shares:p.shares,
+                     rate:rate, effTH:effTH, repTH:repTH, visits:p.visits,
+                     err:(repTH>0)?(100*(1-effTH/repTH)):null };
+          }).filter(function(z){ return z; }).sort(function(a,b){ return b.hours-a.hours; });
           if(rows.length){
             console.log('  --- BY OPERATING POINT ---');
             rows.forEach(function(r){
               console.log('  '+(r.freq+'MHz '+r.volt+'mV').padEnd(16)+
                           r.hours.toFixed(1)+'h  '+String(r.shares).padStart(6)+' shares  '+
                           r.rate.toFixed(2)+'s  eff '+r.effTH.toFixed(2)+' vs '+r.repTH.toFixed(2)+' TH/s'+
-                          (r.err!=null?'   err '+r.err.toFixed(1)+'%':''));
+                          (r.err!=null?('   err '+r.err.toFixed(1)+'% \u00b1'+(100/Math.sqrt(r.shares)).toFixed(1)):'')+
+                          (r.visits>1?('   ('+r.visits+' runs)'):''));
             });
           }
           console.log('  --- SHARE RECONCILIATION ---');
@@ -4694,7 +5272,17 @@ function nxdiag(){
           var hr1h=curStats?(curStats.repTH*1000)
                  :((mm.hashSeries&&mm.hashSeries.length)
                     ? (function(){ var a=mm.hashSeries[mm.hashSeries.length-1]; return a.hr1h||a.hr; })() : null);
-          var tgt=(curSeg&&curSeg.tgt>0)?curSeg.tgt:(x.poolDiff||mm.poolDifficulty||0);
+          // Fall back to the newest share's own target. The bitaxes never set
+          // poolDifficulty -- that comes from a stratum line only the Nexus path
+          // sees -- so this block bailed for them and there was no control group
+          // to judge the Nexus's shortfall against. Every share carries a target,
+          // so use it.
+          var _lastTgt=0;
+          try{
+            var _ser=mm.series||[];
+            for(var _q=_ser.length-1;_q>=0;_q--){ if(_ser[_q].target>0){ _lastTgt=_ser[_q].target; break; } }
+          }catch(e){}
+          var tgt=(curSeg&&curSeg.tgt>0)?curSeg.tgt:(x.poolDiff||mm.poolDifficulty||_lastTgt||0);
           if(curStats){
             console.log('  --- CURRENT SETTING ('+curStats.freq+'MHz '+curStats.volt+'mV, '+
                         curStats.hours.toFixed(1)+'h) ---');
@@ -4711,7 +5299,9 @@ function nxdiag(){
             console.log('  our submit rate     : '+(ourRate==null?'n/a':ourRate.toFixed(2)+' s/share'));
             if(ourRate){
               var seen=100*poolRate/ourRate;
-              console.log('  we capture          : '+seen.toFixed(1)+'% of what this hashrate implies');
+              // Removed: this applied the CURRENT target to the whole window and
+              // contradicted the per-share figure below it (98.5% vs 94.1% on the
+              // same data). The effective-hashrate line is the correct one.
               console.log('  verdict             : '+(seen>95
                 ? 'shares match the hashrate \u2014 nothing is being lost'
                 : 'the miner submits '+seen.toFixed(0)+'% of what its reported hashrate predicts'));
@@ -4720,20 +5310,82 @@ function nxdiag(){
               // whole window. ckpool moves the target mid-window (12139 -> 16009
               // today), so using the latest value against shares earned at the old
               // one read 126% capture and -26% error. Per-share work is immune.
+              // Sum per-share work, but only over the span the share list actually
+              // still covers. m.series is capped at MAX_PTS and prunes oldest
+              // first, so on a busy miner the early hours of the window are gone
+              // -- dividing the surviving work by the FULL elapsed time read 0.71
+              // TH/s against 4.29 reported and an absurd 83% error rate. Measure
+              // from the oldest share we still hold instead.
+              // Scope to the CURRENT operating point. Summing work across a
+              // settings change and dividing by the current 1h hashrate compares
+              // two different regimes: 8.3h at 13.8 TH/s plus 1h at 15.1 gave an
+              // effective 13.78, judged against 15.07, and read as an 8.6% error
+              // rate that was really just the change. Weighted over its own span
+              // the same data is 1.1%.
               var effTH=null;
               (function(){
-                var wSum=0, since=mm._shBaseAt||0, ser=mm.series||[];
+                var segStart=(mm._reconCur && mm._reconCur.t0) ? mm._reconCur.t0 : 0;
+                var since=Math.max(mm._shBaseAt||0, segStart);
+                var wSum=0, ser=mm.series||[], oldestTs=null, nAcc=0;
                 for(var q=ser.length-1;q>=0;q--){
                   var e=ser[q];
                   if(e.ts<since) break;
-                  if(e.accepted) wSum+=(e.target||0);
+                  if(e.accepted){ wSum+=(e.target||0); nAcc++; }
+                  oldestTs=e.ts;
                 }
-                var secs=(Date.now()-since)/1000;
-                if(wSum>0 && secs>0) effTH=(wSum*4294967296)/(secs*1e12);
+                if(oldestTs==null) return;
+                var secs=(Date.now()-oldestTs)/1000;
+                // A truncated list can only shorten the span, never lengthen it,
+                // so this stays honest either way.
+                if(wSum>0 && secs>60 && nAcc>50) effTH=(wSum*4294967296)/(secs*1e12);
               })();
               if(effTH==null) effTH=curStats?curStats.effTH:((tgt*4294967296)/((mins*60/parsedGain)*1e12));
-              console.log('  effective hashrate  : '+effTH.toFixed(2)+' TH/s vs '+(hr1h/1000).toFixed(2)+' TH/s reported');
-              console.log('  implied error rate  : '+(100*(1-effTH/(hr1h/1000))).toFixed(1)+'%');
+              // Reported side must cover the same stretch. hr1h is a rolling 1h
+              // average that lags a change, so use the mean of samples inside the
+              // current segment where one exists.
+              var _repTH=hr1h/1000;
+              try{
+                var _cs=mm._reconCur;
+                if(_cs && _cs.hrN>0) _repTH=(_cs.hrSum/_cs.hrN)/1000;
+              }catch(e){}
+              console.log('  effective hashrate  : '+effTH.toFixed(2)+' TH/s vs '+_repTH.toFixed(2)+' TH/s reported'+
+                          ((mm._reconCur&&mm._reconCur.freq)?('   @'+mm._reconCur.freq+'MHz/'+mm._reconCur.volt+'mV'):''));
+              var _impErr=100*(1-effTH/_repTH);
+              console.log('  implied error rate  : '+_impErr.toFixed(1)+'%');
+              // Independent check. Miners that report errorPercentage give us a
+              // number derived inside the firmware from discarded nonces, with no
+              // connection to our share arithmetic. If the two agree, the method
+              // is validated and the same figure can be trusted on a miner that
+              // reports nothing -- which is the whole point for the Nexus.
+              // Average the REPORTED rate over the same window. AxeOS reports it
+              // instantaneously and it moves constantly, so comparing one sample
+              // against a figure integrated over hours would disagree for reasons
+              // that have nothing to do with the method.
+              var _eSum=0,_eN=0,_eMin=null,_eMax=null;
+              try{
+                var _hsE=mm.hashSeries||[], _since=mm._shBaseAt||0;
+                for(var _k=_hsE.length-1;_k>=0;_k--){
+                  var _e=_hsE[_k];
+                  if(_e.ts<_since) break;
+                  if(_e.err!=null){
+                    _eSum+=_e.err; _eN++;
+                    if(_eMin==null||_e.err<_eMin) _eMin=_e.err;
+                    if(_eMax==null||_e.err>_eMax) _eMax=_e.err;
+                  }
+                }
+              }catch(e){}
+              if(_eN>0){
+                var _eAvg=_eSum/_eN, _gap=Math.abs(_impErr-_eAvg);
+                console.log('  miner reports       : '+_eAvg.toFixed(2)+'% mean over '+_eN+
+                            ' samples (range '+_eMin.toFixed(2)+'\u2013'+_eMax.toFixed(2)+'%)');
+                console.log('  agreement           : '+
+                  (_gap<=1.5 ? '\u2713 within '+_gap.toFixed(2)+' points \u2014 method validated here'
+                             : '\u26a0 differs by '+_gap.toFixed(1)+' points'));
+              } else if(mm.axeOSErrorRate!=null){
+                console.log('  miner reports       : '+mm.axeOSErrorRate.toFixed(2)+'% (instant only, no history yet)');
+              } else {
+                console.log('  miner reports       : nothing \u2014 this derived figure is the only one available');
+              }
             }
           } else {
             console.log('  need 1h hashrate + target; not available yet');
@@ -5597,11 +6249,34 @@ function luckFor(m, winMs){
   // Never reach back past the settling window -- shares there were unrecoverable
   // and would read as a permanent shortfall.
   if(m._luckFrom && cutoff < m._luckFrom) cutoff = m._luckFrom;
+  // Settings changed recently: start after the blackout instead of averaging
+  // across two different operating points with a lagging hashrate.
+  // Blackout ranges are cut OUT of the window rather than moving its start. A
+  // change three hours ago used to shorten a 24h window to three hours; now it
+  // keeps all 24 minus the affected minutes, and every change is excluded
+  // independently instead of only the most recent one mattering.
+  var _bl=(m._luckBlackouts||[]).filter(function(b){ return b.to>cutoff && b.from<now; });
+  var _inBlackout=function(ts){
+    for(var bi=0;bi<_bl.length;bi++){ if(ts>=_bl[bi].from && ts<=_bl[bi].to) return true; }
+    return false;
+  };
+  // Blacked-out time is not measurable time, so it comes off the span too --
+  // otherwise expected work is charged for minutes whose shares were dropped.
+  var _blackoutSec=function(a,b){
+    if(!(b>a)) return 0;
+    var tot=0;
+    for(var bi=0;bi<_bl.length;bi++){
+      var lo=Math.max(a,_bl[bi].from), hi=Math.min(b,_bl[bi].to);
+      if(hi>lo) tot+=(hi-lo);
+    }
+    return tot/1000;
+  };
   if(now-cutoff < 20000) return null;      // too little clean data to mean anything
   var act=0, oldest=null, newest=null, oldestTarget=0;
   for(var i=series.length-1;i>=0;i--){
     var p=series[i];
     if(p.ts<cutoff) break;
+    if(_bl.length && _inBlackout(p.ts)) continue;
     if(p.accepted) act+=(p.target||0);  // target, not found — see note above
     if(newest==null) newest=p.ts;
     oldestTarget=(p.accepted?(p.target||0):0);   // running: ends as the oldest share's
@@ -5625,13 +6300,15 @@ function luckFor(m, winMs){
   // only count time the miner was actually hashing (see activeSpanSec)
   var spanSec=activeSpanSec(m, oldest, spanEnd);
   if(!(spanSec>0)) spanSec=(spanEnd-oldest)/1000;   // fallback if no hashrate history
-  if(spanSec<=0) return null;
+  if(_bl.length) spanSec -= _blackoutSec(oldest, spanEnd);
+  if(spanSec<=60) return null;                     // too little clean time left
   // Mean hashrate across the same stretch, from the 2s poll series (GH/s)
   var hs=m.hashSeries||[], sum=0, n=0;
   for(var j=hs.length-1;j>=0;j--){
     var q=hs[j];
     if(q.ts<oldest) break;
     if(q.ts>spanEnd) continue;
+    if(_bl.length && _inBlackout(q.ts)) continue;
     if(q.hr>0){ sum+=q.hr; n++; }
   }
   // If the bounded stretch held no samples yet (very few shares so far), widen
@@ -5750,6 +6427,22 @@ function pushSessionData(){
         uptimeSnapshot:m.axeOSUptime||0,
         snapshotTs:Date.now(),
         sessionCleared:!!(m._sessionCleared),
+        // Diagnostics for the mobile page. Mobile cannot compute these -- Windows
+        // owns the segment data -- so the finished structure is shipped. Computed
+        // at most ONCE PER 60 SECONDS on a plain timestamp cache: this push runs
+        // every ~2 s, and recomputing per push is exactly what made an earlier
+        // build sluggish. Stratum is omitted; mobile fetches /nxdiag itself.
+        diag:(function(){
+          try{
+            var t=Date.now();
+            if(!m._diagPush || (t-(m._diagPushAt||0))>60000){
+              var dd=diagFor(m,null);
+              m._diagPush={ ops:dd.ops.slice(0,12), recon:dd.recon||null, blocked:(dd.blocked||[]).slice(0,4) };
+              m._diagPushAt=t;
+            }
+            return m._diagPush;
+          }catch(e){ return null; }
+        })(),
         hrScores:m.topHrSeries||[],
         series:recentSeries,
         hashSeries:hashPts,
@@ -5869,7 +6562,7 @@ function pushFleet(){
       pace: (function(){ try{
         var ms=Object.values(miners), ts=0, tn=0;
         ms.forEach(function(mm){ var t=paceTarget(mm); if(t>0){ ts+=t; tn++; } });
-        return paceFor(f.shares||0, tn?ts/tn:0, f.sessBest||0);
+        return f.pace;
       }catch(e){ return null; } })(),
       // raw numbers — for anything that wants to format or threshold itself
       sessionBestRaw: f.sessBest||0,
@@ -7154,6 +7847,29 @@ function _saveReports(data){
   try{ localStorage.setItem(_reportsKey, JSON.stringify(data)); }catch(e){}
 }
 
+function saveSessionBestEvent(m, kind, prevSess, currSess){
+  // Records what happened to a miner's session best, into the SAME reports store
+  // the Crash/Restart Reports panel reads -- so a clear or a kept glitch can be
+  // reviewed afterward instead of chasing the live log (which scrolls too fast).
+  if(!m.ip) return;
+  var report = {
+    ts: Date.now(),
+    reason: kind,                 // 'session-cleared' or 'glitch-kept'
+    ip: m.ip, name: m.name||'', color: m.color||'#f7931a',
+    sessionBestBefore: prevSess||0,
+    sessionBestAfter: currSess||0,
+    uptimeAtEvent: (m._lastUpSeen!=null?m._lastUpSeen:(m.axeOSUptime||null)),
+    note: (kind==='session-cleared')
+      ? 'Session best dropped and uptime reset — treated as a real restart, share list cleared.'
+      : 'Session best reading dropped but uptime did NOT reset — treated as a firmware glitch, share list kept.'
+  };
+  var all = _loadReports();
+  if(!all[m.ip]) all[m.ip] = [];
+  all[m.ip].unshift(report);
+  if(all[m.ip].length > 10) all[m.ip] = all[m.ip].slice(0,10);
+  _saveReports(all);
+  try{ fetch(SERVER+'/reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(all)}).catch(function(){}); }catch(e){}
+}
 function saveSessionReport(m, reason, lastGoodPt){
   if(!m.ip) return;
   // Don't save if no meaningful data exists
@@ -7359,6 +8075,49 @@ function openReportsPanel(){
       card.style.cssText = 'background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:10px;overflow:visible';
       var date = new Date(r.ts);
       var dateStr = date.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+
+      // Session-best events (clear vs kept-glitch) are a different shape from crash
+      // reports -- no hashrate/temps/top10 -- so they get their own compact card.
+      if(r.reason==='session-cleared' || r.reason==='glitch-kept'){
+        var kept = (r.reason==='glitch-kept');
+        var accent = kept ? 'var(--grn)' : 'var(--red)';
+        var label = kept ? 'Best Kept (glitch)' : 'Session Cleared';
+        var upStr = (r.uptimeAtEvent!=null)
+          ? (r.uptimeAtEvent>=3600?Math.floor(r.uptimeAtEvent/3600)+'h '+Math.floor((r.uptimeAtEvent%3600)/60)+'m'
+             : r.uptimeAtEvent>=60?Math.floor(r.uptimeAtEvent/60)+'m':r.uptimeAtEvent+'s')
+          : '—';
+        var hdr = document.createElement('div');
+        hdr.style.cssText='display:flex;align-items:center;padding:10px 14px;cursor:pointer;user-select:none;gap:8px';
+        hdr.innerHTML=
+          '<span style="font-size:.82rem;font-weight:600;color:var(--txt)">'+label+'</span>'+
+          '<span style="font-size:.7rem;background:rgba(255,255,255,0.06);color:'+accent+';border-radius:4px;padding:1px 6px">'+
+            (kept?'kept':'cleared')+'</span>'+
+          '<span style="font-size:.75rem;color:var(--muted);margin-left:4px">'+dateStr+'</span>'+
+          '<span style="font-size:.75rem;color:var(--muted);margin-left:auto">'+fmtD(r.sessionBestBefore)+' → '+fmtD(r.sessionBestAfter)+'</span>'+
+          '<span class="rpt-chev" style="color:var(--muted);margin-left:8px;font-size:.8rem">›</span>';
+        (function(rip,rts){
+          var del=document.createElement('button');
+          del.style.cssText='background:transparent;border:none;color:var(--red);cursor:pointer;font-size:.8rem;padding:0 6px;margin-left:4px;opacity:.7';
+          del.textContent='✕';
+          del.onclick=function(e){ e.stopPropagation(); if(!confirm('Delete this entry?')) return;
+            var all=_loadReports(); if(all[rip]) all[rip]=all[rip].filter(function(x){return x.ts!==rts;});
+            _saveReports(all); _pushReportsToServer(); openReportsPanel(); };
+          hdr.appendChild(del);
+        })(r.ip,r.ts);
+        var body=document.createElement('div');
+        body.style.cssText='display:none;padding:0 14px 14px;border-top:1px solid var(--bdr)';
+        body.innerHTML=
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0;font-size:.8rem">'+
+            '<div><span style="color:var(--muted)">Best before</span><br><b style="color:var(--orange)">'+fmtD(r.sessionBestBefore)+'</b></div>'+
+            '<div><span style="color:var(--muted)">Best after</span><br><b>'+fmtD(r.sessionBestAfter)+'</b></div>'+
+            '<div><span style="color:var(--muted)">Uptime at event</span><br><b>'+upStr+'</b></div>'+
+            '<div><span style="color:var(--muted)">Outcome</span><br><b style="color:'+accent+'">'+(kept?'List kept':'List cleared')+'</b></div>'+
+          '</div>'+
+          '<div style="font-size:.78rem;color:var(--muted);line-height:1.5">'+(r.note||'')+'</div>';
+        hdr.onclick=function(){ var o=body.style.display==='block'; body.style.display=o?'none':'block'; hdr.querySelector('.rpt-chev').textContent=o?'›':'˅'; };
+        card.appendChild(hdr); card.appendChild(body); content.appendChild(card);
+        return;
+      }
       var dur = r.duration ? (r.duration>=3600?Math.floor(r.duration/3600)+'h '+Math.floor((r.duration%3600)/60)+'m':r.duration>=60?Math.floor(r.duration/60)+'m '+r.duration%60+'s':r.duration+'s') : '—';
       var hrStr = r.lastHashrate ? (r.lastHashrate>=1000?(r.lastHashrate/1000).toFixed(2)+' TH/s':r.lastHashrate.toFixed(2)+' GH/s') : '—';
       var effStr = r.lastEfficiency ? r.lastEfficiency+' W/TH' : '—';

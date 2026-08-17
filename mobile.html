@@ -508,7 +508,8 @@ function _buildFleetCard(){
   // Power+Efficiency and 10m+1h share a square each — they're natural pairs and
   // it drops the card from 5 rows to 4 without shrinking anything.
   var rows=[
-    {k:'fstatus', lbl:'Status', val:f.online+'/'+f.count+' online', cls:_fleetStatusClass(f)},
+    {k:'fstatus', lbl:'Status', val:f.online+'/'+f.count+' online', cls:_fleetStatusClass(f),
+      r:{id:'fblocktime', lbl:'Block', val:_mobBlockTxt()}},
     {k:'fshares', special:'shares'},
     {k:'fatbest', lbl:'All-Time Best', val:fmtD(f.atBest)},
     {k:'fsessbest', lbl:'Session Best', val:fmtD(f.sessBest)},
@@ -569,8 +570,11 @@ function _fleetLuckInline(f){
     var v=f&&f.luck?f.luck[w.key]:null;
     var txt=(v==null)?'\u2014':(fmtLuck(v));
     var col=_fleetLuckColor(v);
-    return '<span style="color:var(--muted)">'+w.lbl+'</span> '+
-           '<span id="fv-fluck-'+w.key+'" style="color:'+col+';font-weight:600">'+txt+'</span>';
+    // No space between the window label and its value -- the flex gap already
+    // separates one pair from the next, so an inner space read as four loose
+    // words rather than four labelled numbers.
+    return '<span style="white-space:nowrap"><span style="color:var(--muted)">'+w.lbl+'</span>'+
+           '<span id="fv-fluck-'+w.key+'" style="color:'+col+';font-weight:600">'+txt+'</span></span>';
   }).join('');
 }
 // Mobile used to build all six charts for every miner -- 18 canvases on a
@@ -841,6 +845,28 @@ function _fleetStatusClass(f){
   return 'green';
 }
 
+// ── Network block timer (fleet card) ─────────────────────────────────────────
+var _mobBlockTip=0;
+function _mobBlockTxt(){
+  if(!(_mobBlockTip>0)) return '—';
+  var sec=(Date.now()/1000)-_mobBlockTip;
+  var m=Math.floor(sec/60), s=Math.floor(sec%60);
+  if(m>=60){ var h=Math.floor(m/60); return h+'h '+(m%60)+'m'; }
+  return m+'m '+(s<10?'0':'')+s+'s';
+}
+function _mobTickBlock(){
+  var el=document.getElementById('fv-fblocktime');
+  if(el) el.textContent=_mobBlockTxt();
+}
+function _mobFetchBlock(){
+  fetch(SERVER+'/blocktime',{signal:AbortSignal.timeout(5000)})
+    .then(function(r){return r.json();})
+    .then(function(d){ if(d && d.time>0) _mobBlockTip=d.time; })
+    .catch(function(){});
+}
+_mobFetchBlock();
+setInterval(_mobFetchBlock, 30000);
+setInterval(_mobTickBlock, 1000);
 function renderMiners(){
   var c=document.getElementById('tab-miners');
   if(!minerIPs.length){c.innerHTML='<div id="mob-notif-wrap"></div><div class="loading">No miners configured</div>';return;}
@@ -1077,7 +1103,12 @@ function renderMiners(){
         var v=lk[w[1]];
         var txt=(v!=null)?fmtLuck(v):'—';
         var col=(v==null)?'var(--muted)':(v>=100?'var(--grn)':(v>=90?'var(--txt)':(v>=75?'#f0b429':'var(--red)')));
-        return '<span style="color:var(--muted)">'+w[0]+'</span> <span id="mluck-'+w[1]+'-'+key+'" style="color:'+col+';font-weight:600">'+txt+'</span>';
+        // Wrap each pair. The row is justify-content:space-between, which spread
+        // every child evenly -- so the label and its value were pushed apart as
+        // if they were separate items. One span per pair makes the spacing land
+        // between windows instead of inside them.
+        return '<span style="white-space:nowrap"><span style="color:var(--muted)">'+w[0]+'</span>'+
+               '<span id="mluck-'+w[1]+'-'+key+'" style="color:'+col+';font-weight:600">'+txt+'</span></span>';
       });
       var lr=document.createElement('div');
       lr.style.cssText='display:flex;justify-content:space-between;gap:6px;padding:8px 16px;font-size:.72rem;border-bottom:1px solid var(--bdr)';
@@ -2503,6 +2534,9 @@ async function poolRestart(ip){
 }
 // ── SETTINGS TAB ──────────────────────────────────────────────────────────────
 function renderSettings(){
+  // The auto-refresh calls this; without the guard it repaints the settings page
+  // over the diagnostics view seconds after you open it.
+  if(_mobDiagView) return;
   var c=document.getElementById('tab-settings');
   if(!minerIPs.length){c.innerHTML='<div id="mob-notif-wrap"></div><div class="loading">No miners configured</div>';return;}
   c.innerHTML='<div id="mob-notif-wrap"></div>';
@@ -2554,6 +2588,14 @@ function renderSettings(){
     mobLoadReports().then(function(){ renderMobReports(); }).catch(function(){ renderMobReports(); });
   };
   c.appendChild(rpBtn);
+
+  // Diagnostics, same shape as the Reports button above it.
+  var dgBtn=document.createElement('button');
+  dgBtn.style.cssText=rpBtn.style.cssText;
+  dgBtn.innerHTML='\u{1F50D} <span style="flex:1;margin-left:8px">Diagnostics</span>'+
+                  '<span style="color:var(--muted);font-size:.75rem">\u203a</span>';
+  dgBtn.onclick=function(){ renderMobDiag(); };
+  c.appendChild(dgBtn);
 
   // Last Hour Report button
   var hrpBtn=document.createElement('button');
@@ -3123,6 +3165,22 @@ function updateOddsCard(){
     return '1 in '+oneIn.toLocaleString()+' <span style="color:var(--muted);font-size:.72rem">('+pctStr+')</span>';
   }
 
+  // Chance of beating the fleet's all-time best this month. A share's difficulty
+  // is Pareto with alpha=1: P(one share exceeds x) = target/x. Over N shares in
+  // a month the chance of at least one beating B is 1-(1-target/B)^N, which for
+  // large N is the same as 1-exp(-N*target/B). N*target is just total work, so
+  // this reduces to work_per_month / current_record -- no share history needed,
+  // and it stays correct as vardiff moves the target around.
+  var _atBest=0, _recordOdds=null;
+  try{
+    var _ff=_fleetStats();
+    _atBest=(_ff&&_ff.atBest)?_ff.atBest:0;
+    if(_atBest>0 && totalTHs>0){
+      var workPerMonth=(totalTHs*1e12*30.44*86400)/4294967296;   // difficulty units
+      _recordOdds=1-Math.exp(-workPerMonth/_atBest);
+    }
+  }catch(e){}
+
   var coinNames={btc:'Bitcoin',bch:'Bitcoin Cash',dgb:'DigiByte',xec:'eCash',fb:'Fractal BTC'};
   var coinLabel=coinNames[SELECTED_COIN]||'Bitcoin';
 
@@ -3142,6 +3200,13 @@ function updateOddsCard(){
       '<div style="display:flex;gap:6px">'+btnHtml+'</div>'+
     '</div>'+
     '<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;padding:0 16px 14px 16px;font-size:.82rem;align-items:baseline">'+
+      (_recordOdds!=null
+        ? '<span style="color:var(--muted)">Record '+fmtD(_atBest)+'</span>'+
+          '<span style="color:var(--orange);font-family:monospace">'+
+            (_recordOdds>=0.01 ? (_recordOdds*100).toFixed(1)+'% this month'
+                               : oddsStr(_recordOdds)+' /mo')+
+          '</span>'
+        : '')+
       '<span style="color:var(--muted)">Per hour</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(bph)+'</span>'+
       '<span style="color:var(--muted)">Per day</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(bpd)+'</span>'+
       '<span style="color:var(--muted)">Per month</span><span style="color:var(--grn);font-family:monospace">'+oddsStr(bpm)+'</span>'+
@@ -3277,6 +3342,189 @@ function renderMobHourReport(){
   if(!minerIPs.length){ body.innerHTML='<div style="color:var(--muted);text-align:center;padding:40px">No miners.</div>'; }
 }
 
+var _mobDiagView=false;
+// Collapse state in memory, so the 2s auto-refresh re-render does not reopen
+// everything you just collapsed. Miners and setting groups default open.
+var _mdOpen=(function(){ try{ return JSON.parse(localStorage.getItem('mob_diag_open')||'{}'); }catch(e){ return {}; } })();
+function _mdSaveOpen(){ try{ localStorage.setItem('mob_diag_open', JSON.stringify(_mdOpen)); }catch(e){} }
+function _mdId(k){ return k.replace(/[^A-Za-z0-9]/g,'_'); }
+function _mdToggle(k){
+  var openByDefault = (k.charAt(0)==='m' || k.charAt(0)==='g');
+  var isOpen = openByDefault ? (_mdOpen[k]!==false) : (_mdOpen[k]===true);
+  // Capture the new state in a LOCAL before the delete below, which removes the
+  // key when it returns to default -- reading _mdOpen[k] back as undefined drove
+  // the flip the wrong way and stuck a default-open group after one cycle.
+  var nowOpen = !isOpen;
+  _mdOpen[k] = nowOpen;
+  if(nowOpen === openByDefault) delete _mdOpen[k];
+  _mdSaveOpen();
+  var b=document.getElementById('mdb-'+_mdId(k));
+  var a=document.getElementById('mda-'+_mdId(k));
+  if(b) b.style.display = nowOpen ? '' : 'none';
+  if(a) a.textContent = nowOpen ? '\u25be' : '\u25b8';
+}
+
+function _mdR(label, value, note){
+  return '<div style="display:flex;gap:8px;padding:1px 0">'+
+         '<span style="color:var(--muted);flex:0 0 46%">'+label+'</span>'+
+         '<span style="color:var(--txt);flex:1">'+value+
+         (note?(' <span style="color:var(--muted);font-size:.66rem">'+note+'</span>'):'')+
+         '</span></div>';
+}
+function _mdH(t){
+  return '<div style="color:var(--muted);font-size:.62rem;letter-spacing:.06em;'+
+         'text-transform:uppercase;margin:10px 0 4px">'+t+'</div>';
+}
+// Diagnostics page. Takes over the settings tab the way the reports view does.
+// Everything shown is pushed from Windows (which owns the segment data) plus a
+// direct /nxdiag fetch for the stratum counters.
+function renderMobDiag(){
+  _mobDiagView=true;
+  var tab=document.getElementById('tab-settings');
+  if(!tab) return;
+  tab.innerHTML='';
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--bdr);'+
+                    'gap:10px;position:sticky;top:0;background:var(--bg);z-index:5';
+  var back=document.createElement('button');
+  back.style.cssText='background:transparent;border:1px solid var(--bdr);color:var(--txt);'+
+                     'padding:6px 14px;border-radius:8px;font-family:inherit;font-size:.8rem';
+  back.textContent='\u2039 Back';
+  back.onclick=function(){ _mobDiagView=false; renderSettings(); };
+  var title=document.createElement('div');
+  title.style.cssText='font-size:.95rem;font-weight:700;color:var(--txt)';
+  title.textContent='\u{1F50D} Diagnostics';
+  hdr.appendChild(back); hdr.appendChild(title);
+  tab.appendChild(hdr);
+
+  var content=document.createElement('div');
+  content.style.cssText='padding:4px 0 24px 0';
+  content.innerHTML='<div style="padding:16px;color:var(--muted)">Loading\u2026</div>';
+  tab.appendChild(content);
+
+  fetch(SERVER+'/nxdiag',{signal:AbortSignal.timeout(5000)})
+    .then(function(r){ return r.json(); })
+    .catch(function(){ return []; })
+    .then(function(arr){
+      arr = Array.isArray(arr) ? arr : [];
+      var html='';
+      // Bodies always rendered, hidden with display:none, so a tap is a style
+      // flip rather than a rebuild.
+      function msec(k, title, right, inner, indent, defOpen){
+        var open = defOpen ? (_mdOpen[k]!==false) : (_mdOpen[k]===true);
+        var id=_mdId(k);
+        return '<div style="border:1px solid var(--bdr);border-radius:6px;margin:0 0 8px '+(indent||0)+'px;overflow:hidden">'+
+          '<div onclick="_mdToggle(\''+k+'\')" style="display:flex;align-items:center;gap:6px;padding:7px 9px;background:var(--surf2)">'+
+            '<span id="mda-'+id+'" style="color:var(--muted);width:11px">'+(open?'\u25be':'\u25b8')+'</span>'+
+            title+
+            '<span style="margin-left:auto;font-size:.7rem;color:var(--muted)">'+(right||'')+'</span></div>'+
+          '<div id="mdb-'+id+'" style="padding:7px 9px'+(open?'':';display:none')+'">'+inner+'</div></div>';
+      }
+      minerIPs.forEach(function(ip){
+        var sd=sessionData[ip]||{};
+        var d=sd.diag||null;
+        var x=arr.filter(function(z){ return z.ip===ip; })[0]||{};
+        var ops=(d&&d.ops)||[];
+        var mk='m:'+ip, mOpen=_mdOpen[mk]!==false, mid=_mdId(mk);
+        html+='<div class="card" style="margin:12px;overflow:hidden">';
+        html+='<div onclick="_mdToggle(\''+mk+'\')" style="display:flex;align-items:center;gap:8px;'+
+              'padding:11px 14px;font-weight:700;color:'+getMinerColor(ip)+';border-bottom:1px solid var(--bdr)">'+
+              '<span id="mda-'+mid+'" style="color:var(--muted);font-weight:400;width:12px">'+(mOpen?'\u25be':'\u25b8')+'</span>'+
+              (getMinerName(ip)||ip)+
+              '<span style="color:var(--muted);font-weight:400;font-size:.72rem"> '+ip+'</span>'+
+              '<span style="margin-left:auto;color:var(--muted);font-weight:400;font-size:.7rem">'+
+                ops.length+(ops.length===1?' setting':' settings')+'</span></div>';
+        html+='<div id="mdb-'+mid+'" style="padding:8px 12px 12px;font-size:.74rem;line-height:1.5'+(mOpen?'':';display:none')+'">';
+
+        if(ops.length){
+          ops.forEach(function(r){
+            var gk='g:'+ip+':'+r.freq+':'+r.volt;
+            var real=(r.err!=null && r.err>2*r.sigma);
+            var inner='';
+            inner+=_mdR('Reported HR', r.repTH.toFixed(2)+' TH/s', 'target '+r.tgt);
+            inner+=_mdR('Implied rate', (r.impliedRate!=null?r.impliedRate.toFixed(2)+' s/share':'\u2014'));
+            inner+=_mdR('Our submit rate', r.rate.toFixed(2)+' s/share');
+            if(r.capture!=null) inner+=_mdR('We capture', r.capture.toFixed(1)+'%');
+            inner+=_mdR('Effective HR', r.effTH.toFixed(2)+' TH/s');
+            inner+=_mdR('Implied error', '<span style="color:'+(real?'var(--orange)':'var(--muted)')+'">'+
+              (r.err==null?'\u2014':(r.err.toFixed(1)+'% \u00b1'+r.sigma.toFixed(1)+
+                (r.raw<-1?(' (+'+Math.abs(r.raw).toFixed(1)+'% over)'):(real?'':' (under noise)'))))+'</span>');
+            if(r.reported){
+              inner+=_mdR('Miner reports', r.reported.mean.toFixed(2)+'%',
+                          'over '+r.reported.n+', '+r.reported.min.toFixed(2)+'\u2013'+r.reported.max.toFixed(2)+'%');
+              inner+=_mdR('Agreement', (r.reported.gap<=1.5
+                ? '\u2713 within '+r.reported.gap.toFixed(2)+' pts'
+                : '\u26a0 differs by '+r.reported.gap.toFixed(1)+' pts'));
+            } else {
+              inner+=_mdR('Miner reports', 'nothing \u2014 derived only');
+            }
+
+            var rb='';
+            rb+=_mdR('Ran for', r.hours.toFixed(2)+' h', (r.visits>1?('latest of '+r.visits):''));
+            rb+=_mdR('We plotted', Math.round(r.shares).toLocaleString()+' shares');
+            if(r.devDelta!=null){
+              rb+=_mdR('Miner counted', r.devDelta.toLocaleString()+' shares');
+              rb+=_mdR('Captured', (r.acc!=null?r.acc.toFixed(1)+'%':'\u2014'),
+                       (r.acc!=null&&r.acc>=98?'match':''));
+              if(r.devRate!=null) rb+=_mdR('Device rate', r.devRate.toFixed(2)+' s/share');
+              rb+=_mdR('Our parsed rate', r.rate.toFixed(2)+' s/share');
+            } else {
+              rb+='<div style="color:var(--muted)">Device counter not sampled for this run.</div>';
+            }
+            inner+=msec('rg:'+ip+':'+r.freq+':'+r.volt,
+                        '<span style="font-weight:600;color:var(--txt)">Share reconciliation</span>',
+                        (r.acc!=null?r.acc.toFixed(1)+'%':''), rb, 12, false);
+
+            var title='<span style="font-weight:600;color:var(--txt)">'+(r.open?'\u25cf ':'')+r.freq+'/'+r.volt+'</span>'+
+                      '<span style="color:var(--muted);font-size:.68rem">'+r.hours.toFixed(1)+'h \u00b7 '+
+                        Math.round(r.shares).toLocaleString()+'sh'+(r.visits>1?(' \u00b7 '+r.visits+'\u00d7'):'')+'</span>';
+            var right='<span style="color:'+(real?'var(--orange)':'var(--muted)')+'">'+
+                      (r.err==null?'':(r.err.toFixed(1)+'%'))+'</span>';
+            html+=msec(gk, title, right, inner, 0, true);
+          });
+        } else {
+          html+='<div style="color:var(--muted)">Nothing banked yet.'+
+                ((d&&d.blocked&&d.blocked.length)?('<br>'+d.blocked.map(function(b){ return '\u2022 '+b; }).join('<br>')):
+                  ' No segment open \u2014 is freq/voltage being reported?')+'</div>';
+        }
+
+        var rc=(d&&d.recon)||null;
+        if(rc){
+          var rb2='';
+          rb2+=_mdR('Clean run', rc.hours.toFixed(1)+' h', 'since '+rc.why);
+          rb2+=_mdR('Total at start', (rc.baseline!=null?rc.baseline.toLocaleString():'?'));
+          rb2+=_mdR('We plotted since', rc.plotted.toLocaleString());
+          rb2+=_mdR('Should show', rc.should.toLocaleString());
+          rb2+=_mdR('Actually shows', (rc.actual!=null?rc.actual.toLocaleString():'?'));
+          rb2+=_mdR('Difference', (rc.diff>0?'+':'')+rc.diff, rc.acc!=null?(rc.acc.toFixed(1)+'% captured'):'');
+          rb2+=_mdR('Verdict', rc.acc==null?'no data yet':(rc.acc>=98?'MATCH':'missing '+(100-rc.acc).toFixed(1)+'%'));
+          if(rc.deviceRate!=null) rb2+=_mdR('Device rate', rc.deviceRate.toFixed(2)+' s/share');
+          if(rc.parsedRate!=null) rb2+=_mdR('Our parsed rate', rc.parsedRate.toFixed(2)+' s/share');
+          html+=msec('r:'+ip, '<span style="font-weight:600;color:var(--txt)">Reconciliation \u2014 all settings</span>',
+                     (rc.acc!=null?rc.acc.toFixed(1)+'%':''), rb2, 0, false);
+        }
+
+        if(x.submits>0 || x.diffKnown){
+          var pct=(x.submits>0)?(100*x.dropped/x.submits):0;
+          var sb='';
+          sb+='<div style="color:var(--muted);margin-bottom:5px;font-size:.66rem">'+
+              'Relay-wide \u2014 not split by setting.</div>';
+          sb+=_mdR('set_difficulty', x.diffKnown?('yes \u00d7'+x.setDiffCount):'no \u2014 guessed');
+          sb+=_mdR('Pool difficulty', x.poolDiff);
+          sb+=_mdR('Submits / plotted', x.submits+' / '+x.plotted);
+          sb+=_mdR('Dropped', x.dropped+' ('+pct.toFixed(1)+'%)');
+          sb+=_mdR('extranonce1', x.en1?'true':'false');
+          sb+=_mdR('Last targets', (x.lastTargets||[]).length?x.lastTargets.slice(0,6).join(', '):'none');
+          sb+=_mdR('Last share diffs', (x.lastDiffs||[]).length?x.lastDiffs.slice(0,6).join(', '):'none');
+          sb+=_mdR('Min-estimates', (x.estimates||[]).length?x.estimates.join(', '):'none');
+          html+=msec('s:'+ip, '<span style="font-weight:600;color:var(--txt)">Stratum reconstruction</span>',
+                     x.dropped+' dropped', sb, 0, false);
+        }
+        html+='</div></div>';
+      });
+      content.innerHTML=html||'<div style="padding:16px;color:var(--muted)">No miners.</div>';
+    });
+}
 function renderMobReports(){
   _mobReportsView=true;
   var tab=document.getElementById('tab-settings');
@@ -3337,6 +3585,35 @@ function renderMobReports(){
 
       var date=new Date(r.ts);
       var dateStr=date.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+
+      // session-best events get a compact card, same as Windows
+      if(r.reason==='session-cleared' || r.reason==='glitch-kept'){
+        var kept=(r.reason==='glitch-kept');
+        var accent=kept?'var(--grn)':'var(--red)';
+        var upStr=(r.uptimeAtEvent!=null)?(r.uptimeAtEvent>=3600?Math.floor(r.uptimeAtEvent/3600)+'h '+Math.floor((r.uptimeAtEvent%3600)/60)+'m':r.uptimeAtEvent>=60?Math.floor(r.uptimeAtEvent/60)+'m':r.uptimeAtEvent+'s'):'—';
+        var h=document.createElement('div');
+        h.style.cssText='display:flex;align-items:center;padding:12px 14px;cursor:pointer;gap:8px';
+        h.innerHTML='<span style="font-weight:600;color:var(--txt);font-size:.85rem">'+(kept?'Best Kept':'Session Cleared')+'</span>'+
+          '<span style="font-size:.68rem;background:rgba(255,255,255,0.06);color:'+accent+';border-radius:4px;padding:1px 6px">'+(kept?'glitch':'cleared')+'</span>'+
+          '<span style="font-size:.72rem;color:var(--muted);margin-left:auto">'+dateStr+'</span>'+
+          '<span class="rpt-chev" style="color:var(--muted);font-size:.8rem;margin-left:6px">›</span>';
+        var b=document.createElement('div');
+        b.style.cssText='display:none;padding:0 14px 14px;border-top:1px solid var(--bdr);font-size:.8rem';
+        b.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0">'+
+          '<div><span style="color:var(--muted)">Best before</span><br><b style="color:var(--orange)">'+fmtD(r.sessionBestBefore)+'</b></div>'+
+          '<div><span style="color:var(--muted)">Best after</span><br><b>'+fmtD(r.sessionBestAfter)+'</b></div>'+
+          '<div><span style="color:var(--muted)">Uptime</span><br><b>'+upStr+'</b></div>'+
+          '<div><span style="color:var(--muted)">Outcome</span><br><b style="color:'+accent+'">'+(kept?'List kept':'List cleared')+'</b></div>'+
+          '</div><div style="font-size:.75rem;color:var(--muted);line-height:1.5">'+(r.note||'')+'</div>';
+        h.onclick=function(){ var o=b.style.display==='block'; b.style.display=o?'none':'block'; h.querySelector('.rpt-chev').textContent=o?'›':'˅'; };
+        var dz=document.createElement('button');
+        dz.style.cssText='background:transparent;border:none;color:var(--red);font-size:.8rem;padding:0 4px;cursor:pointer;opacity:.7';
+        dz.textContent='✕';
+        dz.onclick=(function(rip,rts){ return function(e){ e.stopPropagation(); mobDeleteReport(rip,rts); }; })(r.ip,r.ts);
+        h.appendChild(dz);
+        card.appendChild(h); card.appendChild(b); minerBody.appendChild(card);
+        return;
+      }
       var dur=r.duration?(r.duration>=3600?Math.floor(r.duration/3600)+'h '+Math.floor((r.duration%3600)/60)+'m':r.duration>=60?Math.floor(r.duration/60)+'m '+r.duration%60+'s':r.duration+'s'):'—';
       var hrStr=r.lastHashrate?(r.lastHashrate>=1000?(r.lastHashrate/1000).toFixed(2)+' TH/s':r.lastHashrate.toFixed(2)+' GH/s'):'—';
       var effStr=r.lastEfficiency?r.lastEfficiency+' W/TH':'—';
@@ -3802,7 +4079,13 @@ setInterval(function(){
     });
     if(changed){
       try{ localStorage.setItem('mob_scripts',JSON.stringify(_mobSc)); }catch(e){}
-      if(activeTab==='settings'&&_mobScView==='list') renderMobScripts();
+      if(activeTab==='settings'&&_mobDiagView){
+        // Keep the scroll position across the auto-refresh rebuild.
+        var _sy=window.scrollY;
+        renderMobDiag();
+        setTimeout(function(){ window.scrollTo(0,_sy); },0);
+      }
+      else if(activeTab==='settings'&&_mobScView==='list') renderMobScripts();
     }
   }).catch(function(){});
 },5000);
@@ -4763,7 +5046,15 @@ function _fleetStats(){
         f.lk[w.key].act+=a; f.lk[w.key].exp+=e;
       });
     }
-    // Fleet pace: sum each miner's work; the fleet best is the max of the maxes.
+    // Fleet pace (option 1: per-miner honest, matches Windows). Each miner brought
+    // its own expected median + its own best; summing like-for-like keeps the
+    // comparison coherent when miners restart at different times.
+    if(sd.pace && sd.pace.med>0){
+      f.paceExpSum=(f.paceExpSum||0)+sd.pace.med;
+      f.paceBestSum=(f.paceBestSum||0)+(sd.pace.best||0);
+      f.paceP10Sum=(f.paceP10Sum||0)+(sd.pace.p10||sd.pace.med);
+      f.paceP90Sum=(f.paceP90Sum||0)+(sd.pace.p90||sd.pace.med);
+    }
     if(sd.pace && sd.pace.w>0) f.paceW+=sd.pace.w;
     if(sd.avgShareSec!=null){ f.avgSecSum+=sd.avgShareSec; f.avgSecN++; }
     if(sd.hrAvg10m!=null){ f.hr10m+=sd.hrAvg10m; f.hr10mAny=true; }
@@ -4779,7 +5070,10 @@ function _fleetStats(){
     var e=f.lk[w.key];
     f.luck[w.key] = (e && e.exp>0) ? (e.act/e.exp*100) : null;
   });
-  f.pace   = _paceForW(f.paceW, f.sessBest);
+  f.pace = (f.paceExpSum>0)
+    ? { w:f.paceW, best:(f.paceBestSum||0), med:f.paceExpSum,
+        p10:(f.paceP10Sum||f.paceExpSum), p90:(f.paceP90Sum||f.paceExpSum) }
+    : null;
   return f;
 }
 
