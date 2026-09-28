@@ -3151,10 +3151,15 @@ function updateOddsCard(){
   }
 
   var share=totalTHs/netHash;
-  var bph=share*(3600/blockTime);
-  var bpd=share*blocksPerDay;
-  var bpm=share*blocksPerDay*30;
-  var bpy=share*blocksPerDay*365;
+  function probabilityForExpectedBlocks(expectedBlocks){
+    if(!(expectedBlocks>0)) return 0;
+    return -Math.expm1(-expectedBlocks);
+  }
+
+  var bph=probabilityForExpectedBlocks(share*(3600/blockTime));
+  var bpd=probabilityForExpectedBlocks(share*blocksPerDay);
+  var bpm=probabilityForExpectedBlocks(share*blocksPerDay*30);
+  var bpy=probabilityForExpectedBlocks(share*blocksPerDay*365);
 
   function oddsStr(bpp){
     if(bpp<=0) return '—';
